@@ -54,4 +54,20 @@ class CommissionReportWizard(models.TransientModel):
             rec.commission_total = rec.amount_total * (commission_percent / 100.0)
 
     def action_print_pdf(self):
-        return self.env.ref('crm_commission.action_commission_report_pdf').report_action(self)
+        self.ensure_one()
+        self._compute_commission_total()
+        return {
+            'type': 'ir.actions.report',
+            'report_name': 'crm_commission.commission_report_pdf',
+            'report_type': 'qweb-pdf',
+            'data': {
+                'user_name': self.user_id.name,
+                'month': self.month,
+                'month_name': dict(self.fields_get(allfields=['month'])['month']['selection'])[self.month],
+                'year': self.year,
+                'commission_total': self.commission_total,
+                'amount_total': self.amount_total,
+                'commission_percent': self.commission_percent,
+            },
+        }
+        

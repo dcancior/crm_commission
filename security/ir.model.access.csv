@@ -1,2 +1,2 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_commission_report_wizard,access.commission.report.wizard,model_commission_report_wizard,crm_commission.group_commission_view,1,0,0,0
+access_commission_report_wizard,access.commission.report.wizard,model_commission_report_wizard,crm_commission.group_commission_view,1,1,1,0

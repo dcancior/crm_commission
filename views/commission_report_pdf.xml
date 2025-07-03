@@ -1,27 +1,27 @@
 <odoo>
-    <template id="commission_report_pdf">
-        <t t-call="web.html_container">
-            <t t-call="web.external_layout">
-                <div class="page">
-                    <h2>Reporte de Comisión Mensual</h2>
-                    <p><strong>Vendedor:</strong> <t t-esc="o.user_id.name"/></p>
-                    <p><strong>Mes:</strong> <t t-esc="dict(o.fields_get(allfields=['month'])['month']['selection'])[o.month]"/></p>
-                    <p><strong>Año:</strong> <t t-esc="o.year"/></p>
-                    <p><strong>Porcentaje Comisión:</strong> <t t-esc="o.commission_percent"/>%</p>
-                    <p><strong>Total Ventas:</strong> <t t-esc="o.amount_total"/></p>
-                    <p><strong>Total Comisión:</strong> <t t-esc="o.commission_total"/></p>
-                </div>
-            </t>
-        </t>
-    </template>
+  <template id="commission_report_pdf">
+    <t t-call="web.html_container">
+      <t t-call="web.external_layout">
+        <div class="page">
+          <h2>Reporte de Comisión Mensual</h2>
+          <p><strong>Vendedor:</strong> <t t-esc="user_name"/></p>
+          <p><strong>Mes:</strong> <t t-esc="month_name"/></p>
+          <p><strong>Año:</strong> <t t-esc="year"/></p>
+          <p><strong>Porcentaje Comisión:</strong> <t t-esc="commission_percent"/>%</p>
+          <p><strong>Total Ventas:</strong> <t t-esc="amount_total"/></p>
+          <p><strong>Total Comisión:</strong> <t t-esc="commission_total"/></p>
+        </div>
+      </t>
+    </t>
+  </template>
 
-    <report
-        id="action_commission_report_pdf"
-        model="commission.report.wizard"
-        string="Reporte de Comisión"
-        report_type="qweb-pdf"
-        name="crm_commission.commission_report_pdf"
-        file="crm_commission.commission_report_pdf"
-        print_report_name="'Reporte_Comision_%s_%s' % (object.month, object.year)"
-    />
+  <report
+    id="action_commission_report_pdf"
+    model="commission.report.wizard"
+    string="Reporte de Comisión"
+    report_type="qweb-pdf"
+    name="crm_commission.commission_report_pdf"
+    file="crm_commission.commission_report_pdf"
+    print_report_name="'Reporte_Comision_%s_%s' % (month, year)"
+  />
 </odoo>
