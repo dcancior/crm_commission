@@ -4,7 +4,7 @@
         <field name="name">Ver Comisiones</field>
         <field name="category_id" ref="base.module_category_sales"/>
     </record>
-
+    
     <record id="view_commission_report_wizard_form" model="ir.ui.view">
         <field name="name">commission.report.wizard.form</field>
         <field name="model">commission.report.wizard</field>
@@ -21,6 +21,7 @@
                     <field name="commission_total" readonly="1"/>
                 </group>
                 <footer>
+                    <button string="Descargar PDF" type="object" name="action_print_pdf" class="btn-primary"/>
                     <button string="Cerrar" class="btn-secondary" special="cancel"/>
                 </footer>
             </form>
@@ -34,10 +35,10 @@
                 target="new"/>
 
     <menuitem id="menu_commission_report_root" name="Comisiones" sequence="100"
-          groups="crm_commission.group_commission_view"/>
+              groups="crm_commission.group_commission_view"/>
     <menuitem id="menu_commission_report_wizard" name="Reporte de Comisión"
-          parent="menu_commission_report_root"
-          action="action_commission_report_wizard"
-          sequence="10"
-          groups="crm_commission.group_commission_view"/>
+              parent="menu_commission_report_root"
+              action="action_commission_report_wizard"
+              sequence="10"
+              groups="crm_commission.group_commission_view"/>
 </odoo>
