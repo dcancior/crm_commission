@@ -4,10 +4,8 @@
         <field name="model">crm.team</field>
         <field name="inherit_id" ref="sales_team.crm_team_view_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//field[@name='alias_contact']" position="after">
-                <group string="Comisión del equipo">
-                    <field name="commission_percent"/>
-                </group>
+            <xpath expr="//group[@name='left']//field[@name='user_id']" position="after">
+                <field name="commission_percent"/>
             </xpath>
         </field>
     </record>
