@@ -10,6 +10,7 @@
         'views/commission_report_pdf.xml',
         'views/sale_order_views.xml',
         'views/account_move_views.xml',
+        'views/account_payment_inherit.xml',
     ],
     'installable': True,
 }
