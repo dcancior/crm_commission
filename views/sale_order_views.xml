@@ -1,11 +1,19 @@
 <odoo>
+    <!-- Grupo sigue siendo válido definirlo aquí -->
+    <record id="group_commission_sale_fields" model="res.groups">
+        <field name="name">Comisión en Pedidos (Campos)</field>
+        <field name="category_id" ref="base.module_category_sales"/>
+    </record>
+
     <record id="view_order_form_inherit_commission" model="ir.ui.view">
         <field name="name">sale.order.form.inherit.commission</field>
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.view_order_form"/>
+        <!-- ❗️Eliminar cualquier field groups_id aquí -->
         <field name="arch" type="xml">
             <xpath expr="//sheet" position="inside">
-                <group>
+                <!-- Control de acceso SOLO con atributo groups en el nodo insertado -->
+                <group groups="crm_commission.group_commission_sale_fields">
                     <field name="seller_name" readonly="1"/>
                     <field name="commission_percent" readonly="1"/>
                     <field name="commission_amount" readonly="1"/>

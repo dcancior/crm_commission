@@ -1,13 +1,16 @@
 <odoo>
-    <!-- Grupo de seguridad -->
-    <record id="group_commission_view" model="res.groups">
-        <field name="name">Ver Comisiones</field>
+    <!-- Grupos separados -->
+    <record id="group_commission_report" model="res.groups">
+        <field name="name">Reporte de Comisión (Wizard)</field>
         <field name="category_id" ref="base.module_category_sales"/>
     </record>
-    
+
+    <!-- Vista del wizard restringida a su grupo -->
     <record id="view_commission_report_wizard_form" model="ir.ui.view">
         <field name="name">commission.report.wizard.form</field>
         <field name="model">commission.report.wizard</field>
+        <!-- ¡Clave!: limitar la vista al grupo del wizard -->
+        <field name="groups_id" eval="[(4, ref('crm_commission.group_commission_report'))]"/>
         <field name="arch" type="xml">
             <form string="Reporte de Comisión Mensual">
                 <group>
@@ -28,17 +31,20 @@
         </field>
     </record>
 
+    <!-- Acción del wizard (opcional poner grupos aquí también) -->
     <act_window id="action_commission_report_wizard"
                 name="Reporte de Comisión"
                 res_model="commission.report.wizard"
                 view_mode="form"
-                target="new"/>
+                target="new"
+                groups="crm_commission.group_commission_report"/>
 
+    <!-- Menú SOLO para el grupo del wizard -->
     <menuitem id="menu_commission_report_root" name="Comisiones" sequence="100"
-              groups="crm_commission.group_commission_view"/>
+              groups="crm_commission.group_commission_report"/>
     <menuitem id="menu_commission_report_wizard" name="Reporte de Comisión"
               parent="menu_commission_report_root"
               action="action_commission_report_wizard"
               sequence="10"
-              groups="crm_commission.group_commission_view"/>
+              groups="crm_commission.group_commission_report"/>
 </odoo>
