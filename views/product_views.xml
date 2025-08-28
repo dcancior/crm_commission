@@ -1,0 +1,15 @@
+<odoo>
+    <record id="view_product_form_mechanic_fields" model="ir.ui.view">
+        <field name="name">product.template.form.mechanic.fields</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_form_view"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='type']" position="after">
+                <group string="Parámetros de servicio (mecánico)" attrs="{'invisible': [('type','!=','service')]}">
+                    <field name="service_hours_required"/>
+                    <field name="service_cost_per_hour"/>
+                </group>
+            </xpath>
+        </field>
+    </record>
+</odoo>

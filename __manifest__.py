@@ -4,13 +4,19 @@
     'summary': 'Permite asignar comisión a los vendedores del CRM',
     'depends': ['crm','sale'],
     'data': [
+        'security/mechanic_commission_groups.xml',
+        'security/ir.model.access.csv',
+        'reports/mechanic_commission_report.xml',
+        'wizards/mechanic_commission_wizard_view.xml',
         'views/crm_team_views.xml',
         'views/commission_report_wizard_view.xml',
-        'security/ir.model.access.csv',
         'views/commission_report_pdf.xml',
         'views/sale_order_views.xml',
         'views/account_move_views.xml',
         'views/account_payment_inherit.xml',
+        'views/product_views.xml',
+        'views/sale_views.xml',
+        
     ],
     'installable': True,
 }

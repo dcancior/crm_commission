@@ -1,0 +1,13 @@
+<odoo>
+    <!-- Grupo de seguridad para el report de mecanicos-->
+    <record id="group_mechanic_commission_view" model="res.groups">
+        <field name="name">Ver Comisiones de Mecánicos</field>
+        <field name="category_id" ref="base.module_category_sales"/>
+    </record>
+
+     <!-- Grupo de seguridad para el report de ventas-->
+    <record id="group_commission_view" model="res.groups">
+        <field name="name">Ver Comisiones</field>
+        <field name="category_id" ref="base.module_category_sales"/>
+    </record>
+</odoo>

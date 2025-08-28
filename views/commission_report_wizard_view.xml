@@ -1,9 +1,5 @@
 <odoo>
-    <!-- Grupo de seguridad -->
-    <record id="group_commission_view" model="res.groups">
-        <field name="name">Ver Comisiones</field>
-        <field name="category_id" ref="base.module_category_sales"/>
-    </record>
+   
     
     <record id="view_commission_report_wizard_form" model="ir.ui.view">
         <field name="name">commission.report.wizard.form</field>

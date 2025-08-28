@@ -1,0 +1,65 @@
+<odoo>
+  <!-- ACCIÓN -->
+  <record id="action_mechanic_commission_report" model="ir.actions.report">
+    <field name="name">Reporte de comisiones de mecánico</field>
+    <field name="model">mechanic.commission.wizard</field>
+    <field name="report_type">qweb-pdf</field>
+    <!-- APUNTA A LA PLANTILLA -->
+    <field name="report_name">crm_commission.mechanic_commission_report_template</field>
+    <field name="report_file">crm_commission.mechanic_commission_report_template</field>
+    <field name="print_report_name">
+      'Comision_Mecanico_' + (employee_name or '') + '_' + (month or '') + '_' + (year or '')
+    </field>
+    <field name="groups_id" eval="[(4, ref('crm_commission.group_mechanic_commission_view'))]"/>
+  </record>
+
+  <!-- PLANTILLA -->
+  <template id="mechanic_commission_report_template">
+    <t t-call="web.html_container">
+      <t t-call="web.external_layout">
+        <div class="page">
+          <h2>Comisiones de Mecánico</h2>
+
+          <p>
+            <b>Mecánico:</b> <t t-esc="employee_name"/><br/>
+            <b>Periodo:</b> <t t-esc="month_name"/> <t t-esc="year"/>
+          </p>
+
+          <table class="table table-sm o_main_table">
+            <thead>
+              <tr>
+                <th>Factura</th>
+                <th>Fecha</th>
+                <th>Servicio</th>
+                <th class="text-right">Cantidad</th>
+                <th class="text-right">Horas</th>
+                <th class="text-right">Subtotal Cliente</th>
+                <th class="text-right">Pago Mecánico</th>
+              </tr>
+            </thead>
+            <tbody>
+              <t t-foreach="lines or []" t-as="l">
+                <tr>
+                  <td><t t-esc="l.get('invoice_name')"/></td>
+                  <td><t t-esc="l.get('invoice_date')"/></td>
+                  <td><t t-esc="l.get('product_name')"/></td>
+                  <td class="text-right"><t t-esc="l.get('quantity')"/></td>
+                  <td class="text-right"><t t-esc="l.get('hours')"/></td>
+                  <td class="text-right"><t t-esc="l.get('subtotal_customer')"/></td>
+                  <td class="text-right"><t t-esc="l.get('payout')"/></td>
+                </tr>
+              </t>
+            </tbody>
+          </table>
+
+          <div class="mt16">
+            <p><b>Servicios:</b> <t t-esc="services_count"/></p>
+            <p><b>Horas totales:</b> <t t-esc="total_hours"/></p>
+            <p><b>Importe facturado (cliente):</b> <t t-esc="amount_invoiced"/></p>
+            <p><b>Total a pagar al mecánico:</b> <t t-esc="payout_total"/></p>
+          </div>
+        </div>
+      </t>
+    </t>
+  </template>
+</odoo>
