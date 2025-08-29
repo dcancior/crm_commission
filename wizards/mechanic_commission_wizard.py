@@ -177,6 +177,7 @@ class MechanicCommissionWizard(models.TransientModel):
             return f"{cur.symbol} {val}" if (getattr(cur, "position", "after") == "before") else f"{val} {cur.symbol}"
 
         lines = [{
+            "is_paid": bool(l.is_paid),
             "invoice_name": l.invoice_name or "",
             "invoice_date": l.invoice_date or "",
             "product_name": l.product_name or "",
@@ -187,7 +188,6 @@ class MechanicCommissionWizard(models.TransientModel):
             "payout": _money(l.payout),
         } for l in self.line_ids]
 
-        # Si no tienes o.month_name como campo, puedes calcularlo así:
         month_name = dict(self.fields_get(allfields=["month"])["month"]["selection"]).get(self.month, "") or ""
 
         data = {
@@ -200,16 +200,12 @@ class MechanicCommissionWizard(models.TransientModel):
             "amount_invoiced": _money(self.amount_invoiced),
             "payout_total": _money(self.payout_total),
             "lines": lines,
+            # opcional: si tu template usa format_amount
+            # "currency_id": self.currency_id,
         }
 
-        return {
-        "type": "ir.actions.report",
-        "report_type": "qweb-pdf",
-        # Usa el XMLID de la ACCIÓN, no del template
-        "report_name": "crm_commission.action_mechanic_commission_report",
-        "data": data,
-        "context": {"active_model": "mechanic.commission.wizard", "active_ids": self.ids},
-    }
+        # >>> Forma canónica: usa la ACCIÓN para que se respete el nombre del archivo
+        return self.env.ref('crm_commission.action_mechanic_commission_report').report_action(self, data=data)
 
     
     @api.depends("month")
@@ -305,6 +301,16 @@ class MechanicCommissionWizard(models.TransientModel):
         entries = self.line_ids.mapped('commission_entry_id')
         today = fields.Date.context_today(self)
         entries.write({'is_paid': True, 'paid_date': today, 'paid_by': self.env.user.id})
+
+
+    def _get_report_base_filename(self):
+        """Nombre del archivo: Reporte de comisiones (Mecánico) AAAA-MM-DD HH-MM"""
+        self.ensure_one()
+        mech = (self.employee_id.name or "Sin mecanico").strip()
+        mech_safe = re.sub(r'[\\/*?:"<>|]', '-', mech)  # limpia caracteres ilegales
+        dt_local = fields.Datetime.context_timestamp(self, fields.Datetime.now())
+        stamp = dt_local.strftime('%Y-%m-%d %H-%M')  # sin dos puntos
+        return f"Reporte de comisiones ({mech_safe}) {stamp}"
 
 class MechanicCommissionWizardLine(models.TransientModel):
     _name = 'mechanic.commission.wizard.line'

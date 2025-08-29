@@ -8,13 +8,7 @@
       <field name="report_type">qweb-pdf</field>
       <field name="report_name">crm_commission.mechanic_commission_report_template</field>
       <field name="report_file">crm_commission.mechanic_commission_report_template</field>
-      <field name="print_report_name"><![CDATA[
-        'Comision_Mecanico_%s_%s_%s' % (
-          (object.employee_id.name if hasattr(object, 'employee_id') and object.employee_id else (getattr(object, 'employee_name', '') or '')),
-          (getattr(object, 'month_name', '') or str(getattr(object, 'month', '') or '')),
-          str(getattr(object, 'year', '') or '')
-        )
-      ]]></field>
+      <field name="print_report_name" eval="False"/>
       <!-- Si quieres restringir por grupo, descomenta:
       <field name="groups_id" eval="[(4, ref('crm_commission.group_mechanic_commission_view'))]"/>
       -->
@@ -64,7 +58,7 @@
                       <t t-if="l.get('is_paid')">
                         <span>Pagada</span>
                       </t>
-                      <t t-if="not l.get('is_paid')">
+                      <t t-else="">
                         <span>No pagada</span>
                       </t>
                     </td>
@@ -78,6 +72,7 @@
                     <td class="text-right"><t t-esc="'%.2f' % qty_val"/></td>
 
                     <!-- Costo/Hora -->
+                    
                     <t t-set="cph_raw" t-value="l.get('cost_per_hour') or 0.0"/>
                     <t t-set="cph_val" t-value="float(cph_raw) if not isinstance(cph_raw, str) else float((cph_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
                     <td class="text-right"><t t-esc="'%.2f' % cph_val"/></td>
@@ -157,6 +152,5 @@
         </t>
       </t>
     </template>
-
   </data>
 </odoo>
