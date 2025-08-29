@@ -16,3 +16,4 @@ class ProductTemplate(models.Model):
         digits=(16, 2),
         default=0.0,
     )
+

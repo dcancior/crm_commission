@@ -6,6 +6,7 @@
     'data': [
         'security/mechanic_commission_groups.xml',
         'security/ir.model.access.csv',
+        
         'reports/mechanic_commission_report.xml',
         'wizards/mechanic_commission_wizard_view.xml',
         'views/crm_team_views.xml',

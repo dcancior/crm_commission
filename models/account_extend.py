@@ -7,7 +7,7 @@ class AccountMoveLine(models.Model):
     mechanic_id = fields.Many2one(
         "hr.employee",
         string="Mecánico",
-        help="Empleado que realizó el servicio.",
+        help="Mecánico que realizó el servicio.",
         index=True,
         copy=False,
     )

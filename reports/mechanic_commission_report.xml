@@ -41,11 +41,12 @@
               <t t-foreach="lines or []" t-as="l">
                 <tr>
                   <td><t t-esc="l.get('invoice_name')"/></td>
-                  <td><t t-esc="l.get('invoice_date')"/></td>
+                  <!--<td><t t-esc="l.get('invoice_date')"/></td>-->
                   <td><t t-esc="l.get('product_name')"/></td>
                   <td class="text-right"><t t-esc="l.get('quantity')"/></td>
+                  <td class="text-right"><t t-esc="l.get('cost_per_hour')"/></td>
                   <td class="text-right"><t t-esc="l.get('hours')"/></td>
-                  <td class="text-right"><t t-esc="l.get('subtotal_customer')"/></td>
+                  <!--<td class="text-right"><t t-esc="l.get('subtotal_customer')"/></td>-->
                   <td class="text-right"><t t-esc="l.get('payout')"/></td>
                 </tr>
               </t>

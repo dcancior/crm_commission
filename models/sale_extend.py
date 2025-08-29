@@ -16,6 +16,7 @@ class SaleOrderLine(models.Model):
         readonly=True,
         store=False,
     )
+    
     # << NUEVO: bandera para mostrar/ocultar en vista, evita product_id.type en attrs
     display_mechanic_fields = fields.Boolean(
         string="Mostrar campos de mecánico",

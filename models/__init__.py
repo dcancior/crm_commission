@@ -5,5 +5,6 @@ from . import account_move_commission
 from . import account_extend
 from . import product_extend
 from . import sale_extend
+from . import mechanic_commission_entry
 
 

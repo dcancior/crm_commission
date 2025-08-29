@@ -70,6 +70,8 @@ class MechanicCommissionWizard(models.TransientModel):
         store=False,
     )
 
+
+    #@api.depends('line_ids.subtotal_customer', 'line_ids.payout', 'line_ids.hours', 'employee_id', 'month', 'month', 'year' )
     @api.depends("employee_id", "month", "year")
     def _compute_totals(self):
         for wiz in self:
@@ -88,9 +90,8 @@ class MechanicCommissionWizard(models.TransientModel):
             date_start = f"{year}-{str(month).zfill(2)}-01"
             date_end = f"{year}-{str(month).zfill(2)}-{last_day}"
 
-            # Facturas cliente 'posted' y pagadas completamente en el rango
             moves = self.env["account.move"].search([
-                ("move_type", "=", "out_invoice"),
+                ("move_type", "=", "out_invoice"),     # si quieres incluir devoluciones, usa ['out_invoice','out_refund']
                 ("state", "=", "posted"),
                 ("payment_state", "=", "paid"),
                 ("invoice_date", ">=", date_start),
@@ -98,26 +99,61 @@ class MechanicCommissionWizard(models.TransientModel):
             ])
 
             lines = moves.mapped("invoice_line_ids").filtered(
-                lambda l: l.mechanic_id.id == wiz.employee_id.id and l.product_id.type == "service"
+                lambda l: getattr(l, "mechanic_id", False)
+                    and l.mechanic_id.id == wiz.employee_id.id
+                    and l.product_id.type == "service"
             )
 
             detail_vals = []
+            Entry = self.env['mechanic.commission.entry']
+
             for l in lines:
                 qty = l.quantity or 0.0
-                hrs = (l.product_id.product_tmpl_id.service_hours_required or 0.0) * qty
-                payout = (
-                    (l.product_id.product_tmpl_id.service_cost_per_hour or 0.0)
-                    * (l.product_id.product_tmpl_id.service_hours_required or 0.0)
-                    * qty
-                )
+                # >>> Definir horas requeridas del servicio y costo/hora desde el template
+                hrs_req = (getattr(l.product_id.product_tmpl_id, 'service_hours_required', 0.0) or 0.0)
+                cph     = (getattr(l.product_id.product_tmpl_id, 'service_cost_per_hour', 0.0) or 0.0)
+
+                hrs = hrs_req * qty
+                payout = cph * hrs  # equivalente a cph * hrs_req * qty
+
+                vals_entry = {
+                    'company_id': self.env.company.id,
+                    'employee_id': wiz.employee_id.id,
+                    'invoice_id': l.move_id.id,
+                    'invoice_line_id': l.id,
+                    'invoice_name': l.move_id.name or l.move_id.ref or "",
+                    'invoice_date': l.move_id.invoice_date,
+                    'product_id': l.product_id.id,
+                    'product_name': l.product_id.display_name,
+                    'quantity': qty,
+                    'hours': hrs,
+                    'subtotal_customer': l.price_subtotal,
+                    'payout': payout,
+                    'cost_per_hour': cph,  # << persistimos CPH
+                    'currency_id': (l.currency_id.id or self.env.company.currency_id.id),
+                    'month': wiz.month,
+                    'year': wiz.year,
+                }
+                entry = Entry.search([
+                    ('employee_id', '=', wiz.employee_id.id),
+                    ('invoice_line_id', '=', l.id),
+                ], limit=1)
+                if entry:
+                    entry.write(vals_entry)
+                else:
+                    entry = Entry.create(vals_entry)
+
                 detail_vals.append((0, 0, {
-                    "invoice_name": l.move_id.name or l.move_id.ref or "",
-                    "invoice_date": l.move_id.invoice_date,
-                    "product_name": l.product_id.display_name,
-                    "quantity": qty,
-                    "hours": hrs,
-                    "payout": payout,
-                    "subtotal_customer": l.price_subtotal,
+                    "commission_entry_id": entry.id,
+                    "invoice_name": entry.invoice_name,
+                    "invoice_date": entry.invoice_date,
+                    "product_name": entry.product_name,
+                    "quantity": entry.quantity,
+                    "hours": entry.hours,
+                    "cost_per_hour": entry.cost_per_hour,
+                    "payout": entry.payout,
+                    "subtotal_customer": entry.subtotal_customer,
+                    "is_paid": entry.is_paid,
                 }))
 
             wiz.line_ids = detail_vals
@@ -145,6 +181,7 @@ class MechanicCommissionWizard(models.TransientModel):
             "invoice_date": l.invoice_date or "",
             "product_name": l.product_name or "",
             "quantity": _num(l.quantity, 2),
+            "cost_per_hour": _money(l.cost_per_hour),
             "hours": _num(l.hours, 2),
             "subtotal_customer": _money(l.subtotal_customer),
             "payout": _money(l.payout),
@@ -181,19 +218,141 @@ class MechanicCommissionWizard(models.TransientModel):
         for w in self:
             w.month_name = sel.get(w.month or "", "")
 
-class MechanicCommissionWizardLine(models.TransientModel):
-    _name = "mechanic.commission.wizard.line"
-    _description = "Detalle para comisiones de mecánico"
+    @api.onchange('employee_id', 'month', 'year')
+    def _onchange_build_lines(self):
+        if not (self.employee_id and self.month and self.year):
+            self.line_ids = [(5, 0, 0)]
+            return
 
-    wizard_id = fields.Many2one("mechanic.commission.wizard", ondelete="cascade")
-    invoice_name = fields.Char("Factura")
-    invoice_date = fields.Date("Fecha factura")
-    product_name = fields.Char("Servicio")
-    quantity = fields.Float("Cantidad", digits=(16, 2))
-    hours = fields.Float("Horas", digits=(16, 2))
-    payout = fields.Monetary("Pago mecánico", currency_field="currency_id")
-    subtotal_customer = fields.Monetary("Subtotal cliente", currency_field="currency_id")
-    currency_id = fields.Many2one(
-        "res.currency",
-        default=lambda self: self.env.company.currency_id.id,
+        year = int(self.year)
+        month = int(self.month)
+        last_day = calendar.monthrange(year, month)[1]
+        date_start = f"{year}-{str(month).zfill(2)}-01"
+        date_end = f"{year}-{str(month).zfill(2)}-{last_day}"
+
+        domain_lines = [
+            ('move_id.move_type', 'in', ['out_invoice', 'out_refund']),
+            ('move_id.state', '=', 'posted'),
+            ('product_id.type', '=', 'service'),
+            ('move_id.invoice_date', '>=', date_start),
+            ('move_id.invoice_date', '<=', date_end),
+        ]
+        aml = self.env['account.move.line'].search(domain_lines)
+
+        Entry = self.env['mechanic.commission.entry']
+        entries_to_keep = self.env['mechanic.commission.entry']
+
+        for line in aml:
+            mechanic = self.employee_id
+            if not mechanic:
+                continue
+
+            # >>> DEFINIR cph y horas requeridas (evita NameError)
+            cph = (getattr(line.product_id.product_tmpl_id, 'service_cost_per_hour', 0.0) or 0.0)
+            hrs_req = (getattr(line.product_id.product_tmpl_id, 'service_hours_required', 0.0) or 0.0)
+
+            qty = line.quantity or 0.0
+            hrs = hrs_req * qty
+            payout = cph * hrs_req * qty
+
+            vals_base = {
+                'company_id': self.env.company.id,
+                'employee_id': mechanic.id,
+                'invoice_id': line.move_id.id,
+                'invoice_line_id': line.id,
+                'invoice_name': f'{line.move_id.name or line.move_id.payment_reference or ""} - {line.move_id.partner_id.display_name}',
+                'invoice_date': line.move_id.invoice_date,
+                'product_id': line.product_id.id,
+                'product_name': line.product_id.display_name,
+                'quantity': qty,
+                'hours': hrs,
+                'subtotal_customer': line.price_subtotal,
+                'payout': payout,
+                'cost_per_hour': cph,  # <<< ahora sí está definido
+                'currency_id': line.currency_id.id or self.env.company.currency_id.id,
+                'month': str(month).zfill(2),
+                'year': str(year),
+            }
+
+            entry = Entry.search([('employee_id', '=', mechanic.id),
+                                ('invoice_line_id', '=', line.id)], limit=1)
+            if entry:
+                entry.write(vals_base)
+            else:
+                entry = Entry.create(vals_base)
+
+            entries_to_keep |= entry
+
+        # Construir las líneas del wizard usando el valor PERSISTIDO
+        self.line_ids = [(5, 0, 0)] + [
+            (0, 0, {
+                'commission_entry_id': e.id,
+                'invoice_name': e.invoice_name,
+                'invoice_date': e.invoice_date,
+                'product_name': e.product_name,
+                'quantity': e.quantity,
+                'hours': e.hours,
+                'subtotal_customer': e.subtotal_customer,
+                'payout': e.payout,
+                'cost_per_hour': e.cost_per_hour,  # <<< usar el campo persistente
+                'is_paid': e.is_paid,
+            })
+            for e in entries_to_keep.sorted(lambda r: (r.invoice_date or fields.Date.today(), r.id))
+        ]
+    
+    def action_mark_all_paid(self):
+        self.ensure_one()
+        entries = self.line_ids.mapped('commission_entry_id')
+        today = fields.Date.context_today(self)
+        entries.write({'is_paid': True, 'paid_date': today, 'paid_by': self.env.user.id})
+
+class MechanicCommissionWizardLine(models.TransientModel):
+    _name = 'mechanic.commission.wizard.line'
+    _description = 'Línea wizard comisión mecánicos'
+
+    wizard_id = fields.Many2one('mechanic.commission.wizard', required=True, ondelete='cascade')
+    commission_entry_id = fields.Many2one('mechanic.commission.entry', required=True, ondelete='cascade')
+
+    # Campos “vistos” en el tree (copiados para visualización)
+    invoice_name = fields.Char(string='Factura', readonly=True)
+    invoice_date = fields.Date(string='Fecha Factura', readonly=True)
+    product_name = fields.Char(readonly=True)
+    quantity = fields.Float(string='Cantidad', readonly=True)
+    hours = fields.Float(string='Horas', readonly=True)
+    subtotal_customer = fields.Monetary(readonly=True, currency_field='currency_id')
+    payout = fields.Monetary(readonly=True, string='Comisión', currency_field='currency_id')
+    currency_id = fields.Many2one(related='wizard_id.currency_id', store=False, readonly=True)
+    cost_per_hour = fields.Monetary(
+        string='Costo por hora',
+        readonly=True,
+        currency_field='currency_id',
+        related='commission_entry_id.cost_per_hour'
     )
+
+    # Checkbox editable que escribe en la entrada persistente:
+    is_paid = fields.Boolean(string='Pagado', related='commission_entry_id.is_paid', readonly=False)
+
+    # Opcional: acceso a fecha/usuario de pago como related (solo lectura)
+    paid_date = fields.Date(related='commission_entry_id.paid_date', readonly=True)
+    paid_by = fields.Many2one('res.users', related='commission_entry_id.paid_by', readonly=True)
+
+    def write(self, vals):
+        """Si el usuario tilda/destilda 'is_paid', setea metadata de pago."""
+        res = super().write(vals)
+        if 'is_paid' in vals:
+            for line in self:
+                entry = line.commission_entry_id
+                if entry:
+                    if vals['is_paid']:
+                        entry.write({
+                            'is_paid': True,
+                            'paid_date': fields.Date.context_today(self),
+                            'paid_by': self.env.user.id,
+                        })
+                    else:
+                        entry.write({
+                            'is_paid': False,
+                            'paid_date': False,
+                            'paid_by': False,
+                        })
+        return res

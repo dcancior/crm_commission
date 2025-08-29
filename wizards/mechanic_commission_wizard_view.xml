@@ -9,40 +9,63 @@
                     <field name="month"/>
                     <field name="year"/>
                 </group>
-                <group>
-                    <field name="services_count" readonly="1"/>
-                    <field name="total_hours" readonly="1"/>
-                    <field name="amount_invoiced" readonly="1"/>
-                    <field name="payout_total" readonly="1"/>
+                <group col="2">
+                    <!-- Columna izquierda: KPIs -->
+                    <group>
+                        <field name="services_count" readonly="1"/>
+                        <field name="total_hours" readonly="1"/>
+                        <field name="amount_invoiced" readonly="1"/>
+                        <field name="payout_total" readonly="1"/>
+                    </group>
                 </group>
+
+
                 <notebook>
                     <page string="Detalle de líneas facturadas (pagadas)">
                         <field name="line_ids" nolabel="1">
                             <tree editable="bottom">
+                                <field name="is_paid"/>
                                 <field name="invoice_name" readonly="1"/>
-                                <field name="invoice_date" readonly="1"/>
+                                <!--<field name="invoice_date" readonly="1"/>-->
                                 <field name="product_name" readonly="1"/>
                                 <field name="quantity" readonly="1"/>
+                                <field name="cost_per_hour" readonly="1"/>
                                 <field name="hours" readonly="1"/>
-                                <field name="subtotal_customer" readonly="1"/>
+                                <!--<field name="subtotal_customer" readonly="1"/> -->
                                 <field name="payout" readonly="1"/>
+                                <field name="paid_date" readonly="1"/>
+                                <field name="paid_by" readonly="1"/>
                             </tree>
                         </field>
                     </page>
                 </notebook>
+
                 <footer>
-                    <button string="Descargar PDF" type="object" name="action_print_pdf" class="btn-primary"/>
-                    <button string="Cerrar" class="btn-secondary" special="cancel"/>
+                    <div class="d-flex w-100 align-items-center">
+                        <!-- Izquierda: acciones secundarias -->
+                        <div>
+                            <button string="Descargar PDF" type="object" name="action_print_pdf" class="btn btn-secondary btn-sm"/>
+                            <button string="Cerrar" class="btn btn-light btn-sm" special="cancel"/>
+                        </div>
+
+                        <!-- Derecha: marcar pagadas -->
+                        <div class="ml-auto">
+                            <button name="action_mark_all_paid"
+                                    type="object"
+                                    string="Marcar todas como pagadas"
+                                    class="btn btn-outline-primary btn-sm"/>
+                        </div>
+                    </div>
                 </footer>
             </form>
         </field>
     </record>
 
     <act_window id="action_mechanic_commission_wizard"
-            name="Reporte de Comisiones (Mecánicos)"
-            res_model="mechanic.commission.wizard"
-            view_mode="form"
-            target="new"/>
+                name="Reporte de Comisiones (Mecánicos)"
+                res_model="mechanic.commission.wizard"
+                view_mode="form"
+                target="new"/>
 
     <menuitem id="menu_mechanic_commission_root"
               name="Comisiones Mecánicos"
