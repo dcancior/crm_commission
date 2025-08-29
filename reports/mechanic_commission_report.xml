@@ -1,66 +1,162 @@
 <odoo>
-  <!-- ACCIÓN -->
-  <record id="action_mechanic_commission_report" model="ir.actions.report">
-    <field name="name">Reporte de comisiones de mecánico</field>
-    <field name="model">mechanic.commission.wizard</field>
-    <field name="report_type">qweb-pdf</field>
-    <!-- APUNTA A LA PLANTILLA -->
-    <field name="report_name">crm_commission.mechanic_commission_report_template</field>
-    <field name="report_file">crm_commission.mechanic_commission_report_template</field>
-    <field name="print_report_name">
-      'Comision_Mecanico_' + (employee_name or '') + '_' + (month or '') + '_' + (year or '')
-    </field>
-    <field name="groups_id" eval="[(4, ref('crm_commission.group_mechanic_commission_view'))]"/>
-  </record>
+  <data>
 
-  <!-- PLANTILLA -->
-  <template id="mechanic_commission_report_template">
-    <t t-call="web.html_container">
-      <t t-call="web.external_layout">
-        <div class="page">
-          <h2>Comisiones de Mecánico</h2>
+    <!-- ACCIÓN DEL REPORTE -->
+    <record id="action_mechanic_commission_report" model="ir.actions.report">
+      <field name="name">Reporte de comisiones de mecánico</field>
+      <field name="model">mechanic.commission.wizard</field>
+      <field name="report_type">qweb-pdf</field>
+      <field name="report_name">crm_commission.mechanic_commission_report_template</field>
+      <field name="report_file">crm_commission.mechanic_commission_report_template</field>
+      <field name="print_report_name"><![CDATA[
+        'Comision_Mecanico_%s_%s_%s' % (
+          (object.employee_id.name if hasattr(object, 'employee_id') and object.employee_id else (getattr(object, 'employee_name', '') or '')),
+          (getattr(object, 'month_name', '') or str(getattr(object, 'month', '') or '')),
+          str(getattr(object, 'year', '') or '')
+        )
+      ]]></field>
+      <!-- Si quieres restringir por grupo, descomenta:
+      <field name="groups_id" eval="[(4, ref('crm_commission.group_mechanic_commission_view'))]"/>
+      -->
+    </record>
 
-          <p>
-            <b>Mecánico:</b> <t t-esc="employee_name"/><br/>
-            <b>Periodo:</b> <t t-esc="month_name"/> <t t-esc="year"/>
-          </p>
+    <!-- TEMPLATE QWEB -->
+    <template id="mechanic_commission_report_template" name="Mechanic Commission Report">
+      <t t-call="web.html_container">
+        <t t-call="web.external_layout">
+          <div class="page">
 
-          <table class="table table-sm o_main_table">
-            <thead>
-              <tr>
-                <th>Factura</th>
-                <th>Fecha</th>
-                <th>Servicio</th>
-                <th class="text-right">Cantidad</th>
-                <th class="text-right">Horas</th>
-                <th class="text-right">Subtotal Cliente</th>
-                <th class="text-right">Pago Mecánico</th>
-              </tr>
-            </thead>
-            <tbody>
-              <t t-foreach="lines or []" t-as="l">
+            <!-- Encabezado -->
+            <h2 class="text-center">Comisiones de Mecánico</h2>
+            <div class="row mt16 mb8">
+              <div class="col-6">
+                <p>
+                  <b>Mecánico:</b>
+                  <t t-esc="employee_name or (object.employee_id.name if object and hasattr(object,'employee_id') and object.employee_id else '')"/>
+                </p>
+              </div>
+              <div class="col-6 text-right">
+                <p>
+                  <b>Periodo:</b>
+                  <t t-esc="month_name or str(month or '')"/> <t t-esc="year or ''"/>
+                </p>
+              </div>
+            </div>
+
+            <!-- Tabla de líneas -->
+            <table class="table table-sm table-striped o_main_table">
+              <thead>
                 <tr>
-                  <td><t t-esc="l.get('invoice_name')"/></td>
-                  <!--<td><t t-esc="l.get('invoice_date')"/></td>-->
-                  <td><t t-esc="l.get('product_name')"/></td>
-                  <td class="text-right"><t t-esc="l.get('quantity')"/></td>
-                  <td class="text-right"><t t-esc="l.get('cost_per_hour')"/></td>
-                  <td class="text-right"><t t-esc="l.get('hours')"/></td>
-                  <!--<td class="text-right"><t t-esc="l.get('subtotal_customer')"/></td>-->
-                  <td class="text-right"><t t-esc="l.get('payout')"/></td>
+                  <th class="text-center">Estado</th>
+                  <th>Factura</th>
+                  <th>Servicio</th>
+                  <th class="text-right">Cantidad</th>
+                  <th class="text-right">Costo/Hora</th>
+                  <th class="text-right">Horas</th>
+                  <th class="text-right">Pago Mecánico</th>
                 </tr>
-              </t>
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                <t t-foreach="lines or []" t-as="l">
+                  <tr>
+                    <!-- Estado -->
+                    <td class="text-center">
+                      <t t-if="l.get('is_paid')">
+                        <span>Pagada</span>
+                      </t>
+                      <t t-if="not l.get('is_paid')">
+                        <span>No pagada</span>
+                      </t>
+                    </td>
 
-          <div class="mt16">
-            <p><b>Servicios:</b> <t t-esc="services_count"/></p>
-            <p><b>Horas totales:</b> <t t-esc="total_hours"/></p>
-            <p><b>Importe facturado (cliente):</b> <t t-esc="amount_invoiced"/></p>
-            <p><b>Total a pagar al mecánico:</b> <t t-esc="payout_total"/></p>
+                    <td><t t-esc="l.get('invoice_name') or ''"/></td>
+                    <td><t t-esc="l.get('product_name') or ''"/></td>
+
+                    <!-- Cantidad -->
+                    <t t-set="qty_raw" t-value="l.get('quantity') or 0.0"/>
+                    <t t-set="qty_val" t-value="float(qty_raw) if not isinstance(qty_raw, str) else float((qty_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
+                    <td class="text-right"><t t-esc="'%.2f' % qty_val"/></td>
+
+                    <!-- Costo/Hora -->
+                    <t t-set="cph_raw" t-value="l.get('cost_per_hour') or 0.0"/>
+                    <t t-set="cph_val" t-value="float(cph_raw) if not isinstance(cph_raw, str) else float((cph_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
+                    <td class="text-right"><t t-esc="'%.2f' % cph_val"/></td>
+
+                    <!-- Horas -->
+                    <t t-set="hrs_raw" t-value="l.get('hours') or 0.0"/>
+                    <t t-set="hrs_val" t-value="float(hrs_raw) if not isinstance(hrs_raw, str) else float((hrs_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
+                    <td class="text-right"><t t-esc="'%.2f' % hrs_val"/></td>
+
+                    <!-- Pago Mecánico -->
+                    <t t-set="payout_raw" t-value="l.get('payout') or 0.0"/>
+                    <t t-set="payout_val" t-value="float(payout_raw) if not isinstance(payout_raw, str) else float((payout_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
+                    <td class="text-right">
+                      <t t-if="currency_id">
+                        <t t-esc="format_amount(payout_val, currency_id)"/>
+                      </t>
+                      <t t-else="">
+                        <t t-esc="'%.2f' % payout_val"/>
+                      </t>
+                    </td>
+                  </tr>
+                </t>
+
+                <!-- Sin líneas -->
+                <t t-if="not (lines and len(lines))">
+                  <tr>
+                    <td colspan="7" class="text-center text-muted">Sin registros</td>
+                  </tr>
+                </t>
+              </tbody>
+            </table>
+
+            <!-- Totales (sanear por si llegan como texto con $) -->
+            <t t-set="ai_raw" t-value="amount_invoiced or 0.0"/>
+            <t t-set="ai_val" t-value="float(ai_raw) if not isinstance(ai_raw, str) else float((ai_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
+            <t t-set="pt_raw" t-value="payout_total or 0.0"/>
+            <t t-set="pt_val" t-value="float(pt_raw) if not isinstance(pt_raw, str) else float((pt_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
+
+            <div class="mt16">
+              <table class="table table-sm" style="width:60%; margin-left:auto;">
+                <tbody>
+                  <tr>
+                    <td><b>Servicios</b></td>
+                    <td class="text-right"><t t-esc="services_count or 0"/></td>
+                  </tr>
+                  <tr>
+                    <td><b>Horas totales</b></td>
+                    <td class="text-right"><t t-esc="'%.2f' % (float(total_hours or 0.0) if not isinstance(total_hours, str) else float((total_hours or '0').replace('$','').replace(',','').replace(' ','')))"/></td>
+                  </tr>
+                  <tr>
+                    <td><b>Importe facturado (cliente)</b></td>
+                    <td class="text-right">
+                      <t t-if="currency_id">
+                        <t t-esc="format_amount(ai_val, currency_id)"/>
+                      </t>
+                      <t t-else="">
+                        <t t-esc="'%.2f' % ai_val"/>
+                      </t>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><b>Total a pagar al mecánico</b></td>
+                    <td class="text-right">
+                      <t t-if="currency_id">
+                        <t t-esc="format_amount(pt_val, currency_id)"/>
+                      </t>
+                      <t t-else="">
+                        <t t-esc="'%.2f' % pt_val"/>
+                      </t>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
           </div>
-        </div>
+        </t>
       </t>
-    </t>
-  </template>
+    </template>
+
+  </data>
 </odoo>
