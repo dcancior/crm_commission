@@ -48,6 +48,7 @@
                   <th class="text-right">Costo/Hora</th>
                   <th class="text-right">Horas</th>
                   <th class="text-right">Pago Mecánico</th>
+                  <th class="text-center">Fecha pago</th>
                 </tr>
               </thead>
               <tbody>
@@ -85,6 +86,7 @@
                     <!-- Pago Mecánico -->
                     <t t-set="payout_raw" t-value="l.get('payout') or 0.0"/>
                     <t t-set="payout_val" t-value="float(payout_raw) if not isinstance(payout_raw, str) else float((payout_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
+                    
                     <td class="text-right">
                       <t t-if="currency_id">
                         <t t-esc="format_amount(payout_val, currency_id)"/>
@@ -93,6 +95,7 @@
                         <t t-esc="'%.2f' % payout_val"/>
                       </t>
                     </td>
+                    <td class="text-center"><t t-esc="l.get('paid_date') or ''"/></td>
                   </tr>
                 </t>
 

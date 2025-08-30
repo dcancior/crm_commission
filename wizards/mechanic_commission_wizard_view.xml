@@ -44,21 +44,10 @@
                 </notebook>
 
                 <footer>
-                    <div class="d-flex w-100 align-items-center">
-                        <!-- Izquierda: acciones secundarias -->
-                        <div>
-                            <button string="Descargar PDF" type="object" name="action_print_pdf" class="btn btn-secondary btn-sm"/>
-                            <button string="Cerrar" class="btn btn-light btn-sm" special="cancel"/>
-                        </div>
-
-                        <!-- Derecha: marcar pagadas -->
-                        <div class="ml-auto">
-                            <button name="action_mark_all_paid"
-                                    type="object"
-                                    string="Marcar todas como pagadas"
-                                    class="btn btn-outline-primary btn-sm"/>
-                        </div>
-                    </div>
+                    <button name="action_mark_all_paid" type="object" string="Marcar todas como pagadas" class="oe_highlight"/> 
+                    <button string="Cerrar" special="cancel"/>
+                    <button name="action_print_pdf" type="object" string="Descargar PDF"/>
+                    
                 </footer>
             </form>
         </field>

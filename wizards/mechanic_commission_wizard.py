@@ -228,6 +228,7 @@ class MechanicCommissionWizard(models.TransientModel):
             "hours": _num(l.hours, 2),
             "subtotal_customer": _money(l.subtotal_customer),
             "payout": _money(l.payout),
+            "paid_date": fields.Date.to_string(l.paid_date) if l.paid_date else "",
         } for l in self.line_ids]
 
         month_name = dict(self.fields_get(allfields=["month"])["month"]["selection"]).get(self.month, "") or ""
