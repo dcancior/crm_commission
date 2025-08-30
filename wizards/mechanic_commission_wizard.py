@@ -80,8 +80,8 @@ class MechanicCommissionWizard(models.TransientModel):
     report_paid_filter = fields.Selection(
         [
             ('all', 'Todas'),
-            ('paid', 'Solo pagadas'),
-            ('unpaid', 'Solo no pagadas'),
+            ('paid', 'Pagadas'),
+            ('unpaid', 'No pagadas'),
         ],
         string="Filtrar para PDF",
         default='all',

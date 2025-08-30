@@ -12,9 +12,10 @@
 
             <!-- Columna Mecánico antes del subtotal -->
             <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="before">
-                <field name="mechanic_id" optional="show"/>
+                <field name="mechanic_id"
+                    optional="show"
+                    domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
             </xpath>
-
             <!-- Costo mecánico después del subtotal (controlado por display_mechanic_fields) -->
             <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="after">
                 <field name="mechanic_cost_subtotal"
@@ -32,16 +33,16 @@
             <!-- Grupo visible con los campos del mecánico -->
             <xpath expr="//field[@name='order_line']/form//group[1]" position="after">
                 <group string="Mecánico">
-                    <field name="mechanic_id"/>
+                    <field name="mechanic_id"
+                        domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
                     <field name="mechanic_hours_required" readonly="1"
-                           attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+                        attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
                     <field name="mechanic_cost_per_hour" readonly="1"
-                           attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+                        attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
                     <field name="mechanic_cost_subtotal" readonly="1"
-                           attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+                        attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
                 </group>
             </xpath>
-
         </field>
     </record>
 </odoo>
