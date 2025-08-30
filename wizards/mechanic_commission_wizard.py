@@ -70,6 +70,48 @@ class MechanicCommissionWizard(models.TransientModel):
         store=False,
     )
 
+    
+
+    # Usuarios permitidos (miembros del equipo "Mecánicos")
+    allowed_user_ids = fields.Many2many('res.users', compute='_compute_allowed_user_ids', store=False)
+
+    allowed_employee_ids = fields.Many2many(
+        'hr.employee', compute='_compute_allowed_employee_ids', store=False
+    )
+
+    @api.depends()
+    def _compute_allowed_employee_ids(self):
+        Team = self.env['crm.team']
+        Employee = self.env['hr.employee']
+
+        # Busca el equipo por nombre (con y sin acento por si acaso)
+        team = Team.search([('name', '=', 'Mecánicos')], limit=1) \
+               or Team.search([('name', 'ilike', 'mecan')], limit=1)
+
+        # Arranca vacío
+        emps = Employee.browse([])
+
+        if team:
+            # OJO: En Odoo 16, team.member_ids son registros de crm.team.member.
+            # De ahí sacamos los usuarios (res.users) con mapped('user_id')
+            member_users = team.member_ids.mapped('user_id')
+            # Incluye al líder si aplica
+            if team.user_id:
+                member_users |= team.user_id
+
+            if member_users:
+                emps = Employee.search([('user_id', 'in', member_users.ids)])
+
+        for w in self:
+            w.allowed_employee_ids = emps
+
+    @api.depends()
+    def _compute_allowed_user_ids(self):
+        Team = self.env['crm.team']
+        team = Team.search([('name', '=', 'Mecánicos')], limit=1)
+        for w in self:
+            w.allowed_user_ids = team.member_ids if team else self.env['res.users']  # si no hay equipo, quedará vacío
+
 
     #@api.depends('line_ids.subtotal_customer', 'line_ids.payout', 'line_ids.hours', 'employee_id', 'month', 'month', 'year' )
     @api.depends("employee_id", "month", "year")

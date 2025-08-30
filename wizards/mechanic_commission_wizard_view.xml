@@ -5,7 +5,10 @@
         <field name="arch" type="xml">
             <form string="Reporte de comisiones de mecánicos (mensual)">
                 <group>
-                    <field name="employee_id" options="{'no_create_edit': True}"/>
+                    
+                    <field name="employee_id"
+                        options="{'no_create_edit': True}"
+                        domain="[('active','=',True), ('job_id.name','ilike','Mecán')]"/>
                     <field name="month"/>
                     <field name="year"/>
                 </group>
