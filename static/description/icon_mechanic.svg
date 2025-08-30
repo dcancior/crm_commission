@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Mecánico">
+  <!-- Fondo cuadrado con esquinas redondeadas -->
+  <rect x="4" y="4" width="56" height="56" rx="8" fill="#714BDE"></rect>
+  <!-- Llave inglesa: trazo blanco, esquinas redondeadas -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Mango -->
+    <path d="M22 42 L36 28"></path>
+    <!-- Cabeza de la llave (media luna simplificada) -->
+    <path d="M36 28
+             c4 -4 10 -4 14 0
+             c-2 2 -4 3 -6 3
+             c0 2 -1 4 -3 6"></path>
+    <!-- Detalle del ojal del mango -->
+    <circle cx="20" cy="44" r="3" fill="#FFFFFF" stroke="none"></circle>
+  </g>
+</svg>
