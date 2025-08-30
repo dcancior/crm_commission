@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- Botón en el encabezado del pedido de venta -->
+    <record id="view_order_form_add_assign_mechanic_btn" model="ir.ui.view">
+        <field name="name">sale.order.form.assign.mechanic.button</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_open_set_mechanic_wizard"
+                        type="object"
+                        string="Asignar mecánico"
+                        class="btn-secondary"
+                        attrs="{'invisible': [('state','not in',('draft','sent'))]}"/>
+            </xpath>
+        </field>
+    </record>
+    <!-- Formulario del wizard -->
+    <record id="view_sale_order_set_mechanic_wizard_form" model="ir.ui.view">
+        <field name="name">sale.order.set.mechanic.wizard.form</field>
+        <field name="model">sale.order.set.mechanic.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Asignar mecánico a líneas de servicio">
+                <group>
+                    <group>
+                        <field name="order_id" readonly="1"/>
+                        <field name="company_id" readonly="1" invisible="1"/>
+                        <field name="mechanic_id" domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
+                        <field name="only_empty"/>
+
+                        <field name="affected_count" readonly="1"/>
+                    </group>
+                    <group>
+                        <separator string="Notas"/>
+                        <p>
+                            Se actualizarán las líneas de <b>tipo servicio</b> del pedido.
+                            <br/>Active "Solo líneas sin mecánico" para no sobrescribir líneas ya asignadas.
+                        </p>
+                    </group>
+                </group>
+                <footer>
+                    <button string="Cancelar" class="btn-secondary" special="cancel"/>
+                    <button name="action_apply" type="object" string="Aplicar" class="oe_highlight"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+</odoo>
