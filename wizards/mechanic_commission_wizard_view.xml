@@ -4,55 +4,55 @@
         <field name="model">mechanic.commission.wizard</field>
         <field name="arch" type="xml">
             <form string="Reporte de comisiones de mecánicos (mensual)">
-                <group>
-                    
-                    <field name="employee_id"
-                        options="{'no_create_edit': True}"
-                        domain="[('active','=',True), ('job_id.name','ilike','Mecán')]"/>
-                    <field name="month"/>
-                    <field name="year"/>
-                    <!-- NUEVO -->
-                    <field name="report_paid_filter"/>
-                </group>
+                <sheet>
 
-                <group col="2">
-                    <!-- Columna izquierda: KPIs -->
-                    <group>
+                    <!-- Filtros -->
+                    <group col="4">
+                        <field name="employee_id"
+                               options="{'no_create_edit': True}"
+                               domain="[('active','=',True), ('job_id.name','ilike','Mecán')]"/>
+                        <field name="month"/>
+                        <field name="year"/>
+                        <field name="report_paid_filter"/>
+                    </group>
+
+                    <!-- KPIs -->
+                    <group col="4">
                         <field name="services_count" readonly="1"/>
                         <field name="total_hours" readonly="1"/>
                         <field name="amount_invoiced" readonly="1"/>
                         <field name="payout_total" readonly="1"/>
                     </group>
-                </group>
 
+                    <!-- Detalle -->
+                    <notebook>
+                        <page string="Detalle de líneas facturadas (pagadas)">
+                            <field name="line_ids" nolabel="1"
+                                   context="{'no_open': 1}"
+                                   options="{'no_create': True}">
+                                <tree editable="bottom" create="0" edit="0">
+                                    <!-- Pon primero las columnas esenciales para que en móvil no se corte lo importante -->
+                                    <field name="invoice_name" readonly="1"/>
+                                    <field name="product_name" readonly="1"/>
+                                    <field name="hours" readonly="1"/>
+                                    <field name="payout" readonly="1"/>
+                                    <!-- El resto al final -->
+                                    <field name="is_paid"/>
+                                    <field name="quantity" readonly="1"/>
+                                    <field name="cost_per_hour" readonly="1"/>
+                                    <field name="paid_date" readonly="1"/>
+                                    <field name="paid_by" readonly="1"/>
+                                </tree>
+                            </field>
+                        </page>
+                    </notebook>
 
-
-
-                <notebook>
-                    <page string="Detalle de líneas facturadas (pagadas)">
-                        <field name="line_ids" nolabel="1">
-                            <tree editable="bottom">
-                                <field name="is_paid"/>
-                                <field name="invoice_name" readonly="1"/>
-                                <!--<field name="invoice_date" readonly="1"/>-->
-                                <field name="product_name" readonly="1"/>
-                                <field name="quantity" readonly="1"/>
-                                <field name="cost_per_hour" readonly="1"/>
-                                <field name="hours" readonly="1"/>
-                                <!--<field name="subtotal_customer" readonly="1"/> -->
-                                <field name="payout" readonly="1"/>
-                                <field name="paid_date" readonly="1"/>
-                                <field name="paid_by" readonly="1"/>
-                            </tree>
-                        </field>
-                    </page>
-                </notebook>
+                </sheet>
 
                 <footer>
-                    <button name="action_mark_all_paid" type="object" string="Marcar todas como pagadas" class="oe_highlight"/> 
+                    <button name="action_mark_all_paid" type="object" string="Marcar todas como pagadas" class="oe_highlight"/>
                     <button string="Cerrar" special="cancel"/>
                     <button name="action_print_pdf" type="object" string="Descargar PDF"/>
-                    
                 </footer>
             </form>
         </field>

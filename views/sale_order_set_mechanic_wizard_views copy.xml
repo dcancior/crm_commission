@@ -31,11 +31,14 @@
                         <field name="affected_count" readonly="1"/>
                     </group>
                     <group>
+                        <div>
                         <separator string="Notas"/>
-                        <p>
-                            Se actualizarán las líneas de <b>tipo servicio</b> del pedido.
-                            <br/>Active "Solo líneas sin mecánico" para no sobrescribir líneas ya asignadas.
-                        </p>
+                        <div>
+                            <p>
+                                Se actualizarán las líneas de <b>tipo servicio</b> del pedido.
+                                <br/>Active "Solo líneas sin mecánico" para no sobrescribir líneas ya asignadas.
+                            </p>
+                        </div>
                     </group>
                 </group>
                 <footer>
