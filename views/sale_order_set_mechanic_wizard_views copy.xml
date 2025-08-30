@@ -1,28 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
-
-    <!-- Vista que ahora SOLO agrega el botón estilo link arriba del notebook -->
+    <!-- Botón en el encabezado del pedido de venta -->
     <record id="view_order_form_add_assign_mechanic_btn" model="ir.ui.view">
         <field name="name">sale.order.form.assign.mechanic.button</field>
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
-            <!-- Botón tipo link (misma acción), alineado a la derecha sobre el notebook -->
-            <xpath expr="//sheet//notebook" position="before">
-                <div class="d-flex justify-content-end mb-2">
-                    <button name="action_open_set_mechanic_wizard"
-                            type="object"
-                            class="btn btn-link btn-sm"
-                            icon="fa-wrench"
-                            string=" Asignar mecánico"
-                            title="Asignar mecánico a líneas de servicio"
-                            attrs="{'invisible': [('state','not in',('draft','sent'))]}"/>
-                </div>
+            <xpath expr="//header" position="inside">
+                <button name="action_open_set_mechanic_wizard"
+                        type="object"
+                        string="Asignar mecánico"
+                        class="btn-secondary"
+                        attrs="{'invisible': [('state','not in',('draft','sent'))]}"/>
             </xpath>
         </field>
     </record>
-
-    <!-- Formulario del wizard (sin cambios) -->
+    <!-- Formulario del wizard -->
     <record id="view_sale_order_set_mechanic_wizard_form" model="ir.ui.view">
         <field name="name">sale.order.set.mechanic.wizard.form</field>
         <field name="model">sale.order.set.mechanic.wizard</field>
@@ -34,6 +27,7 @@
                         <field name="company_id" readonly="1" invisible="1"/>
                         <field name="mechanic_id" domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
                         <field name="only_empty"/>
+
                         <field name="affected_count" readonly="1"/>
                     </group>
                     <group>
@@ -51,5 +45,4 @@
             </form>
         </field>
     </record>
-
 </odoo>
