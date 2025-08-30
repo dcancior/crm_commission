@@ -69,15 +69,24 @@ class MechanicCommissionWizard(models.TransientModel):
         compute="_compute_totals",
         store=False,
     )
-
     
-
     # Usuarios permitidos (miembros del equipo "Mecánicos")
     allowed_user_ids = fields.Many2many('res.users', compute='_compute_allowed_user_ids', store=False)
 
     allowed_employee_ids = fields.Many2many(
         'hr.employee', compute='_compute_allowed_employee_ids', store=False
     )
+
+    report_paid_filter = fields.Selection(
+        [
+            ('all', 'Todas'),
+            ('paid', 'Solo pagadas'),
+            ('unpaid', 'Solo no pagadas'),
+        ],
+        string="Filtrar para PDF",
+        default='all',
+    )
+    
 
     @api.depends()
     def _compute_allowed_employee_ids(self):
@@ -218,6 +227,20 @@ class MechanicCommissionWizard(models.TransientModel):
             val = f"{(x or 0.0):.{decimals}f}"
             return f"{cur.symbol} {val}" if (getattr(cur, "position", "after") == "before") else f"{val} {cur.symbol}"
 
+        # >>> NUEVO: aplica filtro para el PDF sobre las líneas del wizard
+        line_records = self.line_ids
+        if self.report_paid_filter == 'paid':
+            line_records = line_records.filtered(lambda r: bool(r.is_paid))
+        elif self.report_paid_filter == 'unpaid':
+            line_records = line_records.filtered(lambda r: not bool(r.is_paid))
+
+        # >>> NUEVO: KPIs recalculados para el PDF según el filtro
+        services_count_pdf = len(line_records)
+        total_hours_pdf = sum(line_records.mapped('hours') or [0.0])
+        payout_total_pdf = sum(line_records.mapped('payout') or [0.0])
+        amount_invoiced_pdf = sum(line_records.mapped('subtotal_customer') or [0.0])
+
+        # Construir líneas para el template desde line_records filtradas
         lines = [{
             "is_paid": bool(l.is_paid),
             "invoice_name": l.invoice_name or "",
@@ -229,7 +252,7 @@ class MechanicCommissionWizard(models.TransientModel):
             "subtotal_customer": _money(l.subtotal_customer),
             "payout": _money(l.payout),
             "paid_date": fields.Date.to_string(l.paid_date) if l.paid_date else "",
-        } for l in self.line_ids]
+        } for l in line_records]
 
         month_name = dict(self.fields_get(allfields=["month"])["month"]["selection"]).get(self.month, "") or ""
 
@@ -238,16 +261,15 @@ class MechanicCommissionWizard(models.TransientModel):
             "month": self.month or "",
             "month_name": month_name,
             "year": self.year or "",
-            "services_count": int(self.services_count or 0),
-            "total_hours": _num(self.total_hours, 2),
-            "amount_invoiced": _money(self.amount_invoiced),
-            "payout_total": _money(self.payout_total),
+            # >>> NUEVO: pasar los KPIs del PDF (ya filtrados)
+            "services_count": int(services_count_pdf or 0),
+            "total_hours": _num(total_hours_pdf, 2),
+            "amount_invoiced": _money(amount_invoiced_pdf),
+            "payout_total": _money(payout_total_pdf),
             "lines": lines,
-            # opcional: si tu template usa format_amount
-            # "currency_id": self.currency_id,
+            # "currency_id": self.currency_id,  # si tu template usa format_amount
         }
 
-        # >>> Forma canónica: usa la ACCIÓN para que se respete el nombre del archivo
         return self.env.ref('crm_commission.action_mechanic_commission_report').report_action(self, data=data)
 
     
@@ -269,34 +291,35 @@ class MechanicCommissionWizard(models.TransientModel):
         date_start = f"{year}-{str(month).zfill(2)}-01"
         date_end = f"{year}-{str(month).zfill(2)}-{last_day}"
 
-        domain_lines = [
-            ('move_id.move_type', 'in', ['out_invoice', 'out_refund']),
-            ('move_id.state', '=', 'posted'),
-            ('product_id.type', '=', 'service'),
-            ('move_id.invoice_date', '>=', date_start),
-            ('move_id.invoice_date', '<=', date_end),
-        ]
-        aml = self.env['account.move.line'].search(domain_lines)
+        # 🔧 FACTURAS DEL CLIENTE **PAGADAS** (igual que en _compute_totals)
+        moves = self.env['account.move'].search([
+            ('move_type', '=', 'out_invoice'),     # si luego quieres incluir devoluciones, agrega 'out_refund'
+            ('state', '=', 'posted'),
+            ('payment_state', '=', 'paid'),
+            ('invoice_date', '>=', date_start),
+            ('invoice_date', '<=', date_end),
+        ])
+
+        # 🔧 LÍNEAS DE SERVICIO DEL **MECÁNICO SELECCIONADO**
+        inv_lines = moves.mapped('invoice_line_ids').filtered(
+            lambda l: l.product_id.type == 'service'
+                    and getattr(l, 'mechanic_id', False)
+                    and l.mechanic_id.id == self.employee_id.id
+        )
 
         Entry = self.env['mechanic.commission.entry']
         entries_to_keep = self.env['mechanic.commission.entry']
 
-        for line in aml:
-            mechanic = self.employee_id
-            if not mechanic:
-                continue
-
-            # >>> DEFINIR cph y horas requeridas (evita NameError)
+        for line in inv_lines:
             cph = (getattr(line.product_id.product_tmpl_id, 'service_cost_per_hour', 0.0) or 0.0)
             hrs_req = (getattr(line.product_id.product_tmpl_id, 'service_hours_required', 0.0) or 0.0)
-
             qty = line.quantity or 0.0
             hrs = hrs_req * qty
-            payout = cph * hrs_req * qty
+            payout = cph * hrs  # = cph * hrs_req * qty
 
             vals_base = {
                 'company_id': self.env.company.id,
-                'employee_id': mechanic.id,
+                'employee_id': self.employee_id.id,
                 'invoice_id': line.move_id.id,
                 'invoice_line_id': line.id,
                 'invoice_name': f'{line.move_id.name or line.move_id.payment_reference or ""} - {line.move_id.partner_id.display_name}',
@@ -307,14 +330,16 @@ class MechanicCommissionWizard(models.TransientModel):
                 'hours': hrs,
                 'subtotal_customer': line.price_subtotal,
                 'payout': payout,
-                'cost_per_hour': cph,  # <<< ahora sí está definido
+                'cost_per_hour': cph,
                 'currency_id': line.currency_id.id or self.env.company.currency_id.id,
                 'month': str(month).zfill(2),
                 'year': str(year),
             }
 
-            entry = Entry.search([('employee_id', '=', mechanic.id),
-                                ('invoice_line_id', '=', line.id)], limit=1)
+            entry = Entry.search([
+                ('employee_id', '=', self.employee_id.id),
+                ('invoice_line_id', '=', line.id)
+            ], limit=1)
             if entry:
                 entry.write(vals_base)
             else:
@@ -322,8 +347,8 @@ class MechanicCommissionWizard(models.TransientModel):
 
             entries_to_keep |= entry
 
-        # Construir las líneas del wizard usando el valor PERSISTIDO
-        self.line_ids = [(5, 0, 0)] + [
+        # Construir comandos (sin filtrar aún por comisión)
+        lines_cmds = [
             (0, 0, {
                 'commission_entry_id': e.id,
                 'invoice_name': e.invoice_name,
@@ -333,11 +358,29 @@ class MechanicCommissionWizard(models.TransientModel):
                 'hours': e.hours,
                 'subtotal_customer': e.subtotal_customer,
                 'payout': e.payout,
-                'cost_per_hour': e.cost_per_hour,  # <<< usar el campo persistente
+                'cost_per_hour': e.cost_per_hour,
                 'is_paid': e.is_paid,
+                'paid_date': e.paid_date,
+                'paid_by': e.paid_by.id if e.paid_by else False,
             })
             for e in entries_to_keep.sorted(lambda r: (r.invoice_date or fields.Date.today(), r.id))
         ]
+
+        # 🧠 FILTRO DE COMISIÓN (solo para el árbol del wizard)
+        if self.report_paid_filter == 'paid':
+            lines_cmds = [cmd for cmd in lines_cmds if cmd[2].get('is_paid')]
+        elif self.report_paid_filter == 'unpaid':
+            lines_cmds = [cmd for cmd in lines_cmds if not cmd[2].get('is_paid')]
+
+        self.line_ids = [(5, 0, 0)] + lines_cmds
+
+
+
+    @api.onchange('report_paid_filter')
+    def _onchange_report_paid_filter(self):
+        # Reconstruye y aplica el filtro sin tocar mes/año/empleado
+        self._onchange_build_lines()
+
     
     def action_mark_all_paid(self):
         self.ensure_one()

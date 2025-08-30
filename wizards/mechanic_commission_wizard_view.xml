@@ -11,7 +11,10 @@
                         domain="[('active','=',True), ('job_id.name','ilike','Mecán')]"/>
                     <field name="month"/>
                     <field name="year"/>
+                    <!-- NUEVO -->
+                    <field name="report_paid_filter"/>
                 </group>
+
                 <group col="2">
                     <!-- Columna izquierda: KPIs -->
                     <group>
@@ -21,6 +24,8 @@
                         <field name="payout_total" readonly="1"/>
                     </group>
                 </group>
+
+
 
 
                 <notebook>
