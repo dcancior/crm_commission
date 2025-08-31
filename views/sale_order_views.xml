@@ -5,7 +5,8 @@
         <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
             <xpath expr="//sheet" position="inside">
-                <group>
+                <group string="Comisiones"
+                       groups="crm_commission.group_sale_order_commission_fields">
                     <field name="seller_name" readonly="1"/>
                     <field name="commission_percent" readonly="1"/>
                     <field name="commission_amount" readonly="1"/>

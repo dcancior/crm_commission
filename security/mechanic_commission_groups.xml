@@ -7,7 +7,13 @@
 
      <!-- Grupo de seguridad para el report de ventas-->
     <record id="group_commission_view" model="res.groups">
-        <field name="name">Ver Comisiones</field>
+        <field name="name">Ver Reporte de Comisiones</field>
+        <field name="category_id" ref="base.module_category_sales"/>
+    </record>
+
+    <!-- Grupo solo para la vista de comisiones en pedidos de venta -->
+    <record id="group_sale_order_commission_fields" model="res.groups">
+        <field name="name">Ver Campos de Comisión en Pedidos</field>
         <field name="category_id" ref="base.module_category_sales"/>
     </record>
 </odoo>
