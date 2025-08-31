@@ -16,4 +16,10 @@
         <field name="name">Ver Campos de Comisión en Pedidos</field>
         <field name="category_id" ref="base.module_category_sales"/>
     </record>
+
+    <!-- Grupo para ver comisiones en la lista (tree) de facturación -->
+    <record id="group_invoice_tree_commission_view" model="res.groups">
+        <field name="name">Ver comisiones en lista tree de facturación</field>
+        <field name="category_id" ref="base.module_category_accounting"/>
+    </record>
 </odoo>
