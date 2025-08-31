@@ -67,7 +67,8 @@
     <menuitem id="menu_mechanic_commission_root"
               name="Comisiones Mecánicos"
               sequence="100"
-              groups="crm_commission.group_mechanic_commission_view"/>
+              groups="crm_commission.group_mechanic_commission_view"
+              web_icon="crm_commission,static/description/icon_mechanic.svg"/>
 
     <menuitem id="menu_mechanic_commission_report"
               name="Reporte mensual"

@@ -1,23 +1,32 @@
 <odoo>
-   
-    
     <record id="view_commission_report_wizard_form" model="ir.ui.view">
         <field name="name">commission.report.wizard.form</field>
         <field name="model">commission.report.wizard</field>
         <field name="arch" type="xml">
             <form string="Reporte de Comisión Mensual">
-                <group>
-                    <field name="user_id"/>
-                    <field name="month"/>
-                    <field name="year"/>
-                </group>
-                <group>
-                    <field name="commission_percent" readonly="1"/>
-                    <field name="amount_total" readonly="1"/>
-                    <field name="commission_total" readonly="1"/>
-                </group>
+                <sheet>
+
+                    <!-- Filtros -->
+                    <group col="3">
+                        <field name="user_id"/>
+                        <field name="month"/>
+                        <field name="year"/>
+                    </group>
+
+                    <!-- Totales / KPIs -->
+                    <group col="3">
+                        <field name="commission_percent" readonly="1"/>
+                        <field name="amount_total" readonly="1"/>
+                        <field name="commission_total" readonly="1"/>
+                    </group>
+
+                </sheet>
+
                 <footer>
-                    <button string="Descargar PDF" type="object" name="action_print_pdf" class="btn-primary"/>
+                    <button name="action_print_pdf"
+                            type="object"
+                            string="Descargar PDF"
+                            class="btn-primary"/>
                     <button string="Cerrar" class="btn-secondary" special="cancel"/>
                 </footer>
             </form>
@@ -25,14 +34,19 @@
     </record>
 
     <act_window id="action_commission_report_wizard"
-                name="Reporte de Comisión"
+                name="Reporte de Comisión de Ventas"
                 res_model="commission.report.wizard"
                 view_mode="form"
                 target="new"/>
 
-    <menuitem id="menu_commission_report_root" name="Comisiones" sequence="100"
-              groups="crm_commission.group_commission_view"/>
-    <menuitem id="menu_commission_report_wizard" name="Reporte de Comisión"
+    <menuitem id="menu_commission_report_root"
+              name="Comisiones de Ventas"
+              sequence="100"
+              groups="crm_commission.group_commission_view"
+              web_icon="crm_commission,static/description/icon_commission.svg"/>
+
+    <menuitem id="menu_commission_report_wizard"
+              name="Reporte de Comisión de Ventas"
               parent="menu_commission_report_root"
               action="action_commission_report_wizard"
               sequence="10"
