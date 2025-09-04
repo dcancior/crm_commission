@@ -2,6 +2,7 @@
 from odoo import models, fields, api
 from datetime import datetime
 import calendar
+import re  # para _get_report_base_filename
 
 MONTHS = [
     ('01', 'Enero'), ('02', 'Febrero'), ('03', 'Marzo'), ('04', 'Abril'),
@@ -93,21 +94,14 @@ class MechanicCommissionWizard(models.TransientModel):
         Team = self.env['crm.team']
         Employee = self.env['hr.employee']
 
-        # Busca el equipo por nombre (con y sin acento por si acaso)
         team = Team.search([('name', '=', 'Mecánicos')], limit=1) \
-               or Team.search([('name', 'ilike', 'mecan')], limit=1)
+            or Team.search([('name', 'ilike', 'mecan')], limit=1)
 
-        # Arranca vacío
         emps = Employee.browse([])
-
         if team:
-            # OJO: En Odoo 16, team.member_ids son registros de crm.team.member.
-            # De ahí sacamos los usuarios (res.users) con mapped('user_id')
             member_users = team.member_ids.mapped('user_id')
-            # Incluye al líder si aplica
             if team.user_id:
                 member_users |= team.user_id
-
             if member_users:
                 emps = Employee.search([('user_id', 'in', member_users.ids)])
 
@@ -119,10 +113,14 @@ class MechanicCommissionWizard(models.TransientModel):
         Team = self.env['crm.team']
         team = Team.search([('name', '=', 'Mecánicos')], limit=1)
         for w in self:
-            w.allowed_user_ids = team.member_ids if team else self.env['res.users']  # si no hay equipo, quedará vacío
+            if team:
+                users = team.member_ids.mapped('user_id')
+                if team.user_id:
+                    users |= team.user_id
+                w.allowed_user_ids = users
+            else:
+                w.allowed_user_ids = self.env['res.users'].browse([])
 
-
-    #@api.depends('line_ids.subtotal_customer', 'line_ids.payout', 'line_ids.hours', 'employee_id', 'month', 'month', 'year' )
     @api.depends("employee_id", "month", "year")
     def _compute_totals(self):
         for wiz in self:
@@ -142,7 +140,7 @@ class MechanicCommissionWizard(models.TransientModel):
             date_end = f"{year}-{str(month).zfill(2)}-{last_day}"
 
             moves = self.env["account.move"].search([
-                ("move_type", "=", "out_invoice"),     # si quieres incluir devoluciones, usa ['out_invoice','out_refund']
+                ("move_type", "=", "out_invoice"),
                 ("state", "=", "posted"),
                 ("payment_state", "=", "paid"),
                 ("invoice_date", ">=", date_start),
@@ -160,12 +158,12 @@ class MechanicCommissionWizard(models.TransientModel):
 
             for l in lines:
                 qty = l.quantity or 0.0
-                # >>> Definir horas requeridas del servicio y costo/hora desde el template
+                # Horas requeridas del servicio y costo/hora desde el template
                 hrs_req = (getattr(l.product_id.product_tmpl_id, 'service_hours_required', 0.0) or 0.0)
                 cph     = (getattr(l.product_id.product_tmpl_id, 'service_cost_per_hour', 0.0) or 0.0)
 
                 hrs = hrs_req * qty
-                payout = cph * hrs  # equivalente a cph * hrs_req * qty
+                payout = cph * hrs  # cph * hrs_req * qty
 
                 vals_entry = {
                     'company_id': self.env.company.id,
@@ -180,7 +178,7 @@ class MechanicCommissionWizard(models.TransientModel):
                     'hours': hrs,
                     'subtotal_customer': l.price_subtotal,
                     'payout': payout,
-                    'cost_per_hour': cph,  # << persistimos CPH
+                    'cost_per_hour': cph,
                     'currency_id': (l.currency_id.id or self.env.company.currency_id.id),
                     'month': wiz.month,
                     'year': wiz.year,
@@ -205,6 +203,8 @@ class MechanicCommissionWizard(models.TransientModel):
                     "payout": entry.payout,
                     "subtotal_customer": entry.subtotal_customer,
                     "is_paid": entry.is_paid,
+                    "paid_date": entry.paid_date,
+                    "paid_by": entry.paid_by.id if entry.paid_by else False,
                 }))
 
             wiz.line_ids = detail_vals
@@ -227,14 +227,14 @@ class MechanicCommissionWizard(models.TransientModel):
             val = f"{(x or 0.0):.{decimals}f}"
             return f"{cur.symbol} {val}" if (getattr(cur, "position", "after") == "before") else f"{val} {cur.symbol}"
 
-        # >>> NUEVO: aplica filtro para el PDF sobre las líneas del wizard
+        # Aplica filtro para el PDF sobre las líneas del wizard
         line_records = self.line_ids
         if self.report_paid_filter == 'paid':
             line_records = line_records.filtered(lambda r: bool(r.is_paid))
         elif self.report_paid_filter == 'unpaid':
             line_records = line_records.filtered(lambda r: not bool(r.is_paid))
 
-        # >>> NUEVO: KPIs recalculados para el PDF según el filtro
+        # KPIs recalculados para el PDF según el filtro
         services_count_pdf = len(line_records)
         total_hours_pdf = sum(line_records.mapped('hours') or [0.0])
         payout_total_pdf = sum(line_records.mapped('payout') or [0.0])
@@ -251,7 +251,7 @@ class MechanicCommissionWizard(models.TransientModel):
             "hours": _num(l.hours, 2),
             "subtotal_customer": _money(l.subtotal_customer),
             "payout": _money(l.payout),
-            "paid_date": fields.Date.to_string(l.paid_date) if l.paid_date else "",
+            "paid_date": fields.Datetime.to_string(l.paid_date) if l.paid_date else "",
         } for l in line_records]
 
         month_name = dict(self.fields_get(allfields=["month"])["month"]["selection"]).get(self.month, "") or ""
@@ -261,13 +261,11 @@ class MechanicCommissionWizard(models.TransientModel):
             "month": self.month or "",
             "month_name": month_name,
             "year": self.year or "",
-            # >>> NUEVO: pasar los KPIs del PDF (ya filtrados)
             "services_count": int(services_count_pdf or 0),
             "total_hours": _num(total_hours_pdf, 2),
             "amount_invoiced": _money(amount_invoiced_pdf),
             "payout_total": _money(payout_total_pdf),
             "lines": lines,
-            # "currency_id": self.currency_id,  # si tu template usa format_amount
         }
 
         return self.env.ref('crm_commission.action_mechanic_commission_report').report_action(self, data=data)
@@ -291,16 +289,16 @@ class MechanicCommissionWizard(models.TransientModel):
         date_start = f"{year}-{str(month).zfill(2)}-01"
         date_end = f"{year}-{str(month).zfill(2)}-{last_day}"
 
-        # 🔧 FACTURAS DEL CLIENTE **PAGADAS** (igual que en _compute_totals)
+        # FACTURAS DEL CLIENTE pagadas
         moves = self.env['account.move'].search([
-            ('move_type', '=', 'out_invoice'),     # si luego quieres incluir devoluciones, agrega 'out_refund'
+            ('move_type', '=', 'out_invoice'),
             ('state', '=', 'posted'),
             ('payment_state', '=', 'paid'),
             ('invoice_date', '>=', date_start),
             ('invoice_date', '<=', date_end),
         ])
 
-        # 🔧 LÍNEAS DE SERVICIO DEL **MECÁNICO SELECCIONADO**
+        # LÍNEAS DE SERVICIO DEL mecánico seleccionado
         inv_lines = moves.mapped('invoice_line_ids').filtered(
             lambda l: l.product_id.type == 'service'
                     and getattr(l, 'mechanic_id', False)
@@ -315,7 +313,7 @@ class MechanicCommissionWizard(models.TransientModel):
             hrs_req = (getattr(line.product_id.product_tmpl_id, 'service_hours_required', 0.0) or 0.0)
             qty = line.quantity or 0.0
             hrs = hrs_req * qty
-            payout = cph * hrs  # = cph * hrs_req * qty
+            payout = cph * hrs
 
             vals_base = {
                 'company_id': self.env.company.id,
@@ -366,7 +364,7 @@ class MechanicCommissionWizard(models.TransientModel):
             for e in entries_to_keep.sorted(lambda r: (r.invoice_date or fields.Date.today(), r.id))
         ]
 
-        # 🧠 FILTRO DE COMISIÓN (solo para el árbol del wizard)
+        # Filtro de comisión (solo para el árbol del wizard)
         if self.report_paid_filter == 'paid':
             lines_cmds = [cmd for cmd in lines_cmds if cmd[2].get('is_paid')]
         elif self.report_paid_filter == 'unpaid':
@@ -374,20 +372,36 @@ class MechanicCommissionWizard(models.TransientModel):
 
         self.line_ids = [(5, 0, 0)] + lines_cmds
 
-
-
     @api.onchange('report_paid_filter')
     def _onchange_report_paid_filter(self):
         # Reconstruye y aplica el filtro sin tocar mes/año/empleado
         self._onchange_build_lines()
 
-    
     def action_mark_all_paid(self):
         self.ensure_one()
         entries = self.line_ids.mapped('commission_entry_id')
-        today = fields.Date.context_today(self)
-        entries.write({'is_paid': True, 'paid_date': today, 'paid_by': self.env.user.id})
-
+        if not entries:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Marcar como pagadas',
+                    'message': 'No hay líneas para marcar.',
+                    'sticky': False,
+                }
+            }
+        # Abre wizard de confirmación para elegir "Efectivo" o "Transferencia"
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Marcar todas como pagadas',
+            'res_model': 'mechanic.commission.mass.pay.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_entry_ids': [(6, 0, entries.ids)],   # pasa las entradas
+                'parent_wizard_id': self.id,                  # para refrescar al cerrar
+            }
+        }
 
     def _get_report_base_filename(self):
         """Nombre del archivo: Reporte de comisiones (Mecánico) AAAA-MM-DD HH-MM"""
@@ -397,6 +411,7 @@ class MechanicCommissionWizard(models.TransientModel):
         dt_local = fields.Datetime.context_timestamp(self, fields.Datetime.now())
         stamp = dt_local.strftime('%Y-%m-%d %H-%M')  # sin dos puntos
         return f"Reporte de comisiones ({mech_safe}) {stamp}"
+
 
 class MechanicCommissionWizardLine(models.TransientModel):
     _name = 'mechanic.commission.wizard.line'
@@ -421,12 +436,21 @@ class MechanicCommissionWizardLine(models.TransientModel):
         related='commission_entry_id.cost_per_hour'
     )
 
-    # Checkbox editable que escribe en la entrada persistente:
+    # Estado de pago (editable: escribe en el persistente y setea metadata abajo)
     is_paid = fields.Boolean(string='Pagado', related='commission_entry_id.is_paid', readonly=False)
 
-    # Opcional: acceso a fecha/usuario de pago como related (solo lectura)
-    paid_date = fields.Date(related='commission_entry_id.paid_date', readonly=True)
+    # Fechas/usuario (related, solo lectura) - ¡DATETIME!
+    paid_date = fields.Datetime(related='commission_entry_id.paid_date', readonly=True)
     paid_by = fields.Many2one('res.users', related='commission_entry_id.paid_by', readonly=True)
+
+    # Forma de pago: RELATED EDITABLE -> guarda en la entrada persistente
+    pago_comision = fields.Selection(
+        [('efect', 'Efectivo'), ('trans', 'Transferencia')],
+        string='Pago comisión',
+        related='commission_entry_id.pago_comision',
+        readonly=False,
+        store=False,
+    )
 
     def write(self, vals):
         """Si el usuario tilda/destilda 'is_paid', setea metadata de pago."""
@@ -438,7 +462,7 @@ class MechanicCommissionWizardLine(models.TransientModel):
                     if vals['is_paid']:
                         entry.write({
                             'is_paid': True,
-                            'paid_date': fields.Date.context_today(self),
+                            'paid_date': fields.Datetime.now(),  # DateTime en UTC
                             'paid_by': self.env.user.id,
                         })
                     else:
@@ -448,3 +472,52 @@ class MechanicCommissionWizardLine(models.TransientModel):
                             'paid_by': False,
                         })
         return res
+
+
+class MechanicCommissionMassPayWizard(models.TransientModel):
+    _name = 'mechanic.commission.mass.pay.wizard'
+    _description = 'Marcar comisiones pagadas (masivo)'
+
+    entry_ids = fields.Many2many(
+        'mechanic.commission.entry',
+        'mc_masspay_entry_rel',   # <-- nombre corto para la tabla rel
+        'wizard_id',              # <-- columna que apunta al wizard
+        'entry_id',               # <-- columna que apunta a mechanic.commission.entry
+        string='Entradas',
+        required=True,
+    )
+    pago_comision = fields.Selection(
+        [('efect', 'Efectivo'), ('trans', 'Transferencia')],
+        string='Forma de pago',
+        required=True
+    )
+    paid_date = fields.Datetime(string='Fecha y hora de pago', default=lambda self: fields.Datetime.now())
+    pay_note = fields.Char(string='Nota (opcional)')
+
+    def action_confirm(self):
+        self.ensure_one()
+        vals = {
+            'is_paid': True,
+            'pago_comision': self.pago_comision,
+            'paid_date': self.paid_date,          # Datetime (UTC)
+            'paid_by': self.env.user.id,
+        }
+        if self.pay_note:
+            vals['pay_note'] = self.pay_note
+        self.entry_ids.write(vals)
+
+        # Reabrir el wizard padre para ver los cambios actualizados
+        parent_id = self.env.context.get('parent_wizard_id')
+        if parent_id:
+            return {
+                'type': 'ir.actions.act_window',
+                'res_model': 'mechanic.commission.wizard',
+                'res_id': parent_id,
+                'view_mode': 'form',
+                'view_id': self.env.ref('crm_commission.view_mechanic_commission_wizard_form').id,
+                'target': 'new',
+                'context': dict(self.env.context, notif_msg='Comisiones marcadas como pagadas.'),
+            }
+
+        # Fallback: cerrar si no hay padre (no debería pasar)
+        return {'type': 'ir.actions.act_window_close'}

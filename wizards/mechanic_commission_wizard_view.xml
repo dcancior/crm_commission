@@ -76,4 +76,27 @@
               action="action_mechanic_commission_wizard"
               sequence="10"
               groups="crm_commission.group_mechanic_commission_view"/>
+
+
+
+    <record id="view_mechanic_commission_mass_pay_wizard_form" model="ir.ui.view">
+        <field name="name">mechanic.commission.mass.pay.wizard.form</field>
+        <field name="model">mechanic.commission.mass.pay.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Marcar como pagadas">
+                <group>
+                    <field name="pago_comision" required="1"/>
+                    <field name="paid_date"/>
+                    <field name="pay_note"/>
+                </group>
+                <group>
+                    <field name="entry_ids" widget="many2many_tags" options="{'no_open': True, 'no_create': True}"/>
+                </group>
+                <footer>
+                    <button name="action_confirm" type="object" string="Aplicar" class="oe_highlight"/>
+                    <button string="Cancelar" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
 </odoo>

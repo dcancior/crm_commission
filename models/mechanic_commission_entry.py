@@ -32,13 +32,18 @@ class MechanicCommissionEntry(models.Model):
 
     # Control de pago de la comisión
     is_paid = fields.Boolean(string='Pagado', default=False)
-    paid_date = fields.Date(string='Fecha de pago')
+    paid_date = fields.Datetime(string='Fecha y hora de pago')
     paid_by = fields.Many2one('res.users', string='Pagado por')
     pay_note = fields.Char(string='Nota pago')
 
     # Auxiliar para filtros por periodo
     month = fields.Char(string='Mes (MM)', size=2, index=True)
     year = fields.Char(string='Año (YYYY)', size=4, index=True)
+
+    pago_comision = fields.Selection(
+        [('efect', 'Efectivo'), ('trans', 'Transferencia')],
+        string='Pago comisión'
+    )
 
     _sql_constraints = [
         # Evita duplicados por misma línea de factura para el mismo mecánico
