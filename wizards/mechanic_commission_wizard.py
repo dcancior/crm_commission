@@ -66,9 +66,11 @@ class MechanicCommissionWizard(models.TransientModel):
     line_ids = fields.One2many(
         "mechanic.commission.wizard.line",
         "wizard_id",
-        string="Detalle",
+        string="Pago de comisión por servicio",
         compute="_compute_totals",
         store=False,
+        readonly=False,                # <-- permitir edición
+        inverse="_inverse_line_ids",   # <-- NECESARIO para que Odoo “acepte” los cambios
     )
     
     # Usuarios permitidos (miembros del equipo "Mecánicos")
@@ -88,6 +90,54 @@ class MechanicCommissionWizard(models.TransientModel):
         default='all',
     )
     
+
+    def _inverse_line_ids(self):
+        for w in self:
+            for line in w.line_ids:
+                entry = line.commission_entry_id
+                if not entry:
+                    continue
+
+                vals = {}
+
+                # Si el usuario eligió forma de pago, forzar pagado + metadata
+                if line.pago_comision:
+                    vals.update({
+                        'pago_comision': line.pago_comision,
+                        'is_paid': True,
+                        'paid_date': fields.Datetime.now(),
+                        'paid_by': self.env.user.id,
+                    })
+                else:
+                    # Mantén el estado si no se cambió; opcionalmente podrías "despagar" aquí
+                    pass
+
+                # Si tocó explícitamente el check de pagado (por si editaste inline en el tree)
+                if line.is_paid and not entry.is_paid:
+                    vals.setdefault('is_paid', True)
+                    vals.setdefault('paid_date', fields.Datetime.now())
+                    vals.setdefault('paid_by', self.env.user.id)
+                elif (not line.is_paid) and entry.is_paid:
+                    vals.update({'is_paid': False, 'paid_date': False, 'paid_by': False})
+
+                if vals:
+                    entry.write(vals)
+
+    def action_save_lines(self):
+        self.ensure_one()
+        # Fuerza a aplicar lo editado en el O2M
+        self._inverse_line_ids()
+
+        # (Opcional) refrescar la vista y notificar
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'mechanic.commission.wizard',
+            'res_id': self.id,
+            'view_mode': 'form',
+            'view_id': self.env.ref('crm_commission.view_mechanic_commission_wizard_form').id,
+            'target': 'new',
+            'context': dict(self.env.context, notif_msg='Cambios guardados.'),
+        }
 
     @api.depends()
     def _compute_allowed_employee_ids(self):
@@ -446,31 +496,50 @@ class MechanicCommissionWizardLine(models.TransientModel):
     # Forma de pago: RELATED EDITABLE -> guarda en la entrada persistente
     pago_comision = fields.Selection(
         [('efect', 'Efectivo'), ('trans', 'Transferencia')],
-        string='Pago comisión',
+        string='Forma de pago',
         related='commission_entry_id.pago_comision',
         readonly=False,
         store=False,
     )
 
     def write(self, vals):
-        """Si el usuario tilda/destilda 'is_paid', setea metadata de pago."""
         res = super().write(vals)
-        if 'is_paid' in vals:
-            for line in self:
-                entry = line.commission_entry_id
-                if entry:
-                    if vals['is_paid']:
-                        entry.write({
-                            'is_paid': True,
-                            'paid_date': fields.Datetime.now(),  # DateTime en UTC
-                            'paid_by': self.env.user.id,
-                        })
-                    else:
-                        entry.write({
-                            'is_paid': False,
-                            'paid_date': False,
-                            'paid_by': False,
-                        })
+        for line in self:
+            entry = line.commission_entry_id
+            if not entry:
+                continue
+
+            # A) Toggle de pagado desde la UI
+            if 'is_paid' in vals:
+                if vals['is_paid']:
+                    entry.write({
+                        'is_paid': True,
+                        'paid_date': fields.Datetime.now(),
+                        'paid_by': self.env.user.id,
+                        # si no trae forma, default efectivo
+                        **({} if entry.pago_comision else {'pago_comision': 'efect'}),
+                    })
+                else:
+                    entry.write({
+                        'is_paid': False,
+                        'paid_date': False,
+                        'paid_by': False,
+                        # opcional: limpiar forma
+                        # 'pago_comision': False,
+                    })
+
+            # B) Si el usuario selecciona una forma de pago, forzar pagado + metadata
+            if 'pago_comision' in vals and vals['pago_comision']:
+                entry.write({
+                    'pago_comision': vals['pago_comision'],
+                    'is_paid': True,
+                    'paid_date': fields.Datetime.now(),
+                    'paid_by': self.env.user.id,
+                })
+            # (Opcional) Si quieres que al limpiar la forma también se "despague":
+            # elif 'pago_comision' in vals and not vals['pago_comision']:
+            #     entry.write({'pago_comision': False, 'is_paid': False, 'paid_date': False, 'paid_by': False})
+
         return res
 
 

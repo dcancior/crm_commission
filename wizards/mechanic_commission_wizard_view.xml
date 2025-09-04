@@ -28,28 +28,55 @@
                     <notebook>
                         <page string="Detalle de líneas facturadas (pagadas)">
                             <field name="line_ids" nolabel="1"
-                                   context="{'no_open': 1}"
-                                   options="{'no_create': True}">
-                                <tree editable="bottom" create="0" edit="0">
-                                    <!-- Pon primero las columnas esenciales para que en móvil no se corte lo importante -->
+                                context="{'no_open': 1}"
+                                options="{'no_create': True}">
+                                <tree editable="bottom" create="0" edit="0" delete="0">
+                                    <!-- columnas -->
                                     <field name="invoice_name" readonly="1"/>
                                     <field name="product_name" readonly="1"/>
                                     <field name="hours" readonly="1"/>
                                     <field name="payout" readonly="1"/>
-                                    <!-- El resto al final -->
+                                    <!-- Estado de pago (editable) -->
                                     <field name="is_paid"/>
+                                    <!-- Forma de pago (editable, visible solo si is_paid) -->
+                                    <field name="pago_comision"/>
                                     <field name="quantity" readonly="1"/>
                                     <field name="cost_per_hour" readonly="1"/>
                                     <field name="paid_date" readonly="1"/>
                                     <field name="paid_by" readonly="1"/>
                                 </tree>
+
+                                <!-- Subform cuando (por cualquier razón) se intente abrir la línea -->
+                                <form string="Detalle de comisión">
+                                    <group>
+                                        <!-- Ocultamos los M2O técnicos -->
+                                        <field name="wizard_id" invisible="1"/>
+                                        <field name="commission_entry_id" invisible="1"/>
+
+                                        <!-- Solo lectura para visualizar -->
+                                        <field name="invoice_name" readonly="1"/>
+                                        <field name="invoice_date" readonly="1"/>
+                                        <field name="product_name" readonly="1"/>
+                                        <field name="quantity" readonly="1"/>
+                                        <field name="hours" readonly="1"/>
+                                        <field name="subtotal_customer" readonly="1"/>
+                                        <field name="payout" readonly="1"/>
+                                        <field name="cost_per_hour" readonly="1"/>
+
+                                        <field name="is_paid" readonly="1"/>
+                                        <field name="pago_comision"/>
+
+                                        <field name="paid_date" readonly="1"/>
+                                        <field name="paid_by" readonly="1"/>
+                                    </group>
+                                </form>
                             </field>
                         </page>
                     </notebook>
-
                 </sheet>
 
                 <footer>
+                    <button name="action_save_lines" type="object" string="Guardar cambios" class="oe_highlight"/>
                     <button name="action_mark_all_paid" type="object" string="Marcar todas como pagadas" class="oe_highlight"/>
                     <button string="Cerrar" special="cancel"/>
                     <button name="action_print_pdf" type="object" string="Descargar PDF"/>
