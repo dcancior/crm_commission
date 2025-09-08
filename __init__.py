@@ -1,6 +1,12 @@
 # -*- coding: utf-8 -*-
-# Parche mínimo: adapta la llamada __wz_get_response(self, environ, scope)
-# a la firma original (self, environ) usando la referencia ORIGINAL.
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  DCR INFORMATIC SERVICES SAS DE CV                               ║
+# ║  Web: https://www.dcrsoluciones.com                              ║
+# ║  Contacto: info@dcrsoluciones.com                                ║
+# ║                                                                  ║
+# ║  Este módulo está bajo licencia (LGPLv3).                        ║
+# ║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html   ║
+# ╚══════════════════════════════════════════════════════════════════╝
 
 try:
     import odoo.http as ohttp

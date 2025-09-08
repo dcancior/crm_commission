@@ -1,3 +1,13 @@
+# -*- coding: utf-8 -*-
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  DCR INFORMATIC SERVICES SAS DE CV                               ║
+# ║  Web: https://www.dcrsoluciones.com                              ║
+# ║  Contacto: info@dcrsoluciones.com                                ║
+# ║                                                                  ║
+# ║  Este módulo está bajo licencia (LGPLv3).                        ║
+# ║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html   ║
+# ╚══════════════════════════════════════════════════════════════════╝
+
 from . import crm_team
 from . import sale_commission_user
 from . import sale_order_commission

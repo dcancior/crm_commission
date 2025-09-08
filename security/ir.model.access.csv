@@ -9,3 +9,6 @@ access_sale_order_set_mechanic_wizard_manager,access.sale.order.set.mechanic.wiz
 access_mech_comm_mass_pay_wizard_user,access.mechanic.commission.mass.pay.wizard.user,model_mechanic_commission_mass_pay_wizard,base.group_user,1,1,1,1
 access_mech_comm_wizard_user,access.mechanic.commission.wizard.user,model_mechanic_commission_wizard,base.group_user,1,1,1,1
 access_mech_comm_wizard_line_user,access.mechanic.commission.wizard.line.user,model_mechanic_commission_wizard_line,base.group_user,1,1,1,1
+
+
+access_commission_report_wizard_line,access.commission.report.wizard.line,model_commission_report_wizard_line,crm_commission.group_commission_view,1,1,1,1

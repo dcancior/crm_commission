@@ -1,15 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  DCR INFORMATIC SERVICES SAS DE CV                                 ║
+║  Web: https://www.dcrsoluciones.com                                ║
+║  Contacto: info@dcrsoluciones.com                                  ║
+║                                                                    ║
+║  Este módulo está bajo licencia (LGPLv3).                          ║
+║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html     ║
+╚════════════════════════════════════════════════════════════════════╝
+-->
 <odoo>
   <template id="commission_report_pdf">
     <t t-call="web.html_container">
       <t t-call="web.external_layout">
         <div class="page">
           <h2>Reporte de Comisión Mensual</h2>
-          <p><strong>Vendedor:</strong> <t t-esc="user_name"/></p>
-          <p><strong>Mes:</strong> <t t-esc="month_name"/></p>
-          <p><strong>Año:</strong> <t t-esc="year"/></p>
-          <p><strong>Porcentaje Comisión:</strong> <t t-esc="commission_percent"/>%</p>
-          <p><strong>Total Ventas:</strong> <t t-esc="amount_total"/></p>
-          <p><strong>Total Comisión:</strong> <t t-esc="commission_total"/></p>
+
+          <div class="row mt16 mb8">
+            <div class="col-6">
+              <p><strong>Vendedor:</strong> <t t-esc="user_name"/></p>
+              <p><strong>Mes:</strong> <t t-esc="month_name"/> <t t-esc="year"/></p>
+            </div>
+            <div class="col-6">
+              <p><strong>Porcentaje Comisión (equipo):</strong> <t t-esc="commission_percent"/>%</p>
+              <p><strong>Total Ventas (Base):</strong> <t t-esc="amount_total"/></p>
+              <p><strong>Total Comisión:</strong> <t t-esc="commission_total"/></p>
+            </div>
+          </div>
+
+          <h3 class="mt16">Detalle de Facturas (pagadas)</h3>
+          <table class="table table-sm o_main_table">
+            <thead>
+              <tr>
+                <th># Factura</th>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <th class="text-right">Base</th>
+                <th class="text-right">% Com.</th>
+                <th class="text-right">Comisión</th>
+                <th>Estado Pago</th>
+              </tr>
+            </thead>
+            <tbody>
+              <t t-if="invoice_lines">
+                <t t-foreach="invoice_lines" t-as="l">
+                  <tr>
+                    <td><t t-esc="l.get('number')"/></td>
+                    <td><t t-esc="l.get('date')"/></td>
+                    <td><t t-esc="l.get('partner')"/></td>
+                    <td class="text-right"><t t-esc="l.get('amount_untaxed')"/></td>
+                    <td class="text-right"><t t-esc="l.get('commission_percent')"/></td>
+                    <td class="text-right"><t t-esc="l.get('commission_amount')"/></td>
+                    <td><t t-esc="l.get('payment_state')"/></td>
+                  </tr>
+                </t>
+              </t>
+              <t t-else="">
+                <tr><td colspan="7">No hay facturas pagadas en el periodo seleccionado.</td></tr>
+              </t>
+            </tbody>
+            <tfoot>
+              <tr>
+                <th colspan="3" class="text-right">Totales</th>
+                <th class="text-right"><t t-esc="amount_total"/></th>
+                <th></th>
+                <th class="text-right"><t t-esc="commission_total"/></th>
+                <th></th>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </t>
     </t>
