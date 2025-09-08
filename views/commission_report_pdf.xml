@@ -38,7 +38,11 @@
                 <th class="text-right">Base</th>
                 <th class="text-right">% Com.</th>
                 <th class="text-right">Comisión</th>
-                <th>Estado Pago</th>
+                <th>Método</th>
+                <th>Fecha/Hora pago</th>
+                <th>Registró</th>
+                <th>Comisión pagada</th>
+                
               </tr>
             </thead>
             <tbody>
@@ -51,7 +55,10 @@
                     <td class="text-right"><t t-esc="l.get('amount_untaxed')"/></td>
                     <td class="text-right"><t t-esc="l.get('commission_percent')"/></td>
                     <td class="text-right"><t t-esc="l.get('commission_amount')"/></td>
-                    <td><t t-esc="l.get('payment_state')"/></td>
+                    <td><t t-esc="l.get('pay_method')"/></td>
+                    <td><t t-esc="l.get('pay_datetime')"/></td>
+                    <td><t t-esc="l.get('pay_user')"/></td>
+                    <td><t t-esc="l.get('commission_paid')"/></td>
                   </tr>
                 </t>
               </t>
