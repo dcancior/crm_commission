@@ -14,21 +14,28 @@
     <t t-call="web.html_container">
       <t t-call="web.external_layout">
         <div class="page">
-          <h2>Reporte de Comisión Mensual</h2>
+          <h2>Reporte de Comisión</h2>
 
           <div class="row mt16 mb8">
             <div class="col-6">
               <p><strong>Vendedor:</strong> <t t-esc="user_name"/></p>
-              <p><strong>Mes:</strong> <t t-esc="month_name"/> <t t-esc="year"/></p>
+              <p>
+                <strong>Periodo:</strong>
+                <t t-esc="date_start_str"/> — <t t-esc="date_end_str"/>
+              </p>
+              <p>
+                <strong>Filtro:</strong>
+                <t t-esc="{'all':'Todas','paid':'Pagadas','unpaid':'No pagadas'}.get(filter_payment or 'all', 'Todas')"/>
+              </p>
             </div>
             <div class="col-6">
-              <p><strong>Porcentaje Comisión (equipo):</strong> <t t-esc="commission_percent"/>%</p>
-              <p><strong>Total Ventas (Base):</strong> <t t-esc="amount_total"/></p>
-              <p><strong>Total Comisión:</strong> <t t-esc="commission_total"/></p>
+              <p><strong>Porcentaje Comisión (equipo):</strong> <t t-esc="commission_percent_str"/>%</p>
+              <p><strong>Total Ventas (Base):</strong> <t t-esc="amount_total_str"/></p>
+              <p><strong>Total Comisión:</strong> <t t-esc="commission_total_str"/></p>
             </div>
           </div>
 
-          <h3 class="mt16">Detalle de Facturas (pagadas)</h3>
+          <h3 class="mt16">Detalle de Facturas (según filtro)</h3>
           <table class="table table-sm o_main_table">
             <thead>
               <tr>
@@ -42,19 +49,20 @@
                 <th>Fecha/Hora pago</th>
                 <th>Registró</th>
                 <th>Comisión pagada</th>
-                
               </tr>
             </thead>
             <tbody>
-              <t t-if="invoice_lines">
+              <t t-if="invoice_lines and len(invoice_lines)">
                 <t t-foreach="invoice_lines" t-as="l">
                   <tr>
                     <td><t t-esc="l.get('number')"/></td>
                     <td><t t-esc="l.get('date')"/></td>
                     <td><t t-esc="l.get('partner')"/></td>
-                    <td class="text-right"><t t-esc="l.get('amount_untaxed')"/></td>
-                    <td class="text-right"><t t-esc="l.get('commission_percent')"/></td>
-                    <td class="text-right"><t t-esc="l.get('commission_amount')"/></td>
+
+                    <td class="text-right"><t t-esc="l.get('amount_untaxed_str') or l.get('amount_untaxed')"/></td>
+                    <td class="text-right"><t t-esc="l.get('commission_percent_str') or l.get('commission_percent')"/></td>
+                    <td class="text-right"><t t-esc="l.get('commission_amount_str') or l.get('commission_amount')"/></td>
+
                     <td><t t-esc="l.get('pay_method')"/></td>
                     <td><t t-esc="l.get('pay_datetime')"/></td>
                     <td><t t-esc="l.get('pay_user')"/></td>
@@ -63,16 +71,20 @@
                 </t>
               </t>
               <t t-else="">
-                <tr><td colspan="7">No hay facturas pagadas en el periodo seleccionado.</td></tr>
+                <tr>
+                  <td colspan="10" class="text-center text-muted">
+                    No hay facturas en el periodo/filtro seleccionado.
+                  </td>
+                </tr>
               </t>
             </tbody>
             <tfoot>
               <tr>
                 <th colspan="3" class="text-right">Totales</th>
-                <th class="text-right"><t t-esc="amount_total"/></th>
+                <th class="text-right"><t t-esc="amount_total_str or amount_total"/></th>
                 <th></th>
-                <th class="text-right"><t t-esc="commission_total"/></th>
-                <th></th>
+                <th class="text-right"><t t-esc="commission_total_str or commission_total"/></th>
+                <th colspan="4"></th>
               </tr>
             </tfoot>
           </table>
@@ -88,6 +100,6 @@
     report_type="qweb-pdf"
     name="crm_commission.commission_report_pdf"
     file="crm_commission.commission_report_pdf"
-    print_report_name="'Reporte_Comision_%s_%s' % (month, year)"
+    print_report_name="'Reporte_Comision_%s_a_%s' % (date_start_str.replace('/','-'), date_end_str.replace('/','-'))"
   />
 </odoo>

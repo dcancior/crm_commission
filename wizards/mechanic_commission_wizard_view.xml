@@ -5,7 +5,6 @@
         <field name="arch" type="xml">
             <form string="Reporte de comisiones de mecánicos (mensual)">
                 <sheet>
-
                     <!-- Filtros -->
                     <group col="4">
                         <field name="employee_id"

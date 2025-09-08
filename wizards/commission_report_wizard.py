@@ -9,33 +9,41 @@
 # ╚══════════════════════════════════════════════════════════════════╝
 
 from odoo import models, fields, api
-from datetime import datetime
-import calendar
-
-MONTHS = [
-    ('01', 'Enero'), ('02', 'Febrero'), ('03', 'Marzo'), ('04', 'Abril'),
-    ('05', 'Mayo'), ('06', 'Junio'), ('07', 'Julio'), ('08', 'Agosto'),
-    ('09', 'Septiembre'), ('10', 'Octubre'), ('11', 'Noviembre'), ('12', 'Diciembre')
-]
+from odoo.exceptions import ValidationError
+from datetime import datetime, date
 
 PAYMENT_METHODS = [
     ('efectivo', 'Efectivo'),
     ('transferencia', 'Transferencia'),
 ]
 
+def _default_date_start(self):
+    today = fields.Date.context_today(self)
+    return today.replace(day=1)
+
+def _default_date_end(self):
+    return fields.Date.context_today(self)
+
 
 class CommissionReportWizard(models.TransientModel):
     _name = 'commission.report.wizard'
-    _description = 'Wizard para reporte de comisión mensual'
+    _description = 'Wizard para reporte de comisión por rango de fechas'
 
+    # Filtros
     user_id = fields.Many2one('res.users', string='Vendedor', required=True)
-    month = fields.Selection(
-        MONTHS, string='Mes', required=True,
-        default=lambda self: datetime.now().strftime('%m')
-    )
-    year = fields.Selection(
-        [(str(y), str(y)) for y in range(datetime.now().year, datetime.now().year - 10, -1)],
-        string='Año', required=True, default=lambda self: str(datetime.now().year)
+    date_start = fields.Date(string='Desde', required=True, default=_default_date_start)
+    date_end   = fields.Date(string='Hasta', required=True, default=_default_date_end)
+
+    @api.constrains('date_start', 'date_end')
+    def _check_dates(self):
+        for rec in self:
+            if rec.date_start and rec.date_end and rec.date_end < rec.date_start:
+                raise ValidationError("La fecha final no puede ser menor que la fecha inicial.")
+
+    filter_payment = fields.Selection(
+        [('all', 'Todas'), ('paid', 'Pagadas'), ('unpaid', 'No pagadas')],
+        string='Filtro pago comisión',
+        default='all'
     )
 
     # Totales / KPIs
@@ -59,26 +67,8 @@ class CommissionReportWizard(models.TransientModel):
     # Detalle de facturas (sólo pagadas)
     line_ids = fields.One2many('commission.report.wizard.line', 'wizard_id')
 
-    # Helpers
-    date_start = fields.Date(string='Desde', compute='_compute_dates', store=False)
-    date_end = fields.Date(string='Hasta', compute='_compute_dates', store=False)
-
-    @api.depends('month', 'year')
-    def _compute_dates(self):
-        for rec in self:
-            if rec.month and rec.year:
-                y, m = int(rec.year), int(rec.month)
-                last_day = calendar.monthrange(y, m)[1]
-                rec.date_start = datetime(y, m, 1).date()
-                rec.date_end = datetime(y, m, last_day).date()
-            else:
-                rec.date_start = False
-                rec.date_end = False
-
     def _load_lines(self):
-        """Carga y sincroniza líneas con facturas pagadas.
-        Preserva forma de pago/fecha/usuario capturados por el usuario.
-        """
+        """Carga/sincroniza líneas con facturas cliente 'posted' y 'paid' en el rango."""
         for rec in self:
             if not (rec.user_id and rec.date_start and rec.date_end):
                 rec.line_ids = [(5, 0, 0)]
@@ -113,15 +103,17 @@ class CommissionReportWizard(models.TransientModel):
     @api.depends('user_id', 'line_ids.amount_untaxed', 'line_ids.commission_amount')
     def _compute_totals(self):
         for rec in self:
-            # % de comisión desde el equipo del vendedor (si existe)
             rec.commission_percent = (
                 rec.user_id.sale_team_id.commission_percent
-                if rec.user_id and rec.user_id.sale_team_id
-                else 0.0
+                if rec.user_id and rec.user_id.sale_team_id else 0.0
             )
-            # Totales basados en las líneas ya cargadas en pantalla
             rec.amount_total = sum(rec.line_ids.mapped('amount_untaxed')) if rec.line_ids else 0.0
             rec.commission_total = sum(rec.line_ids.mapped('commission_amount')) if rec.line_ids else 0.0
+
+    @api.onchange('user_id', 'date_start', 'date_end')
+    def _onchange_filters(self):
+        # Ya no usamos _compute_dates; sólo recargamos líneas
+        self._load_lines()
 
     def action_refresh(self):
         self.ensure_one()
@@ -134,10 +126,21 @@ class CommissionReportWizard(models.TransientModel):
             'target': 'new',
         }
 
+    def action_save(self):
+        """Guardar cambios sin cerrar el wizard."""
+        self.ensure_one()
+        self.flush()
+        return {
+            'type': 'ir.actions.act_window',
+            'res_model': 'commission.report.wizard',
+            'view_mode': 'form',
+            'res_id': self.id,
+            'target': 'new',
+        }
+
     def action_print_pdf(self):
         self.ensure_one()
-        # ❌ No llames a self._load_lines() aquí; respeta lo que el usuario acaba de capturar
-        self.flush()  # opcional: asegura que el inline edit quede escrito antes de leer
+        self.flush()
 
         currency = self.currency_id or self.env.company.currency_id
         decimals = getattr(currency, 'decimal_places', 2) or 2
@@ -147,16 +150,22 @@ class CommissionReportWizard(models.TransientModel):
             s = f"{val:.{decimals}f}"
             return f"{currency.symbol} {s}" if (currency.position or 'after') == 'before' else f"{s} {currency.symbol}"
 
+        # Aplicar filtro de pagadas/no pagadas para el reporte
+        lines = self.line_ids
+        if self.filter_payment == 'paid':
+            lines = lines.filtered(lambda l: bool(l.payment_method))
+        elif self.filter_payment == 'unpaid':
+            lines = lines.filtered(lambda l: not l.payment_method)
+
         method_labels = dict(PAYMENT_METHODS)
         invoice_lines = []
-        for line in self.line_ids:
+        for line in lines:
             m = line.move_id
             pay_method = method_labels.get(line.payment_method or '', '')
             pay_dt = ''
             if line.payment_datetime:
                 pay_dt = fields.Datetime.context_timestamp(self, line.payment_datetime).strftime('%d/%m/%Y %H:%M:%S')
             pay_user = line.payment_user_id.name if line.payment_user_id else ''
-            # 👇 Define aquí el texto "Sí/No" según haya método elegido
             commission_paid = 'Sí' if line.payment_method else 'No'
             invoice_lines.append({
                 'number': m.name or m.ref or '',
@@ -175,11 +184,14 @@ class CommissionReportWizard(models.TransientModel):
                 'commission_paid': commission_paid,
             })
 
+        ds = self.date_start.strftime('%d/%m/%Y') if self.date_start else ''
+        de = self.date_end.strftime('%d/%m/%Y') if self.date_end else ''
+
         data = {
             'user_name': self.user_id.name,
-            'month': self.month,
-            'month_name': dict(self.fields_get(allfields=['month'])['month']['selection'])[self.month],
-            'year': self.year,
+            'date_start_str': ds,
+            'date_end_str': de,
+            'filter_payment': self.filter_payment,
             'commission_total': self.commission_total,
             'commission_total_str': money_str(self.commission_total),
             'amount_total': self.amount_total,
@@ -191,27 +203,8 @@ class CommissionReportWizard(models.TransientModel):
         }
 
         action = self.env.ref('crm_commission.action_commission_report_pdf').report_action(self, data=data)
-        action['close_on_report_download'] = False  # mantener wizard abierto
+        action['close_on_report_download'] = False
         return action
-
-    @api.onchange('user_id', 'month', 'year')
-    def _onchange_filters(self):
-        self._compute_dates()
-        self._load_lines()
-
-
-    def action_save(self):
-        """Guardar cambios sin cerrar el wizard."""
-        self.ensure_one()
-        self.flush()  # asegura que one2many y cambios de celda se escriban
-        # Muestra el mismo wizard otra vez (target=new mantiene el modal)
-        return {
-            'type': 'ir.actions.act_window',
-            'res_model': 'commission.report.wizard',
-            'view_mode': 'form',
-            'res_id': self.id,
-            'target': 'new',
-        }
 
 
 class CommissionReportWizardLine(models.TransientModel):
@@ -250,7 +243,6 @@ class CommissionReportWizardLine(models.TransientModel):
             self.payment_datetime = fields.Datetime.now()
             self.payment_user_id = self.env.user
 
-
     @api.model_create_multi
     def create(self, vals_list):
         for vals in vals_list:
@@ -261,7 +253,6 @@ class CommissionReportWizardLine(models.TransientModel):
 
     def write(self, vals):
         res = super().write(vals)
-        # Si se acaba de establecer payment_method y no hay sellos, sellar ahora
         if 'payment_method' in vals:
             for rec in self:
                 if rec.payment_method and not rec.payment_datetime:

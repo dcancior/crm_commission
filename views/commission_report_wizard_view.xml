@@ -24,8 +24,9 @@
                     <!-- Filtros -->
                     <group string="Filtros">
                         <field name="user_id" required="1" domain="[('share','=',False)]"/>
-                        <field name="month" required="1"/>
-                        <field name="year" required="1"/>
+                        <field name="date_start" required="1"/>
+                        <field name="date_end" required="1"/>
+                        <field name="filter_payment"/>
                     </group>
 
                     <!-- Totales -->
@@ -44,45 +45,123 @@
 
                     <notebook>
                         <page string="Facturas (sólo pagadas)">
-                            <!-- LÍNEAS -->
-                            <field name="line_ids" nolabel="1">
-                            <!-- Importante: editable="bottom" (o "top") para que se escriban cambios de la fila -->
-                            <tree create="0" delete="0" editable="bottom">
-                                <field name="move_id" options="{'no_create_edit': True, 'no_open': True}"/>
-                                <field name="invoice_date"/>
-                                <field name="partner_id" options="{'no_create_edit': True, 'no_open': True}"/>
-                                <field name="amount_untaxed" sum="Total Base"/>
-                                <field name="commission_percent"/>
 
-                                <!-- Campos por línea -->
+                            <!-- TODAS (único editable) -->
+                            <field name="line_ids" nolabel="1"
+                                context="{'no_open': 1}"
+                                options="{'no_open': True, 'no_create': True, 'no_create_edit': True}"
+                                attrs="{'invisible': [('filter_payment', '!=', 'all')]}">
+                            <tree create="0" edit="0" delete="0" editable="bottom">
+                                <field name="move_id" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/>
+                                <field name="invoice_date" readonly="1"/>
+                                <field name="partner_id" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/>
+                                <field name="amount_untaxed" readonly="1" sum="Total Base"/>
+                                <field name="commission_percent" readonly="1"/>
+
+                                <!-- ÚNICO editable -->
+                                <field name="payment_method"/>
+
+                                <field name="payment_datetime" readonly="1"/>
+                                <field name="payment_user_id" readonly="1"/>
+                                <field name="commission_paid" readonly="1" widget="boolean_toggle"/>
+
+                                <field name="commission_amount" readonly="1" sum="Total Comisión"/>
+                                <field name="payment_state" readonly="1"/>
+                            </tree>
+
+                            <!-- Subform de línea (solo lectura salvo payment_method) -->
+                            <form create="0" edit="0" delete="0">
+                                <group>
+                                <field name="move_id" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/>
+                                <field name="invoice_date" readonly="1"/>
+                                <field name="partner_id" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/>
+                                <field name="amount_untaxed" readonly="1"/>
+                                <field name="commission_percent" readonly="1"/>
+                                <!-- ÚNICO editable -->
                                 <field name="payment_method"/>
                                 <field name="payment_datetime" readonly="1"/>
                                 <field name="payment_user_id" readonly="1"/>
-                                <field name="commission_paid" readonly="1"/>
-
-                                <field name="commission_amount" sum="Total Comisión"/>
-                                
-                            </tree>
-                            <form create="0" delete="0">
-                                <group>
-                                    <field name="move_id" options="{'no_create_edit': True, 'no_open': True}"/>
-                                    <field name="invoice_date"/>
-                                    <field name="partner_id" options="{'no_create_edit': True, 'no_open': True}"/>
-                                    <field name="amount_untaxed"/>
-                                    <field name="commission_percent"/>
-
-                                    <field name="payment_method"/>
-                                    <field name="payment_datetime" readonly="1"/>
-                                    <field name="payment_user_id" readonly="1"/>
-                                     <field name="commission_paid" readonly="1"/>
-
-                                    <field name="commission_amount"/>
-                                    
+                                <field name="commission_paid" readonly="1" widget="boolean_toggle"/>
+                                <field name="commission_amount" readonly="1"/>
+                                <field name="payment_state" readonly="1"/>
                                 </group>
                             </form>
                             </field>
+
+                            <!-- PAGADAS (solo lectura, sin pop-up) -->
+                            <field name="line_ids" nolabel="1"
+                                domain="[('payment_method', '!=', False)]"
+                                context="{'no_open': 1}"
+                                options="{'no_open': True, 'no_create': True, 'no_create_edit': True}"
+                                attrs="{'invisible': [('filter_payment', '!=', 'paid')]}">
+                            <tree create="0" edit="0" delete="0">
+                                <field name="move_id" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/>
+                                <field name="invoice_date" readonly="1"/>
+                                <field name="partner_id" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/>
+                                <field name="amount_untaxed" readonly="1" sum="Total Base"/>
+                                <field name="commission_percent" readonly="1"/>
+                                <field name="payment_method" readonly="1"/>
+                                <field name="payment_datetime" readonly="1"/>
+                                <field name="payment_user_id" readonly="1"/>
+                                <field name="commission_paid" readonly="1" widget="boolean_toggle"/>
+                                <field name="commission_amount" readonly="1" sum="Total Comisión"/>
+                                <field name="payment_state" readonly="1"/>
+                            </tree>
+                            <form create="0" edit="0" delete="0">
+                                <group>
+                                <field name="move_id" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/>
+                                <field name="invoice_date" readonly="1"/>
+                                <field name="partner_id" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/>
+                                <field name="amount_untaxed" readonly="1"/>
+                                <field name="commission_percent" readonly="1"/>
+                                <field name="payment_method" readonly="1"/>
+                                <field name="payment_datetime" readonly="1"/>
+                                <field name="payment_user_id" readonly="1"/>
+                                <field name="commission_paid" readonly="1" widget="boolean_toggle"/>
+                                <field name="commission_amount" readonly="1"/>
+                                <field name="payment_state" readonly="1"/>
+                                </group>
+                            </form>
+                            </field>
+
+                            <!-- NO PAGADAS (solo lectura, sin pop-up) -->
+                            <field name="line_ids" nolabel="1"
+                                domain="[('payment_method', '=', False)]"
+                                context="{'no_open': 1}"
+                                options="{'no_open': True, 'no_create': True, 'no_create_edit': True}"
+                                attrs="{'invisible': [('filter_payment', '!=', 'unpaid')]}">
+                            <tree create="0" edit="0" delete="0">
+                                <field name="move_id" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/>
+                                <field name="invoice_date" readonly="1"/>
+                                <field name="partner_id" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/>
+                                <field name="amount_untaxed" readonly="1" sum="Total Base"/>
+                                <field name="commission_percent" readonly="1"/>
+                                <field name="payment_method" readonly="1"/>
+                                <field name="payment_datetime" readonly="1"/>
+                                <field name="payment_user_id" readonly="1"/>
+                                <field name="commission_paid" readonly="1" widget="boolean_toggle"/>
+                                <field name="commission_amount" readonly="1" sum="Total Comisión"/>
+                                <field name="payment_state" readonly="1"/>
+                            </tree>
+                            <form create="0" edit="0" delete="0">
+                                <group>
+                                <field name="move_id" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/>
+                                <field name="invoice_date" readonly="1"/>
+                                <field name="partner_id" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/>
+                                <field name="amount_untaxed" readonly="1"/>
+                                <field name="commission_percent" readonly="1"/>
+                                <field name="payment_method" readonly="1"/>
+                                <field name="payment_datetime" readonly="1"/>
+                                <field name="payment_user_id" readonly="1"/>
+                                <field name="commission_paid" readonly="1" widget="boolean_toggle"/>
+                                <field name="commission_amount" readonly="1"/>
+                                <field name="payment_state" readonly="1"/>
+                                </group>
+                            </form>
+                            </field>
+
                         </page>
-                    </notebook>
+                        </notebook>
                 </sheet>
 
                 <footer>
