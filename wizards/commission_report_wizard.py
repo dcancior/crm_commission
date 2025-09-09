@@ -10,6 +10,7 @@
 
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError
+import base64
 
 PAYMENT_METHODS = [
     ('efectivo', 'Efectivo'),
@@ -47,10 +48,13 @@ class CommissionReportWizard(models.TransientModel):
     # ========= KPIs / Totales =========
     commission_percent = fields.Float(string='Porcentaje Comisión (Equipo)', digits=(16, 2), compute='_compute_totals')
     lines_count = fields.Integer(string='Líneas', compute='_compute_totals')
-    amount_total = fields.Float(string='Total Ventas (Base)', digits=(16, 2), currency_field='currency_id', compute='_compute_totals')
-    commission_total = fields.Float(string='Total Comisión', digits=(16, 2), currency_field='currency_id', compute='_compute_totals')
+    amount_total = fields.Float(string='Total Ventas (Base)', digits=(16, 2),
+                                currency_field='currency_id', compute='_compute_totals')
+    commission_total = fields.Float(string='Total Comisión', digits=(16, 2),
+                                    currency_field='currency_id', compute='_compute_totals')
 
-    currency_id = fields.Many2one('res.currency', string='Moneda', default=lambda self: self.env.company.currency_id)
+    currency_id = fields.Many2one('res.currency', string='Moneda',
+                                  default=lambda self: self.env.company.currency_id)
 
     # ========= Detalle =========
     line_ids = fields.One2many('commission.report.wizard.line', 'wizard_id')
@@ -68,38 +72,49 @@ class CommissionReportWizard(models.TransientModel):
             ('invoice_date', '<=', self.date_end),
         ]
 
-    def _iter_moves_with_entries(self):
-        """Genera (move, entry) garantizando que exista el commission.payment.entry."""
+    def _iter_moves_with_entries(self, create_missing=True):
+        """Devuelve pares (move, entry) de forma eficiente.
+        - create_missing=True  -> crea entries faltantes (para UI)
+        - create_missing=False -> NO crea (para PDF), evita escrituras en reporte
+        """
         self.ensure_one()
         Move = self.env['account.move']
         Entry = self.env['commission.payment.entry']
 
+        # 1) Trae todas las facturas del rango
         moves = Move.search(self._moves_domain(), order='invoice_date asc, name asc')
         if not moves:
             return []
 
-        # Normaliza legacy ('efect'/'trans') si existiera
-        legacy_map = {'efect': 'efectivo', 'trans': 'transferencia'}
-        entries = Entry.search([('move_id', 'in', moves.ids),
-                                ('salesperson_id', '=', self.user_id.id)])
-        for e in entries:
-            if e.payment_method in legacy_map:
-                e.write({'payment_method': legacy_map[e.payment_method]})
+        # 2) Trae todas las entries en un solo query y mapéalas por move_id
+        entries = Entry.search([
+            ('move_id', 'in', moves.ids),
+            ('salesperson_id', '=', self.user_id.id),
+        ])
+        entry_by_move = {e.move_id.id: e for e in entries}
 
-        out = []
-        for m in moves:
-            entry = Entry.search([('move_id', '=', m.id),
-                                  ('salesperson_id', '=', self.user_id.id)], limit=1)
-            if not entry:
-                entry = Entry.create({
-                    'move_id': m.id,
+        # 3) Normaliza legacy en lote (si aplica)
+        legacy_map = {'efect': 'efectivo', 'trans': 'transferencia'}
+        legacy_to_fix = entries.filtered(lambda e: e.payment_method in legacy_map)
+        if legacy_to_fix:
+            for e in legacy_to_fix:
+                e.payment_method = legacy_map[e.payment_method]
+
+        # 4) Crea en bloque SOLO si se pide (UI); nunca en el PDF
+        if create_missing:
+            missing_ids = [mid for mid in moves.ids if mid not in entry_by_move]
+            if missing_ids:
+                new_entries = Entry.create([{
+                    'move_id': mid,
                     'salesperson_id': self.user_id.id,
-                })
-            out.append((m, entry))
-        return out
+                } for mid in missing_ids])
+                entry_by_move.update({e.move_id.id: e for e in new_entries})
+
+        # 5) Ensambla pares en el mismo orden de 'moves'
+        return [(m, entry_by_move.get(m.id)) for m in moves if entry_by_move.get(m.id)]
 
     def _filter_pair_by_selection(self, pair):
-        """Aplica el filtro (all/paid/unpaid) sobre un par (move, entry)."""
+        """Aplica el filtro (all/paid/unpaid) sobre (move, entry)."""
         self.ensure_one()
         _m, entry = pair
         if self.filter_payment == 'paid':
@@ -111,24 +126,34 @@ class CommissionReportWizard(models.TransientModel):
     # ----------------- CARGA DE LÍNEAS (UI) -----------------
 
     def _load_lines(self):
-        Entry = self.env['commission.payment.entry']
+        """Reconstruye la tabla en UI respetando el filtro y creando entries faltantes."""
         for rec in self:
-            # ⚠️ Antes: si faltaba algo, hacía rec.line_ids = [(5,0,0)]
-            # ✅ Ahora: simplemente no toques las líneas y sal.
             if not (rec.user_id and rec.date_start and rec.date_end):
                 continue
 
-            pairs = rec._iter_moves_with_entries()
-            # aplica el filtro del wizard
+            pairs = rec._iter_moves_with_entries(create_missing=True)
+            # Aplica el filtro actual del wizard
             pairs = [p for p in pairs if rec._filter_pair_by_selection(p)]
 
-            cmds = [(5, 0, 0)]
-            for m, entry in pairs:
-                cmds.append((0, 0, {
+            rec.line_ids = [(5, 0, 0)] + [
+                (0, 0, {
                     'move_id': m.id,
                     'payment_entry_id': entry.id,
-                }))
-            rec.line_ids = cmds
+                })
+                for (m, entry) in pairs
+            ]
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Asegura que, al crearse el wizard en servidor (al pulsar cualquier botón), las líneas ya queden cargadas."""
+        recs = super().create(vals_list)
+        for rec in recs:
+            try:
+                rec._load_lines()
+            except Exception:
+                # no romper creación del wizard si algo falla cargando líneas
+                pass
+        return recs
 
     @api.onchange('user_id', 'date_start', 'date_end', 'filter_payment')
     def _onchange_any_filter(self):
@@ -136,7 +161,7 @@ class CommissionReportWizard(models.TransientModel):
 
     # ----------------- TOTALES / KPIs -----------------
 
-    @api.depends('user_id', 'line_ids.amount_untaxed', 'line_ids.commission_amount')
+    @api.depends('user_id', 'line_ids', 'line_ids.amount_untaxed', 'line_ids.commission_amount')
     def _compute_totals(self):
         for rec in self:
             rec.commission_percent = rec.user_id.sale_team_id.commission_percent if rec.user_id and rec.user_id.sale_team_id else 0.0
@@ -160,7 +185,8 @@ class CommissionReportWizard(models.TransientModel):
     def action_save(self):
         self.ensure_one()
         self.flush()
-        # No tocamos filter_payment aquí; solo confirmamos
+        # Mantiene filtro y líneas
+        self._load_lines()
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -172,12 +198,23 @@ class CommissionReportWizard(models.TransientModel):
         }
 
     def action_print_pdf(self):
-        """Genera el PDF SIN depender de line_ids, para evitar listas vacías por refrescos."""
+        """Renderiza el PDF en servidor (sin /report/pdf) y dispara descarga directa."""
         self.ensure_one()
 
-        # — 1) Reconstruimos el dataset directo de BD (mismo filtro del wizard)
-        pairs = self._iter_moves_with_entries()
+        # Solo entradas existentes (no crear al generar PDF)
+        pairs = self._iter_moves_with_entries(create_missing=False)
         pairs = [p for p in pairs if self._filter_pair_by_selection(p)]
+        if not pairs:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Reporte vacío',
+                    'message': 'No hay facturas en el rango/filtro seleccionado.',
+                    'sticky': False,
+                    'type': 'warning',
+                }
+            }
 
         currency = self.currency_id or self.env.company.currency_id
         decimals = int(getattr(currency, 'decimal_places', 2) or 2)
@@ -232,9 +269,66 @@ class CommissionReportWizard(models.TransientModel):
             'currency': currency,
         }
 
-        action = self.env.ref('crm_commission.action_commission_report_pdf').report_action(self, data=data)
-        action['close_on_report_download'] = False
-        return action
+        # Render QWeb PDF en servidor (sin assets extra/HTTP adicional)
+        Report = self.env['ir.actions.report'].sudo().with_context(
+            lang=self.env.user.lang or 'es_MX',
+            no_abbrev=True,                  # menos procesamiento de cantidades
+            discard_logo_check=True,         # evita chequeos extra de logo
+        )
+        pdf_bytes, _ = Report._render_qweb_pdf('crm_commission.action_commission_report_pdf', [self.id], data=data)
+
+        # Crear attachment y devolver descarga directa
+        fname = f"reporte_comisiones_{(self.user_id.name or '').replace(' ', '_')}_{fields.Datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        attachment = self.env['ir.attachment'].create({
+            'name': fname,
+            'type': 'binary',
+            'datas': base64.b64encode(pdf_bytes),
+            'mimetype': 'application/pdf',
+            'res_model': self._name,
+            'res_id': self.id,
+        })
+        return {
+            'type': 'ir.actions.act_url',
+            'url': f"/web/content/{attachment.id}?download=true",
+            'target': 'self',
+        }
+
+    # --------- Botón “Marcar todas como pagadas” ----------
+    def action_mark_all_paid(self):
+        """
+        Abre el wizard masivo con SOLO las entradas pendientes del rango/usuario actual.
+        No depende de lo que haya alcanzado a renderizarse en la tabla.
+        """
+        self.ensure_one()
+
+        pairs = self._iter_moves_with_entries()
+        # Sin importar el filtro visual, nos quedamos con las NO pagadas (las que interesa marcar)
+        unpaid_entries = self.env['commission.payment.entry'].browse([
+            e.id for (_m, e) in pairs if not e.commission_paid
+        ])
+
+        if not unpaid_entries:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Marcar como pagadas',
+                    'message': 'No hay comisiones pendientes en el rango y vendedor seleccionados.',
+                    'sticky': False,
+                }
+            }
+
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Marcar todas como pagadas',
+            'res_model': 'commission.mass.pay.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_entry_ids': [(6, 0, unpaid_entries.ids)],
+                'parent_wizard_id': self.id,
+            }
+        }
 
 
 class CommissionReportWizardLine(models.TransientModel):
@@ -242,10 +336,12 @@ class CommissionReportWizardLine(models.TransientModel):
     _description = 'Línea del reporte de comisión'
 
     wizard_id = fields.Many2one('commission.report.wizard', required=True, ondelete='cascade')
-    move_id = fields.Many2one('account.move', string='Factura', required=True, domain=[('move_type', '=', 'out_invoice')])
+    move_id = fields.Many2one('account.move', string='Factura', required=True,
+                              domain=[('move_type', '=', 'out_invoice')])
 
     # Enlace PERSISTENTE
-    payment_entry_id = fields.Many2one('commission.payment.entry', string='Registro de pago', ondelete='cascade')
+    payment_entry_id = fields.Many2one('commission.payment.entry', string='Registro de pago',
+                                       ondelete='cascade')
 
     # Indicador (persistente en entry, reflejado aquí)
     commission_paid = fields.Boolean(
@@ -282,7 +378,7 @@ class CommissionReportWizardLine(models.TransientModel):
 
     @api.model_create_multi
     def create(self, vals_list):
-        """Asegura wizard_id/move_id y sella metadatos si ya hay método."""
+        """Asegura wizard_id/move_id; no crear líneas fantasma."""
         cleaned = []
         default_wiz = self.env.context.get('default_wizard_id')
         for vals in vals_list:
@@ -290,7 +386,6 @@ class CommissionReportWizardLine(models.TransientModel):
                 continue
             if not vals.get('wizard_id') and default_wiz:
                 vals['wizard_id'] = default_wiz
-            # Si el método llegó directo (caso improbable), sellar sellos en entry relacionado
             cleaned.append(vals)
         if not cleaned:
             return self.browse()
@@ -334,3 +429,50 @@ class CommissionPaymentEntry(models.Model):
     def _compute_paid(self):
         for r in self:
             r.commission_paid = bool(r.payment_method)
+
+
+# --------- Wizard de pago masivo ----------
+class CommissionMassPayWizard(models.TransientModel):
+    _name = 'commission.mass.pay.wizard'
+    _description = 'Marcar comisiones pagadas (masivo)'
+
+    entry_ids = fields.Many2many(
+        'commission.payment.entry',
+        'cm_masspay_entry_rel',
+        'wizard_id', 'entry_id',
+        string='Registros',
+        required=True,
+    )
+    payment_method = fields.Selection(PAYMENT_METHODS, string='Forma de pago', required=True)
+    payment_datetime = fields.Datetime(string='Fecha y hora de pago',
+                                       default=lambda self: fields.Datetime.now())
+    note = fields.Char(string='Nota (opcional)')
+
+    def action_confirm(self):
+        self.ensure_one()
+
+        vals = {
+            'payment_method': self.payment_method,
+            'payment_datetime': self.payment_datetime,
+            'payment_user_id': self.env.user.id,
+        }
+        if self.note:
+            vals['note'] = self.note
+
+        # Marca SOLO los no pagados (por seguridad)
+        to_write = self.entry_ids.filtered(lambda e: not e.commission_paid)
+        if to_write:
+            to_write.write(vals)
+
+        # Reabrir/refrescar el wizard padre con datos y KPIs cargados
+        parent_id = self.env.context.get('parent_wizard_id')
+        if parent_id:
+            parent = self.env['commission.report.wizard'].browse(parent_id)
+            # refresca líneas en servidor antes de reconstruir la vista
+            try:
+                parent._load_lines()
+            except Exception:
+                pass
+            return parent.action_refresh()
+
+        return {'type': 'ir.actions.act_window_close'}

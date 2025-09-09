@@ -14,3 +14,5 @@ access_mech_comm_wizard_line_user,access.mechanic.commission.wizard.line.user,mo
 access_commission_report_wizard_line,access.commission.report.wizard.line,model_commission_report_wizard_line,crm_commission.group_commission_view,1,1,1,1
 
 access_commission_payment_entry_user,commission.payment.entry user,model_commission_payment_entry,crm_commission.group_commission_view,1,1,1,0
+
+access_commission_mass_pay_wizard,commission.mass.pay.wizard,model_commission_mass_pay_wizard,crm_commission.group_commission_view,1,1,1,1
