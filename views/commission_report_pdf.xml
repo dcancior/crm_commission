@@ -39,34 +39,38 @@
           <table class="table table-sm o_main_table">
             <thead>
               <tr>
+                <th>Comisión pagada</th>
                 <th># Factura</th>
-                <th>Fecha</th>
+                <!-- <th>Fecha</th> -->
                 <th>Cliente</th>
-                <th class="text-right">Base</th>
-                <th class="text-right">% Com.</th>
-                <th class="text-right">Comisión</th>
+                
+                <!-- <th class="text-right">% Com.</th> -->
+                
                 <th>Método</th>
                 <th>Fecha/Hora pago</th>
-                <th>Registró</th>
-                <th>Comisión pagada</th>
+                <!-- <th>Registró</th> -->
+                <th class="text-right">Total sin IVA</th>
+                <th class="text-right">Comisión</th>
               </tr>
             </thead>
             <tbody>
               <t t-if="invoice_lines and len(invoice_lines)">
                 <t t-foreach="invoice_lines" t-as="l">
                   <tr>
+                    <td><t t-esc="l.get('commission_paid')"/></td>
                     <td><t t-esc="l.get('number')"/></td>
-                    <td><t t-esc="l.get('date')"/></td>
+                    <!-- <td><t t-esc="l.get('date')"/></td> -->
                     <td><t t-esc="l.get('partner')"/></td>
 
-                    <td class="text-right"><t t-esc="l.get('amount_untaxed_str') or l.get('amount_untaxed')"/></td>
-                    <td class="text-right"><t t-esc="l.get('commission_percent_str') or l.get('commission_percent')"/></td>
-                    <td class="text-right"><t t-esc="l.get('commission_amount_str') or l.get('commission_amount')"/></td>
+                    
+                    <!-- <td class="text-right"><t t-esc="l.get('commission_percent_str') or l.get('commission_percent')"/></td> -->
+                    
 
                     <td><t t-esc="l.get('pay_method')"/></td>
                     <td><t t-esc="l.get('pay_datetime')"/></td>
-                    <td><t t-esc="l.get('pay_user')"/></td>
-                    <td><t t-esc="l.get('commission_paid')"/></td>
+                    <!-- <td><t t-esc="l.get('pay_user')"/></td> -->
+                    <td class="text-right"><t t-esc="l.get('amount_untaxed_str') or l.get('amount_untaxed')"/></td>
+                    <td class="text-right"><t t-esc="l.get('commission_amount_str') or l.get('commission_amount')"/></td>
                   </tr>
                 </t>
               </t>
@@ -80,11 +84,10 @@
             </tbody>
             <tfoot>
               <tr>
-                <th colspan="3" class="text-right">Totales</th>
+                <th colspan="5" class="text-right">Totales</th>
                 <th class="text-right"><t t-esc="amount_total_str or amount_total"/></th>
-                <th></th>
                 <th class="text-right"><t t-esc="commission_total_str or commission_total"/></th>
-                <th colspan="4"></th>
+                
               </tr>
             </tfoot>
           </table>

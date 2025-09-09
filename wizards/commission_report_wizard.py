@@ -16,11 +16,9 @@ PAYMENT_METHODS = [
     ('transferencia', 'Transferencia'),
 ]
 
-
 def _default_date_start(self):
     today = fields.Date.context_today(self)
     return today.replace(day=1)
-
 
 def _default_date_end(self):
     return fields.Date.context_today(self)
@@ -30,10 +28,10 @@ class CommissionReportWizard(models.TransientModel):
     _name = 'commission.report.wizard'
     _description = 'Wizard para reporte de comisión por rango de fechas'
 
-    # Filtros
+    # ========= Filtros =========
     user_id = fields.Many2one('res.users', string='Vendedor', required=True)
     date_start = fields.Date(string='Desde', required=True, default=_default_date_start)
-    date_end = fields.Date(string='Hasta', required=True, default=_default_date_end)
+    date_end   = fields.Date(string='Hasta', required=True, default=_default_date_end)
 
     @api.constrains('date_start', 'date_end')
     def _check_dates(self):
@@ -43,108 +41,109 @@ class CommissionReportWizard(models.TransientModel):
 
     filter_payment = fields.Selection(
         [('all', 'Todas'), ('paid', 'Pagadas'), ('unpaid', 'No pagadas')],
-        string='Filtro pago comisión',
-        default='all'
+        string='Filtro pago comisión', default='all'
     )
 
-    # Totales / KPIs
-    lines_count = fields.Integer(string='Líneas', compute='_compute_totals', store=False)
-    amount_total = fields.Float(
-        string='Total Ventas (Base)', digits=(16, 2),
-        currency_field='currency_id', compute='_compute_totals'
-    )
-    commission_total = fields.Float(
-        string='Total Comisión', digits=(16, 2),
-        currency_field='currency_id', compute='_compute_totals'
-    )
-    commission_percent = fields.Float(
-        string='Porcentaje Comisión (Equipo)', digits=(16, 2),
-        compute='_compute_totals'
-    )
-    currency_id = fields.Many2one(
-        'res.currency', string='Moneda',
-        default=lambda self: self.env.company.currency_id
-    )
+    # ========= KPIs / Totales =========
+    commission_percent = fields.Float(string='Porcentaje Comisión (Equipo)', digits=(16, 2), compute='_compute_totals')
+    lines_count = fields.Integer(string='Líneas', compute='_compute_totals')
+    amount_total = fields.Float(string='Total Ventas (Base)', digits=(16, 2), currency_field='currency_id', compute='_compute_totals')
+    commission_total = fields.Float(string='Total Comisión', digits=(16, 2), currency_field='currency_id', compute='_compute_totals')
 
-    # ÚNICO O2M (se reconstruye según filtro)
-    line_ids = fields.One2many('commission.report.wizard.line', 'wizard_id', string='Líneas')
+    currency_id = fields.Many2one('res.currency', string='Moneda', default=lambda self: self.env.company.currency_id)
 
-    # ---------------------------
-    # Construcción de líneas O2M
-    # ---------------------------
-    def _load_lines(self):
-        """Reconstruye line_ids respetando vendedor/fechas y el filtro."""
+    # ========= Detalle =========
+    line_ids = fields.One2many('commission.report.wizard.line', 'wizard_id')
+
+    # ----------------- UTILIDADES PRIVADAS -----------------
+
+    def _moves_domain(self):
+        self.ensure_one()
+        return [
+            ('move_type', '=', 'out_invoice'),
+            ('state', '=', 'posted'),
+            ('payment_state', '=', 'paid'),
+            ('invoice_user_id', '=', self.user_id.id),
+            ('invoice_date', '>=', self.date_start),
+            ('invoice_date', '<=', self.date_end),
+        ]
+
+    def _iter_moves_with_entries(self):
+        """Genera (move, entry) garantizando que exista el commission.payment.entry."""
+        self.ensure_one()
+        Move = self.env['account.move']
         Entry = self.env['commission.payment.entry']
+
+        moves = Move.search(self._moves_domain(), order='invoice_date asc, name asc')
+        if not moves:
+            return []
+
+        # Normaliza legacy ('efect'/'trans') si existiera
+        legacy_map = {'efect': 'efectivo', 'trans': 'transferencia'}
+        entries = Entry.search([('move_id', 'in', moves.ids),
+                                ('salesperson_id', '=', self.user_id.id)])
+        for e in entries:
+            if e.payment_method in legacy_map:
+                e.write({'payment_method': legacy_map[e.payment_method]})
+
+        out = []
+        for m in moves:
+            entry = Entry.search([('move_id', '=', m.id),
+                                  ('salesperson_id', '=', self.user_id.id)], limit=1)
+            if not entry:
+                entry = Entry.create({
+                    'move_id': m.id,
+                    'salesperson_id': self.user_id.id,
+                })
+            out.append((m, entry))
+        return out
+
+    def _filter_pair_by_selection(self, pair):
+        """Aplica el filtro (all/paid/unpaid) sobre un par (move, entry)."""
+        self.ensure_one()
+        _m, entry = pair
+        if self.filter_payment == 'paid':
+            return bool(entry.commission_paid)
+        if self.filter_payment == 'unpaid':
+            return not bool(entry.commission_paid)
+        return True  # all
+
+    # ----------------- CARGA DE LÍNEAS (UI) -----------------
+
+    def _load_lines(self):
+        """Reconstruye line_ids respetando el filtro actual (server-side)."""
         for rec in self:
             if not (rec.user_id and rec.date_start and rec.date_end):
                 rec.line_ids = [(5, 0, 0)]
                 continue
 
-            # Facturas del vendedor pagadas en el rango
-            domain = [
-                ('move_type', '=', 'out_invoice'),
-                ('state', '=', 'posted'),
-                ('payment_state', '=', 'paid'),
-                ('invoice_user_id', '=', rec.user_id.id),
-                ('invoice_date', '>=', rec.date_start),
-                ('invoice_date', '<=', rec.date_end),
-            ]
-            moves = rec.env['account.move'].search(domain, order='invoice_date asc, name asc')
-            move_ids = moves.ids
+            pairs = rec._iter_moves_with_entries()
+            # Aplica filtro del selector
+            pairs = [p for p in pairs if rec._filter_pair_by_selection(p)]
 
-            # Normaliza legacy ('efect'/'trans' → 'efectivo'/'transferencia') si existiera
-            legacy_map = {'efect': 'efectivo', 'trans': 'transferencia'}
-            entries = Entry.search([('move_id', 'in', move_ids),
-                                    ('salesperson_id', '=', rec.user_id.id)])
-            for e in entries:
-                if e.payment_method in legacy_map:
-                    e.write({'payment_method': legacy_map[e.payment_method]})
-
-            # Construye comandos según filtro
             cmds = [(5, 0, 0)]
-            for m in moves:
-                entry = Entry.search([
-                    ('move_id', '=', m.id),
-                    ('salesperson_id', '=', rec.user_id.id)
-                ], limit=1)
-                if not entry:
-                    entry = Entry.create({
-                        'move_id': m.id,
-                        'salesperson_id': rec.user_id.id,
-                    })
-
-                include = True
-                if rec.filter_payment == 'paid':
-                    include = bool(entry.commission_paid)
-                elif rec.filter_payment == 'unpaid':
-                    include = not bool(entry.commission_paid)
-
-                if include:
-                    cmds.append((0, 0, {
-                        'move_id': m.id,
-                        'payment_entry_id': entry.id,
-                    }))
-
+            for m, entry in pairs:
+                cmds.append((0, 0, {
+                    'move_id': m.id,
+                    'payment_entry_id': entry.id,
+                }))
             rec.line_ids = cmds
 
-    @api.depends('user_id', 'line_ids', 'line_ids.amount_untaxed', 'line_ids.commission_amount')
+    @api.onchange('user_id', 'date_start', 'date_end', 'filter_payment')
+    def _onchange_any_filter(self):
+        self._load_lines()
+
+    # ----------------- TOTALES / KPIs -----------------
+
+    @api.depends('user_id', 'line_ids.amount_untaxed', 'line_ids.commission_amount')
     def _compute_totals(self):
         for rec in self:
-            rec.commission_percent = (
-                rec.user_id.sale_team_id.commission_percent
-                if rec.user_id and rec.user_id.sale_team_id else 0.0
-            )
+            rec.commission_percent = rec.user_id.sale_team_id.commission_percent if rec.user_id and rec.user_id.sale_team_id else 0.0
             rec.lines_count = len(rec.line_ids)
             rec.amount_total = sum(rec.line_ids.mapped('amount_untaxed')) if rec.line_ids else 0.0
             rec.commission_total = sum(rec.line_ids.mapped('commission_amount')) if rec.line_ids else 0.0
 
-    @api.onchange('user_id', 'date_start', 'date_end')
-    def _onchange_filters(self):
-        self._load_lines()
-
-    @api.onchange('filter_payment')
-    def _onchange_filter_payment(self):
-        self._load_lines()
+    # ----------------- ACCIONES -----------------
 
     def action_refresh(self):
         self.ensure_one()
@@ -160,6 +159,7 @@ class CommissionReportWizard(models.TransientModel):
     def action_save(self):
         self.ensure_one()
         self.flush()
+        # No tocamos filter_payment aquí; solo confirmamos
         return {
             'type': 'ir.actions.client',
             'tag': 'display_notification',
@@ -171,8 +171,13 @@ class CommissionReportWizard(models.TransientModel):
         }
 
     def action_print_pdf(self):
+        """Genera el PDF SIN depender de line_ids, para evitar listas vacías por refrescos."""
         self.ensure_one()
-        self.flush()
+
+        # — 1) Reconstruimos el dataset directo de BD (mismo filtro del wizard)
+        pairs = self._iter_moves_with_entries()
+        pairs = [p for p in pairs if self._filter_pair_by_selection(p)]
+
         currency = self.currency_id or self.env.company.currency_id
         decimals = int(getattr(currency, 'decimal_places', 2) or 2)
 
@@ -181,14 +186,17 @@ class CommissionReportWizard(models.TransientModel):
             s = f"{val:.{decimals}f}"
             return f"{currency.symbol} {s}" if (currency.position or 'after') == 'before' else f"{s} {currency.symbol}"
 
-        lines = self.line_ids  # ya vienen filtradas
         invoice_lines = []
-        for line in lines:
-            m = line.move_id
-            entry = line.payment_entry_id
+        amount_total = 0.0
+        commission_total = 0.0
+
+        for m, entry in pairs:
+            amount_total += (m.amount_untaxed or 0.0)
+            commission_total += (m.commission_amount or 0.0)
             pay_dt = ''
             if entry and entry.payment_datetime:
                 pay_dt = fields.Datetime.context_timestamp(self, entry.payment_datetime).strftime('%d/%m/%Y %H:%M:%S')
+
             invoice_lines.append({
                 'number': m.name or m.ref or '',
                 'date': m.invoice_date and m.invoice_date.strftime('%d/%m/%Y') or '',
@@ -213,10 +221,10 @@ class CommissionReportWizard(models.TransientModel):
             'date_start_str': ds,
             'date_end_str': de,
             'filter_payment': self.filter_payment,
-            'commission_total': self.commission_total,
-            'commission_total_str': money_str(self.commission_total),
-            'amount_total': self.amount_total,
-            'amount_total_str': money_str(self.amount_total),
+            'commission_total': commission_total,
+            'commission_total_str': money_str(commission_total),
+            'amount_total': amount_total,
+            'amount_total_str': money_str(amount_total),
             'commission_percent': self.commission_percent,
             'commission_percent_str': f"{(self.commission_percent or 0.0):.2f}",
             'invoice_lines': invoice_lines,
@@ -233,14 +241,18 @@ class CommissionReportWizardLine(models.TransientModel):
     _description = 'Línea del reporte de comisión'
 
     wizard_id = fields.Many2one('commission.report.wizard', required=True, ondelete='cascade')
-    move_id = fields.Many2one(
-        'account.move', string='Factura', required=True,
-        domain=[('move_type', '=', 'out_invoice')]
-    )
+    move_id = fields.Many2one('account.move', string='Factura', required=True, domain=[('move_type', '=', 'out_invoice')])
 
-    # Enlace PERSISTENTE al registro de pago
-    payment_entry_id = fields.Many2one(
-        'commission.payment.entry', string='Registro de pago', ondelete='cascade'
+    # Enlace PERSISTENTE
+    payment_entry_id = fields.Many2one('commission.payment.entry', string='Registro de pago', ondelete='cascade')
+
+    # Indicador (persistente en entry, reflejado aquí)
+    commission_paid = fields.Boolean(
+        string='Comisión pagada',
+        related='payment_entry_id.commission_paid',
+        store=True,
+        index=True,
+        readonly=True,
     )
 
     # Datos de factura (related)
@@ -252,19 +264,13 @@ class CommissionReportWizardLine(models.TransientModel):
     currency_id = fields.Many2one(related='move_id.currency_id', store=False)
     payment_state = fields.Selection(related='move_id.payment_state', string='Estado Pago', store=False)
 
-    # Datos de pago (related al entry, editable)
+    # Datos de pago (RELATED al entry)
     payment_method = fields.Selection(
         PAYMENT_METHODS, string='Forma de pago comisión',
         related='payment_entry_id.payment_method', readonly=False
     )
     payment_datetime = fields.Datetime(related='payment_entry_id.payment_datetime', readonly=True)
     payment_user_id = fields.Many2one('res.users', related='payment_entry_id.payment_user_id', readonly=True)
-
-    # Booleano de estado (almacenado en entry)
-    commission_paid = fields.Boolean(
-        related='payment_entry_id.commission_paid',
-        store=True, index=True, readonly=True, string='Comisión pagada'
-    )
 
     @api.onchange('payment_method')
     def _onchange_payment_method(self):
@@ -275,13 +281,15 @@ class CommissionReportWizardLine(models.TransientModel):
 
     @api.model_create_multi
     def create(self, vals_list):
+        """Asegura wizard_id/move_id y sella metadatos si ya hay método."""
         cleaned = []
         default_wiz = self.env.context.get('default_wizard_id')
         for vals in vals_list:
             if not vals.get('move_id'):
-                continue  # evita líneas fantasma
+                continue
             if not vals.get('wizard_id') and default_wiz:
                 vals['wizard_id'] = default_wiz
+            # Si el método llegó directo (caso improbable), sellar sellos en entry relacionado
             cleaned.append(vals)
         if not cleaned:
             return self.browse()
