@@ -14,6 +14,34 @@
     <t t-call="web.html_container">
       <t t-call="web.external_layout">
         <div class="page">
+
+          <style type="text/css">
+            /* Ajustes de la tabla para PDF */
+            table.commission-table {
+              width: 100%;
+              border-collapse: collapse;
+              table-layout: fixed; /* respeta colgroup en PDF */
+            }
+            table.commission-table th,
+            table.commission-table td {
+              padding: 4px 6px;
+              vertical-align: top;
+            }
+            /* ↓ Solo el contenido (no el encabezado) con tipografía un punto menor */
+            table.commission-table tbody td,
+            table.commission-table tfoot td,
+            table.commission-table tfoot th {
+              font-size: 11pt;
+              line-height: 1.2;
+            }
+            /* Evitar quiebres en importes y mantenerlos compactos */
+            .col-amount { white-space: nowrap; }
+            /* Permitir wrap normal en Partner (cliente) para no comer ancho */
+            .col-partner { white-space: normal; word-break: break-word; }
+            /* Centrar el Sí/No de comisión pagada para mejor legibilidad */
+            .col-paid { text-align: center; }
+          </style>
+
           <h2>Reporte de Comisión</h2>
 
           <div class="row mt16 mb8">
@@ -35,17 +63,28 @@
             </div>
           </div>
 
-          <h3 class="mt16">Detalle de Facturas (según filtro)</h3>
-          <table class="table table-sm o_main_table">
+          <h3 class="mt16">Detalle de Facturas</h3>
+
+          <table class="table table-sm o_main_table commission-table">
+            <!-- Control fino de anchos de columna -->
+            <colgroup>
+              <!-- Ajusta si cambias el orden de columnas -->
+              <col style="width: 8%;" />   <!-- Comisión pagada -->
+              <col style="width: 14%;" />  <!-- # Factura -->
+              <col style="width: 22%;" />  <!-- Cliente (más angosta) -->
+              <col style="width: 10%;" />  <!-- Método -->
+              <col style="width: 14%;" />  <!-- Fecha/Hora pago -->
+              <col style="width: 16%;" />  <!-- Total sin IVA (más ancho) -->
+              <col style="width: 16%;" />  <!-- Comisión (más ancho) -->
+            </colgroup>
+
             <thead>
               <tr>
                 <th>Comisión pagada</th>
                 <th># Factura</th>
                 <!-- <th>Fecha</th> -->
                 <th>Cliente</th>
-                
                 <!-- <th class="text-right">% Com.</th> -->
-                
                 <th>Método</th>
                 <th>Fecha/Hora pago</th>
                 <!-- <th>Registró</th> -->
@@ -53,41 +92,49 @@
                 <th class="text-right">Comisión</th>
               </tr>
             </thead>
+
             <tbody>
               <t t-if="invoice_lines and len(invoice_lines)">
                 <t t-foreach="invoice_lines" t-as="l">
                   <tr>
-                    <td><t t-esc="l.get('commission_paid')"/></td>
+                    <td class="col-paid"><t t-esc="l.get('commission_paid')"/></td>
                     <td><t t-esc="l.get('number')"/></td>
                     <!-- <td><t t-esc="l.get('date')"/></td> -->
-                    <td><t t-esc="l.get('partner')"/></td>
-
-                    
+                    <td class="col-partner"><t t-esc="l.get('partner')"/></td>
                     <!-- <td class="text-right"><t t-esc="l.get('commission_percent_str') or l.get('commission_percent')"/></td> -->
-                    
-
                     <td><t t-esc="l.get('pay_method')"/></td>
-                    <td><t t-esc="l.get('pay_datetime')"/></td>
+                    <!-- <td><t t-esc="l.get('pay_datetime')"/></td> -->
+                    <td><t t-esc="(l.get('pay_datetime') or '').split(' ')[0]"/></td> <!-- Solo muestra la fecha, no la hora -->
                     <!-- <td><t t-esc="l.get('pay_user')"/></td> -->
-                    <td class="text-right"><t t-esc="l.get('amount_untaxed_str') or l.get('amount_untaxed')"/></td>
-                    <td class="text-right"><t t-esc="l.get('commission_amount_str') or l.get('commission_amount')"/></td>
+                    <td class="text-right col-amount">
+                      <t t-esc="l.get('amount_untaxed_str') or l.get('amount_untaxed')"/>
+                    </td>
+                    <td class="text-right col-amount">
+                      <t t-esc="l.get('commission_amount_str') or l.get('commission_amount')"/>
+                    </td>
                   </tr>
                 </t>
               </t>
               <t t-else="">
                 <tr>
-                  <td colspan="10" class="text-center text-muted">
+                  <!-- 7 columnas visibles -->
+                  <td colspan="7" class="text-center text-muted">
                     No hay facturas en el periodo/filtro seleccionado.
                   </td>
                 </tr>
               </t>
             </tbody>
+
             <tfoot>
               <tr>
+                <!-- Hay 7 columnas. Antes de los totales monetarios hay 5 -->
                 <th colspan="5" class="text-right">Totales</th>
-                <th class="text-right"><t t-esc="amount_total_str or amount_total"/></th>
-                <th class="text-right"><t t-esc="commission_total_str or commission_total"/></th>
-                
+                <th class="text-right col-amount">
+                  <t t-esc="amount_total_str or amount_total"/>
+                </th>
+                <th class="text-right col-amount">
+                  <t t-esc="commission_total_str or commission_total"/>
+                </th>
               </tr>
             </tfoot>
           </table>
