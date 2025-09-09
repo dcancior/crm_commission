@@ -10,16 +10,17 @@
 
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError
-from datetime import datetime, date
 
 PAYMENT_METHODS = [
     ('efectivo', 'Efectivo'),
     ('transferencia', 'Transferencia'),
 ]
 
+
 def _default_date_start(self):
     today = fields.Date.context_today(self)
     return today.replace(day=1)
+
 
 def _default_date_end(self):
     return fields.Date.context_today(self)
@@ -32,7 +33,7 @@ class CommissionReportWizard(models.TransientModel):
     # Filtros
     user_id = fields.Many2one('res.users', string='Vendedor', required=True)
     date_start = fields.Date(string='Desde', required=True, default=_default_date_start)
-    date_end   = fields.Date(string='Hasta', required=True, default=_default_date_end)
+    date_end = fields.Date(string='Hasta', required=True, default=_default_date_end)
 
     @api.constrains('date_start', 'date_end')
     def _check_dates(self):
@@ -47,35 +48,39 @@ class CommissionReportWizard(models.TransientModel):
     )
 
     # Totales / KPIs
+    lines_count = fields.Integer(string='Líneas', compute='_compute_totals', store=False)
     amount_total = fields.Float(
         string='Total Ventas (Base)', digits=(16, 2),
-        currency_field='currency_id', compute='_compute_totals', store=False
+        currency_field='currency_id', compute='_compute_totals'
     )
     commission_total = fields.Float(
         string='Total Comisión', digits=(16, 2),
-        currency_field='currency_id', compute='_compute_totals', store=False
+        currency_field='currency_id', compute='_compute_totals'
     )
     commission_percent = fields.Float(
         string='Porcentaje Comisión (Equipo)', digits=(16, 2),
-        compute='_compute_totals', store=False
+        compute='_compute_totals'
     )
     currency_id = fields.Many2one(
         'res.currency', string='Moneda',
         default=lambda self: self.env.company.currency_id
     )
 
-    # Detalle de facturas (sólo pagadas)
-    line_ids = fields.One2many('commission.report.wizard.line', 'wizard_id')
+    # ÚNICO O2M (se reconstruye según filtro)
+    line_ids = fields.One2many('commission.report.wizard.line', 'wizard_id', string='Líneas')
 
+    # ---------------------------
+    # Construcción de líneas O2M
+    # ---------------------------
     def _load_lines(self):
-        """Carga/sincroniza líneas con facturas cliente 'posted' y 'paid' en el rango."""
+        """Reconstruye line_ids respetando vendedor/fechas y el filtro."""
+        Entry = self.env['commission.payment.entry']
         for rec in self:
             if not (rec.user_id and rec.date_start and rec.date_end):
                 rec.line_ids = [(5, 0, 0)]
                 continue
 
-            existing_map = {l.move_id.id: l for l in rec.line_ids}
-
+            # Facturas del vendedor pagadas en el rango
             domain = [
                 ('move_type', '=', 'out_invoice'),
                 ('state', '=', 'posted'),
@@ -85,34 +90,60 @@ class CommissionReportWizard(models.TransientModel):
                 ('invoice_date', '<=', rec.date_end),
             ]
             moves = rec.env['account.move'].search(domain, order='invoice_date asc, name asc')
+            move_ids = moves.ids
 
-            values = []
+            # Normaliza legacy ('efect'/'trans' → 'efectivo'/'transferencia') si existiera
+            legacy_map = {'efect': 'efectivo', 'trans': 'transferencia'}
+            entries = Entry.search([('move_id', 'in', move_ids),
+                                    ('salesperson_id', '=', rec.user_id.id)])
+            for e in entries:
+                if e.payment_method in legacy_map:
+                    e.write({'payment_method': legacy_map[e.payment_method]})
+
+            # Construye comandos según filtro
+            cmds = [(5, 0, 0)]
             for m in moves:
-                prev = existing_map.get(m.id)
-                vals = {'move_id': m.id}
-                if prev:
-                    vals.update({
-                        'payment_method': prev.payment_method,
-                        'payment_datetime': prev.payment_datetime,
-                        'payment_user_id': prev.payment_user_id.id if prev.payment_user_id else False,
+                entry = Entry.search([
+                    ('move_id', '=', m.id),
+                    ('salesperson_id', '=', rec.user_id.id)
+                ], limit=1)
+                if not entry:
+                    entry = Entry.create({
+                        'move_id': m.id,
+                        'salesperson_id': rec.user_id.id,
                     })
-                values.append((0, 0, vals))
 
-            rec.line_ids = [(5, 0, 0)] + values
+                include = True
+                if rec.filter_payment == 'paid':
+                    include = bool(entry.commission_paid)
+                elif rec.filter_payment == 'unpaid':
+                    include = not bool(entry.commission_paid)
 
-    @api.depends('user_id', 'line_ids.amount_untaxed', 'line_ids.commission_amount')
+                if include:
+                    cmds.append((0, 0, {
+                        'move_id': m.id,
+                        'payment_entry_id': entry.id,
+                    }))
+
+            rec.line_ids = cmds
+
+    @api.depends('user_id', 'line_ids', 'line_ids.amount_untaxed', 'line_ids.commission_amount')
     def _compute_totals(self):
         for rec in self:
             rec.commission_percent = (
                 rec.user_id.sale_team_id.commission_percent
                 if rec.user_id and rec.user_id.sale_team_id else 0.0
             )
+            rec.lines_count = len(rec.line_ids)
             rec.amount_total = sum(rec.line_ids.mapped('amount_untaxed')) if rec.line_ids else 0.0
             rec.commission_total = sum(rec.line_ids.mapped('commission_amount')) if rec.line_ids else 0.0
 
     @api.onchange('user_id', 'date_start', 'date_end')
     def _onchange_filters(self):
-        # Ya no usamos _compute_dates; sólo recargamos líneas
+        self._load_lines()
+
+    @api.onchange('filter_payment')
+    def _onchange_filter_payment(self):
         self._load_lines()
 
     def action_refresh(self):
@@ -127,46 +158,37 @@ class CommissionReportWizard(models.TransientModel):
         }
 
     def action_save(self):
-        """Guardar cambios sin cerrar el wizard."""
         self.ensure_one()
         self.flush()
         return {
-            'type': 'ir.actions.act_window',
-            'res_model': 'commission.report.wizard',
-            'view_mode': 'form',
-            'res_id': self.id,
-            'target': 'new',
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Cambios guardados',
+                'message': 'Pagos de comisión actualizados.',
+                'sticky': False,
+            }
         }
 
     def action_print_pdf(self):
         self.ensure_one()
         self.flush()
-
         currency = self.currency_id or self.env.company.currency_id
-        decimals = getattr(currency, 'decimal_places', 2) or 2
+        decimals = int(getattr(currency, 'decimal_places', 2) or 2)
 
         def money_str(amount):
             val = currency.round(amount or 0.0)
             s = f"{val:.{decimals}f}"
             return f"{currency.symbol} {s}" if (currency.position or 'after') == 'before' else f"{s} {currency.symbol}"
 
-        # Aplicar filtro de pagadas/no pagadas para el reporte
-        lines = self.line_ids
-        if self.filter_payment == 'paid':
-            lines = lines.filtered(lambda l: bool(l.payment_method))
-        elif self.filter_payment == 'unpaid':
-            lines = lines.filtered(lambda l: not l.payment_method)
-
-        method_labels = dict(PAYMENT_METHODS)
+        lines = self.line_ids  # ya vienen filtradas
         invoice_lines = []
         for line in lines:
             m = line.move_id
-            pay_method = method_labels.get(line.payment_method or '', '')
+            entry = line.payment_entry_id
             pay_dt = ''
-            if line.payment_datetime:
-                pay_dt = fields.Datetime.context_timestamp(self, line.payment_datetime).strftime('%d/%m/%Y %H:%M:%S')
-            pay_user = line.payment_user_id.name if line.payment_user_id else ''
-            commission_paid = 'Sí' if line.payment_method else 'No'
+            if entry and entry.payment_datetime:
+                pay_dt = fields.Datetime.context_timestamp(self, entry.payment_datetime).strftime('%d/%m/%Y %H:%M:%S')
             invoice_lines.append({
                 'number': m.name or m.ref or '',
                 'date': m.invoice_date and m.invoice_date.strftime('%d/%m/%Y') or '',
@@ -177,11 +199,10 @@ class CommissionReportWizard(models.TransientModel):
                 'commission_percent_str': f"{(m.commission_percent or 0.0):.2f}",
                 'commission_amount': m.commission_amount,
                 'commission_amount_str': money_str(m.commission_amount),
-                'payment_state': m.payment_state or '',
-                'pay_method': pay_method,
+                'pay_method': dict(PAYMENT_METHODS).get(entry.payment_method, '') if entry else '',
                 'pay_datetime': pay_dt,
-                'pay_user': pay_user,
-                'commission_paid': commission_paid,
+                'pay_user': entry.payment_user_id.name if entry and entry.payment_user_id else '',
+                'commission_paid': 'Sí' if entry and entry.payment_method else 'No',
             })
 
         ds = self.date_start.strftime('%d/%m/%Y') if self.date_start else ''
@@ -211,62 +232,96 @@ class CommissionReportWizardLine(models.TransientModel):
     _name = 'commission.report.wizard.line'
     _description = 'Línea del reporte de comisión'
 
-    wizard_id = fields.Many2one('commission.report.wizard', string='Wizard', required=True, ondelete='cascade')
-    move_id = fields.Many2one('account.move', string='Factura', required=True, domain=[('move_type', '=', 'out_invoice')])
+    wizard_id = fields.Many2one('commission.report.wizard', required=True, ondelete='cascade')
+    move_id = fields.Many2one(
+        'account.move', string='Factura', required=True,
+        domain=[('move_type', '=', 'out_invoice')]
+    )
 
-    # Reutilizamos campos del move (ya calculados)
-    partner_id = fields.Many2one(related='move_id.partner_id', string='Cliente', store=False)
-    invoice_date = fields.Date(related='move_id.invoice_date', string='Fecha', store=False)
-    amount_untaxed = fields.Monetary(related='move_id.amount_untaxed', string='Base', store=False, currency_field='currency_id')
-    commission_percent = fields.Float(related='move_id.commission_percent', string='% Comisión', store=False)
-    commission_amount = fields.Monetary(related='move_id.commission_amount', string='Comisión', store=False, currency_field='currency_id')
+    # Enlace PERSISTENTE al registro de pago
+    payment_entry_id = fields.Many2one(
+        'commission.payment.entry', string='Registro de pago', ondelete='cascade'
+    )
+
+    # Datos de factura (related)
+    partner_id = fields.Many2one(related='move_id.partner_id', store=False)
+    invoice_date = fields.Date(related='move_id.invoice_date', store=False)
+    amount_untaxed = fields.Monetary(related='move_id.amount_untaxed', currency_field='currency_id', store=False)
+    commission_percent = fields.Float(related='move_id.commission_percent', store=False)
+    commission_amount = fields.Monetary(related='move_id.commission_amount', currency_field='currency_id', store=False)
+    currency_id = fields.Many2one(related='move_id.currency_id', store=False)
     payment_state = fields.Selection(related='move_id.payment_state', string='Estado Pago', store=False)
-    currency_id = fields.Many2one(related='move_id.currency_id', string='Moneda', store=False)
 
-    # Selección por línea + sellos
+    # Datos de pago (related al entry, editable)
     payment_method = fields.Selection(
         PAYMENT_METHODS, string='Forma de pago comisión',
-        help='Seleccione cómo se paga la comisión de esta factura',
+        related='payment_entry_id.payment_method', readonly=False
     )
-    payment_datetime = fields.Datetime(
-        string='Fecha/Hora pago', readonly=True,
-        help='Se llena automáticamente al elegir el método'
-    )
-    payment_user_id = fields.Many2one(
-        'res.users', string='Registró', readonly=True,
-        help='Usuario que registró el pago de la comisión'
+    payment_datetime = fields.Datetime(related='payment_entry_id.payment_datetime', readonly=True)
+    payment_user_id = fields.Many2one('res.users', related='payment_entry_id.payment_user_id', readonly=True)
+
+    # Booleano de estado (almacenado en entry)
+    commission_paid = fields.Boolean(
+        related='payment_entry_id.commission_paid',
+        store=True, index=True, readonly=True, string='Comisión pagada'
     )
 
     @api.onchange('payment_method')
     def _onchange_payment_method(self):
-        if self.payment_method:
-            self.payment_datetime = fields.Datetime.now()
-            self.payment_user_id = self.env.user
+        for line in self:
+            if line.payment_entry_id and line.payment_method:
+                line.payment_entry_id.payment_datetime = fields.Datetime.now()
+                line.payment_entry_id.payment_user_id = self.env.user
 
     @api.model_create_multi
     def create(self, vals_list):
+        cleaned = []
+        default_wiz = self.env.context.get('default_wizard_id')
         for vals in vals_list:
-            if vals.get('payment_method'):
-                vals.setdefault('payment_datetime', fields.Datetime.now())
-                vals.setdefault('payment_user_id', self.env.user.id)
-        return super().create(vals_list)
+            if not vals.get('move_id'):
+                continue  # evita líneas fantasma
+            if not vals.get('wizard_id') and default_wiz:
+                vals['wizard_id'] = default_wiz
+            cleaned.append(vals)
+        if not cleaned:
+            return self.browse()
+        return super().create(cleaned)
 
     def write(self, vals):
         res = super().write(vals)
         if 'payment_method' in vals:
-            for rec in self:
-                if rec.payment_method and not rec.payment_datetime:
-                    rec.payment_datetime = fields.Datetime.now()
-                    rec.payment_user_id = self.env.user
+            for line in self:
+                entry = line.payment_entry_id
+                if entry and entry.payment_method and not entry.payment_datetime:
+                    entry.write({
+                        'payment_datetime': fields.Datetime.now(),
+                        'payment_user_id': self.env.user.id,
+                    })
         return res
 
-    commission_paid = fields.Boolean(
-        string='Comisión pagada',
-        compute='_compute_commission_paid',
-        store=False
-    )
+
+class CommissionPaymentEntry(models.Model):
+    _name = 'commission.payment.entry'
+    _description = 'Pago de comisión por factura y vendedor'
+    _rec_name = 'move_id'
+
+    move_id = fields.Many2one('account.move', string='Factura', required=True, ondelete='cascade')
+    salesperson_id = fields.Many2one('res.users', string='Vendedor', required=True, ondelete='cascade')
+
+    payment_method = fields.Selection(PAYMENT_METHODS, string='Forma de pago')
+    payment_datetime = fields.Datetime(string='Fecha/Hora pago')
+    payment_user_id = fields.Many2one('res.users', string='Registró')
+    note = fields.Char(string='Nota')
+
+    commission_paid = fields.Boolean(string='Comisión pagada', compute='_compute_paid', store=True)
+
+    _sql_constraints = [
+        ('move_salesperson_uniq',
+         'unique(move_id, salesperson_id)',
+         'Ya existe un registro de pago de comisión para esa factura y vendedor.'),
+    ]
 
     @api.depends('payment_method')
-    def _compute_commission_paid(self):
-        for rec in self:
-            rec.commission_paid = bool(rec.payment_method)
+    def _compute_paid(self):
+        for r in self:
+            r.commission_paid = bool(r.payment_method)
