@@ -9,18 +9,14 @@
       <form string="Pago de comisión (línea)">
         <group>
           <!-- Claves invisibles -->
-          <field name="wizard_id"        invisible="1" readonly="1" force_save="1"
-                 options="{'no_open': True, 'no_create': True, 'no_create_edit': True}"/>
-          <field name="payment_entry_id" invisible="1" readonly="1" force_save="1"
-                 options="{'no_open': True, 'no_create': True, 'no_create_edit': True}"/>
-          <field name="move_id"          invisible="1" readonly="1" force_save="1"
-                 options="{'no_open': True, 'no_create': True, 'no_create_edit': True}"/>
+          <field name="wizard_id" invisible="1" readonly="1" force_save="1" options="{'no_open': True, 'no_create': True, 'no_create_edit': True}"/>
+          <field name="payment_entry_id" invisible="1" readonly="1" force_save="1" options="{'no_open': True, 'no_create': True, 'no_create_edit': True}"/>
+          <field name="move_id" invisible="1" readonly="1" force_save="1" options="{'no_open': True, 'no_create': True, 'no_create_edit': True}"/>
 
           <!-- Solo lectura de la factura -->
-          <field name="invoice_date" readonly="1"/>
-          <field name="partner_id"   readonly="1" options="{'no_open': True, 'no_create_edit': True}"/>
-          <field name="amount_untaxed" readonly="1"/>
-          <field name="commission_percent" readonly="1"/>
+          <field name="invoice_date" string="Fecha Factura" readonly="1"/>
+          <field name="partner_id" string="Cliente" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/>
+          <field name="amount_untaxed" string="Total sin IVA" readonly="1"/>
 
           <!-- Único editable -->
           <field name="payment_method"/>
@@ -29,6 +25,7 @@
           <field name="payment_datetime" readonly="1"/>
           <field name="payment_user_id" readonly="1"/>
           <field name="commission_paid" readonly="1" widget="boolean_toggle"/>
+          <field name="commission_percent" string="% Comisión" readonly="1"/>
           <field name="commission_amount" readonly="1"/>
         </group>
       </form>
@@ -58,55 +55,42 @@
           <group string="Totales">
             <field name="commission_percent" readonly="1"/>
             <field name="lines_count" readonly="1"/>
-            <field name="amount_total" readonly="1"
-                   widget="monetary"
-                   options="{'currency_field': 'currency_id'}"/>
-            <field name="commission_total" readonly="1"
-                   widget="monetary"
-                   options="{'currency_field': 'currency_id'}"/>
+            <field name="amount_total" readonly="1" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+            <field name="commission_total" readonly="1" widget="monetary" options="{'currency_field': 'currency_id'}"/>
           </group>
 
           <notebook>
             <page string="Facturas (según filtro)">
               <!-- ÚNICA tabla: las líneas ya vienen filtradas desde Python con _load_lines() -->
-              <field name="line_ids" nolabel="1"
-                     mode="tree"
-                     context="{
-                       'no_open': 0,
-                       'default_wizard_id': active_id,
-                       'form_view_ref': 'crm_commission.view_commission_report_line_form'
-                     }"
-                     options="{'no_open': False, 'no_create': True}">
+              <field name="line_ids" nolabel="1" mode="tree" context="{'no_open': 0, 'default_wizard_id': active_id, 'form_view_ref': 'crm_commission.view_commission_report_line_form'}" options="{'no_open': False, 'no_create': True}">
                 <tree create="0" edit="0" delete="0">
-                  <field name="move_id" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/>
-                  <field name="invoice_date" readonly="1"/>
-                  <field name="partner_id" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/>
-                  <field name="amount_untaxed" readonly="1" sum="Total Base"/>
-                  <field name="commission_percent" readonly="1"/>
-                  <!-- Se puede ver aquí pero se edita en el subform -->
-                  <field name="payment_method"/>
-                  <field name="payment_datetime" readonly="1"/>
-                  <field name="payment_user_id" readonly="1"/>
-                  <field name="commission_paid" readonly="1" widget="boolean_toggle"/>
-                  <field name="commission_amount" readonly="1" sum="Total Comisión"/>
+                  <field name="commission_paid" readonly="1" widget="boolean_toggle"/> <!--Booleano pagado no pagado -->
+                  <field name="move_id" string="Factura" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/> <!-- Número de factura-->
+                  <field name="invoice_date" string="Fecha Factura" readonly="1"/> <!-- Fecha y hora de factura -->
+                  <field name="partner_id" string="Cliente" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/> <!-- Cliente -->
+                  <field name="payment_method" string="Forma de pago"/> <!-- Se puede ver aquí pero se edita en el subform -->
+                  <field name="payment_datetime" string="Fecha pago Factura" readonly="1"/> <!-- Fecha y hora del pago de factura -->
+                  <field name="payment_user_id" string="Realizó" readonly="1"/> <!-- Usuario quien hace el pago de factura -->
+                  <field name="amount_untaxed" string="Factura sin IVA" readonly="1" sum="Total Base"/> 
+                  <field name="commission_percent" string="% Comisión" readonly="1"/>
+                  <field name="commission_amount" readonly="1" sum="Comisión"/>
                 </tree>
 
                 <!-- Subform inline (opcional) -->
                 <form string="Pago de comisión" create="0" delete="0">
                   <group>
-                    <field name="wizard_id"        invisible="1" readonly="1" force_save="1"/>
+                    <field name="wizard_id" invisible="1" readonly="1" force_save="1"/>
                     <field name="payment_entry_id" invisible="1" readonly="1" force_save="1"/>
-                    <field name="move_id"          invisible="1" readonly="1" force_save="1"
-                           options="{'no_open': True, 'no_create_edit': True}"/>
-                    <field name="invoice_date" readonly="1"/>
-                    <field name="partner_id" readonly="1"/>
-                    <field name="amount_untaxed" readonly="1"/>
-                    <field name="commission_percent" readonly="1"/>
-                    <field name="payment_method"/>
-                    <field name="payment_datetime" readonly="1"/>
-                    <field name="payment_user_id" readonly="1"/>
-                    <field name="commission_paid" readonly="1" widget="boolean_toggle"/>
-                    <field name="commission_amount" readonly="1"/>
+                    <field name="commission_paid" readonly="1" widget="boolean_toggle"/> <!--Booleano pagado no pagado -->
+                    <field name="move_id" string="Factura" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/> <!-- Número de factura-->
+                    <field name="invoice_date" string="Fecha Factura" readonly="1"/> <!-- Fecha y hora de factura -->
+                    <field name="partner_id" string="Cliente" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/> <!-- Cliente -->
+                    <field name="payment_method" string="Forma de pago"/> <!-- Se puede ver aquí pero se edita en el subform -->
+                    <field name="payment_datetime" string="Fecha pago Factura" readonly="1"/> <!-- Fecha y hora del pago de factura -->
+                    <field name="payment_user_id" string="Realizó" readonly="1"/> <!-- Usuario quien hace el pago de factura -->
+                    <field name="amount_untaxed" string="Factura sin IVA" readonly="1" sum="Total Base"/> 
+                    <field name="commission_percent" string="% Comisión" readonly="1"/>
+                    <field name="commission_amount" readonly="1" sum="Comisión"/>
                   </group>
                 </form>
               </field>
@@ -138,9 +122,7 @@
           <field name="note"/>
         </group>
         <group>
-          <field name="entry_ids"
-                 widget="many2many_tags"
-                 options="{'no_open': True, 'no_create': True}"/>
+          <field name="entry_ids" widget="many2many_tags" options="{'no_open': True, 'no_create': True}"/>
         </group>
         <footer>
           <button name="action_confirm" type="object" string="Aplicar" class="oe_highlight"/>
@@ -151,24 +133,10 @@
   </record>
 
   <!-- Acción para abrir el wizard principal -->
-  <act_window id="action_commission_report_wizard"
-              name="Reporte de Comisión de Ventas"
-              res_model="commission.report.wizard"
-              view_mode="form"
-              target="new"/>
+  <act_window id="action_commission_report_wizard" name="Reporte de Comisión de Ventas" res_model="commission.report.wizard" view_mode="form" target="new"/>
 
   <!-- Menú -->
-  <menuitem id="menu_commission_report_root"
-            name="Comisiones de Ventas"
-            sequence="100"
-            groups="crm_commission.group_commission_view"
-            web_icon="crm_commission,static/description/icon_commission.svg"/>
-
-  <menuitem id="menu_commission_report_wizard"
-            name="Reporte de Comisión de Ventas"
-            parent="menu_commission_report_root"
-            action="action_commission_report_wizard"
-            sequence="10"
-            groups="crm_commission.group_commission_view"/>
+  <menuitem id="menu_commission_report_root" name="Comisiones de Ventas" sequence="100" groups="crm_commission.group_commission_view" web_icon="crm_commission,static/description/icon_commission.svg"/>
+  <menuitem id="menu_commission_report_wizard" name="Reporte de Comisión de Ventas" parent="menu_commission_report_root" action="action_commission_report_wizard" sequence="10" groups="crm_commission.group_commission_view"/>
 
 </odoo>
