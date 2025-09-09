@@ -111,14 +111,15 @@ class CommissionReportWizard(models.TransientModel):
     # ----------------- CARGA DE LÍNEAS (UI) -----------------
 
     def _load_lines(self):
-        """Reconstruye line_ids respetando el filtro actual (server-side)."""
+        Entry = self.env['commission.payment.entry']
         for rec in self:
+            # ⚠️ Antes: si faltaba algo, hacía rec.line_ids = [(5,0,0)]
+            # ✅ Ahora: simplemente no toques las líneas y sal.
             if not (rec.user_id and rec.date_start and rec.date_end):
-                rec.line_ids = [(5, 0, 0)]
                 continue
 
             pairs = rec._iter_moves_with_entries()
-            # Aplica filtro del selector
+            # aplica el filtro del wizard
             pairs = [p for p in pairs if rec._filter_pair_by_selection(p)]
 
             cmds = [(5, 0, 0)]
