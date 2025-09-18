@@ -25,6 +25,7 @@
             <!-- Columna Mecánico antes del subtotal -->
             <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="before">
                 <field name="mechanic_id"
+                    string="Columna de mecánicos"
                     optional="show"
                     domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
             </xpath>
