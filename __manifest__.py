@@ -28,7 +28,8 @@
         'views/product_views.xml',
         'views/sale_views.xml',
         'views/sale_order_set_mechanic_wizard_views.xml',
-        "views/assets.xml",
+        'views/assets.xml',
+        
         
     ],
     'installable': True,

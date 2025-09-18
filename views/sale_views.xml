@@ -10,6 +10,18 @@
         <field name="display_mechanic_fields" invisible="1"/>
       </xpath>
 
+       <!-- Inyecta flags invisibles para usarlos en condiciones -->
+      <xpath expr="//field[@name='order_line']/tree" position="inside">
+        <field name="display_mechanic_fields" invisible="1"/>
+        <field name="product_type" invisible="1"/>
+      </xpath>
+
+      <!-- Aplica decoración SOLO cuando el producto es servicio y falta mecánico -->
+      <xpath expr="//field[@name='order_line']/tree" position="attributes">
+        <!-- Odoo acepta comparadores con == en decoraciones -->
+        <attribute name="decoration-danger">not mechanic_id and product_type == 'service'</attribute>
+      </xpath>
+
       <!-- ✅ Decoración a nivel de fila (rojo si no hay mecánico y se deben mostrar campos) -->
       <xpath expr="//field[@name='order_line']/tree" position="attributes">
         <attribute name="decoration-danger">not mechanic_id and display_mechanic_fields</attribute>
@@ -17,12 +29,11 @@
 
       <!-- Columna Mecánico antes del subtotal -->
       <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="before">
-        <!-- ✅ Requerido también en el form -->
         <field name="mechanic_id"
                string="Columna de mecánicos"
                optional="show"
                domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"
-               attrs="{'required':[('display_mechanic_fields','=',True)]}"/>
+               attrs="{'required':[('product_type','=','service')]}"/>
       </xpath>
 
       <!-- Costo mecánico después del subtotal -->

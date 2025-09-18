@@ -1,0 +1,14 @@
+/* Odoo 16 usa clases bootstrap en decoraciones de tree:
+   - text-danger y/o table-danger sobre el <tr>
+   Cubrimos ambos por si acaso. Solo aplicamos a la celda de mechanic_id. */
+
+.o_list_view tr.text-danger td[data-name="mechanic_id"],
+.o_list_view tr.table-danger td[data-name="mechanic_id"] {
+    background-color: rgba(220, 53, 69, 0.12); /* rojo suave */
+}
+
+.o_list_view tr.text-danger td[data-name="mechanic_id"] .o_field_widget,
+.o_list_view tr.table-danger td[data-name="mechanic_id"] .o_field_widget {
+    color: #dc3545;          /* rojo bootstrap */
+    font-weight: 600;        /* un poco más visible */
+}

@@ -48,6 +48,14 @@ class SaleOrderLine(models.Model):
         help="Horas requeridas × costo por hora × cantidad.",
     )
 
+    # Related al tipo del producto para usarlo en la vista
+    product_type = fields.Selection(
+        related='product_id.type',
+        store=True,  # recomendable para poder usarlo cómodo en tree y dominios
+    )
+
+    
+
     @api.onchange('product_id', 'display_mechanic_fields', 'mechanic_id')
     def _onchange_mechanic_warning(self):
         for line in self:
