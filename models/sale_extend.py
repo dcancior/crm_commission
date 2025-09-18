@@ -66,7 +66,7 @@ class SaleOrderLine(models.Model):  # Clase que hereda las líneas de pedido
     def _compute_mechanic_is_placeholder(self):  # Marca si el mecánico es el placeholder
         for line in self:  # Itera líneas
             name = (line.mechanic_id.name or "").strip().upper()  # Nombre normalizado
-            line.mechanic_is_placeholder = (name == "SELECCIONE UN MECÁNICO")  # True si coincide exactamente
+            line.mechanic_is_placeholder = (name == "SELECCIONAR")  # True si coincide exactamente
 
     @api.onchange("product_id")  # Al cambiar el producto
     def _onchange_autoset_placeholder_mechanic(self):  # Autoselecciona placeholder si es servicio
@@ -82,11 +82,11 @@ class SaleOrderLine(models.Model):  # Clase que hereda las líneas de pedido
         Employee = self.env["hr.employee"]  # Modelo empleado
         # Búsqueda exacta por nombre, permitiendo empleado global (company_id False) o de la compañía actual
         emp = Employee.search([  # Busca exacto primero
-            ("name", "=", "SELECCIONE UN MECÁNICO"),
+            ("name", "=", "SELECCIONAR"),
             "|", ("company_id", "=", False), ("company_id", "=", company_id),
         ], limit=1)  # Límite 1
         if not emp:  # Si no encontró exacto
-            emp = Employee.search([("name", "ilike", "SELECCIONE UN MECÁNICO")], limit=1)  # Búsqueda laxa
+            emp = Employee.search([("name", "ilike", "SELECCIONAR")], limit=1)  # Búsqueda laxa
         return emp  # Devuelve record o vacío
 
     @api.depends(  # Dependencias para el subtotal
