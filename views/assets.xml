@@ -5,7 +5,7 @@
             name="Mechanic Highlight Assets">
     <xpath expr="." position="inside">
       <link rel="stylesheet" href="/crm_commission/static/src/css/mechanic_highlight.css"/>
-      <!-- Si luego quieres JS:
+      <!-- (opcional) JS:
       <script type="module" src="/crm_commission/static/src/js/mechanic_notify.js"/>
       -->
     </xpath>
