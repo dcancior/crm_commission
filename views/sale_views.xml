@@ -1,61 +1,59 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
-╔════════════════════════════════════════════════════════════════════╗
-║  DCR INFORMATIC SERVICES SAS DE CV                                 ║
-║  Web: https://www.dcrsoluciones.com                                ║
-║  Contacto: info@dcrsoluciones.com                                  ║
-║                                                                    ║
-║  Este módulo está bajo licencia (LGPLv3).                          ║
-║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html     ║
-╚════════════════════════════════════════════════════════════════════╝
--->
-
 <odoo>
-    <record id="view_order_form_mechanic_line" model="ir.ui.view">
-        <field name="name">sale.order.form.mechanic.line</field>
-        <field name="model">sale.order</field>
-        <field name="inherit_id" ref="sale.view_order_form"/>
-        <field name="arch" type="xml">
+  <record id="view_order_form_mechanic_line" model="ir.ui.view">
+    <field name="name">sale.order.form.mechanic.line</field>
+    <field name="model">sale.order</field>
+    <field name="inherit_id" ref="sale.view_order_form"/>
+    <field name="arch" type="xml">
 
-            <!-- 2.a) TREE de order_line: inyectar el campo 'display_mechanic_fields' oculto -->
-            <xpath expr="//field[@name='order_line']/tree" position="inside">
-                <field name="display_mechanic_fields" invisible="1"/>
-            </xpath>
+      <!-- Inyectar flag oculto en el tree -->
+      <xpath expr="//field[@name='order_line']/tree" position="inside">
+        <field name="display_mechanic_fields" invisible="1"/>
+      </xpath>
 
-            <!-- Columna Mecánico antes del subtotal -->
-            <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="before">
-                <field name="mechanic_id"
-                    string="Columna de mecánicos"
-                    optional="show"
-                    domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
-            </xpath>
-            <!-- Costo mecánico después del subtotal (controlado por display_mechanic_fields) -->
-            <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="after">
-                <field name="mechanic_cost_subtotal"
-                       optional="hide"
-                       attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
-            </xpath>
+      <!-- ✅ Decoración a nivel de fila (rojo si no hay mecánico y se deben mostrar campos) -->
+      <xpath expr="//field[@name='order_line']/tree" position="attributes">
+        <attribute name="decoration-danger">not mechanic_id and display_mechanic_fields</attribute>
+      </xpath>
 
-            <!-- 2.b) FORM de order_line: inyectar 'display_mechanic_fields' oculto -->
-            <xpath expr="//field[@name='order_line']/form" position="inside">
-                <group invisible="1">
-                    <field name="display_mechanic_fields"/>
-                </group>
-            </xpath>
+      <!-- Columna Mecánico antes del subtotal -->
+      <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="before">
+        <!-- ✅ Requerido también en el form -->
+        <field name="mechanic_id"
+               string="Columna de mecánicos"
+               optional="show"
+               domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"
+               attrs="{'required':[('display_mechanic_fields','=',True)]}"/>
+      </xpath>
 
-            <!-- Grupo visible con los campos del mecánico -->
-            <xpath expr="//field[@name='order_line']/form//group[1]" position="after">
-                <group string="Mecánico">
-                    <field name="mechanic_id"
-                        domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
-                    <field name="mechanic_hours_required" readonly="1"
-                        attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
-                    <field name="mechanic_cost_per_hour" readonly="1"
-                        attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
-                    <field name="mechanic_cost_subtotal" readonly="1"
-                        attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
-                </group>
-            </xpath>
-        </field>
-    </record>
+      <!-- Costo mecánico después del subtotal -->
+      <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="after">
+        <field name="mechanic_cost_subtotal"
+               optional="hide"
+               attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+      </xpath>
+
+      <!-- FORM: flag oculto -->
+      <xpath expr="//field[@name='order_line']/form" position="inside">
+        <group invisible="1">
+          <field name="display_mechanic_fields"/>
+        </group>
+      </xpath>
+
+      <!-- FORM: grupo de mecánico -->
+      <xpath expr="//field[@name='order_line']/form//group[1]" position="after">
+        <group string="Mecánico">
+          <field name="mechanic_id"
+                 domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]" 
+                 attrs="{'required':[('display_mechanic_fields','=',True)]}"/>
+          <field name="mechanic_hours_required" readonly="1"
+                 attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+          <field name="mechanic_cost_per_hour" readonly="1"
+                 attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+          <field name="mechanic_cost_subtotal" readonly="1"
+                 attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+        </group>
+      </xpath>
+
+    </field>
+  </record>
 </odoo>
