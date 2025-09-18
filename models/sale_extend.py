@@ -48,6 +48,31 @@ class SaleOrderLine(models.Model):
         help="Horas requeridas × costo por hora × cantidad.",
     )
 
+    @api.onchange('product_id', 'display_mechanic_fields', 'mechanic_id')
+    def _onchange_mechanic_warning(self):
+        for line in self:
+            if line.display_mechanic_fields and not line.mechanic_id:
+                return {
+                    'warning': {
+                        'title': _('Falta seleccionar el mecánico'),
+                        'message': _(
+                            'Esta línea requiere un mecánico. '
+                            'Por favor, selecciona un valor en el campo "Columna de mecánicos".'
+                        )
+                    }
+                }
+        return {}
+
+
+    # (Opcional) Validación dura al confirmar/guardar
+    @api.constrains('display_mechanic_fields', 'mechanic_id')
+    def _check_mechanic_required(self):
+        for line in self:
+            if line.display_mechanic_fields and not line.mechanic_id:
+                raise ValidationError(_('Debes seleccionar un mecánico en las líneas que lo requieren.'))
+
+                
+
     @api.depends(
         "product_id",
         "product_uom_qty",
