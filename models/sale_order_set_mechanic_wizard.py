@@ -8,112 +8,77 @@
 # ║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html   ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
-from odoo import models, fields, api
+from odoo import models, fields, api, _  # importa _ por si lo necesitas en mensajes  # noqa: E265
 
-class SaleOrder(models.Model):
-    _inherit = 'sale.order'
+# -------------------------------------------------------------------
+# Extensión mínima de sale.order SOLO para abrir el wizard
+# (El aviso "una sola vez" y cualquier validación déjalos en sale_extend.py)
+# -------------------------------------------------------------------
+class SaleOrder(models.Model):  # noqa: E265
+    _inherit = 'sale.order'  # noqa: E265
 
-    def action_open_set_mechanic_wizard(self):
-        self.ensure_one()
-        return {
-            'type': 'ir.actions.act_window',
-            'name': 'Asignar mecánico a líneas',
-            'res_model': 'sale.order.set.mechanic.wizard',
-            'view_mode': 'form',
-            'target': 'new',
-            'context': {
-                'default_order_id': self.id,
-                'default_company_id': self.company_id.id,
+    def action_open_set_mechanic_wizard(self):  # Acción para abrir el wizard  # noqa: E265
+        self.ensure_one()  # Garantiza un solo registro  # noqa: E265
+        return {  # Devuelve acción ventana modal  # noqa: E265
+            'type': 'ir.actions.act_window',  # Tipo de acción  # noqa: E265
+            'name': _('Asignar mecánico a líneas'),  # Título de la ventana  # noqa: E265
+            'res_model': 'sale.order.set.mechanic.wizard',  # Modelo del wizard  # noqa: E265
+            'view_mode': 'form',  # Modo formulario  # noqa: E265
+            'target': 'new',  # Abrir en modal  # noqa: E265
+            'context': {  # Contexto por defecto  # noqa: E265
+                'default_order_id': self.id,  # Pedido actual  # noqa: E265
+                'default_company_id': self.company_id.id,  # Compañía del pedido  # noqa: E265
             },
-        }
-
-    # Flag para no repetir el aviso en este pedido
-    mechanic_warning_ack = fields.Boolean(default=False, copy=False)
-
-    @api.onchange('order_line.mechanic_id', 'order_line.product_id', 'order_line.display_mechanic_fields')  # Disparadores del aviso  # noqa: E265
-    def _onchange_mechanic_global_warning(self):  # Aviso no bloqueante solo una vez por pedido  # noqa: E265
-        for order in self:  # Itera pedidos del recordset  # noqa: E265
-            if order.mechanic_warning_ack:  # Si ya avisó antes en este pedido  # noqa: E265
-                continue  # No volver a avisar  # noqa: E265
-
-            # Filtramos líneas de servicio (usa product_type related=product_id.type)  # noqa: E265
-            service_lines = order.order_line.filtered(lambda l: l.product_id and l.product_id.type == 'service')  # noqa: E265
-            if not service_lines:  # Si no hay servicios, no avisar  # noqa: E265
-                continue  # Salta  # noqa: E265
-
-            any_with_mechanic = any(l.mechanic_id for l in service_lines)  # ¿Existe al menos una línea de servicio con mecánico?  # noqa: E265
-            any_missing_mechanic = any(not l.mechanic_id for l in service_lines)  # ¿Hay alguna de servicio sin mecánico?  # noqa: E265
-
-            if (not any_with_mechanic) and any_missing_mechanic:  # Si no hay ninguna con mecánico y sí faltan  # noqa: E265
-                order.mechanic_warning_ack = True  # Marca que ya se avisó (no repetirá)  # noqa: E265
-                return {  # Devuelve warning no bloqueante  # noqa: E265
-                    'warning': {
-                        'title': _('Falta seleccionar el mecánico'),  # Título del aviso  # noqa: E265
-                        'message': _(
-                            'Tienes líneas de SERVICIO sin mecánico. '
-                            'Selecciona al menos una línea con mecánico. '
-                            'Este aviso se mostrará una sola vez por pedido.'
-                        ),  # Mensaje del aviso  # noqa: E265
-                    }
-                }  # fin return  # noqa: E265
-
-        return {}  # No hay aviso  # noqa: E265
-
-    def action_confirm(self):  # Bloquea confirmar si no hay al menos un mecánico en servicios  # noqa: E265
-        for order in self:  # Itera pedidos  # noqa: E265
-            service_lines = order.order_line.filtered(lambda l: l.product_id and l.product_id.type == 'service')  # noqa: E265
-            if service_lines and not any(l.mechanic_id for l in service_lines):  # Si hay servicios y ninguno con mecánico  # noqa: E265
-                # raise ValidationError(_('Debes asignar al menos un mecánico en alguna línea de servicio.'))  # noqa: E265
-                return {  # Si no quieres bloquear, puedes devolver un warning no bloqueante  # noqa: E265
-                    'warning': {
-                        'title': _('Falta seleccionar el mecánico'),
-                        'message': _('Debes asignar al menos un mecánico en alguna línea de servicio para confirmar.'),  # noqa: E265
-                    }
-                }  # noqa: E265
-        return super().action_confirm()  # Llama confirm estándar  # noqa: E265
+        }  # noqa: E265
 
 
-class SaleOrderSetMechanicWizard(models.TransientModel):
-    _name = 'sale.order.set.mechanic.wizard'
-    _description = 'Asignar mecánico a líneas de servicio del pedido'
+# -------------------------------------------------------------------
+# WIZARD: Asignar mecánico masivo a líneas de servicio del pedido
+# -------------------------------------------------------------------
+class SaleOrderSetMechanicWizard(models.TransientModel):  # noqa: E265
+    _name = 'sale.order.set.mechanic.wizard'  # Nombre técnico  # noqa: E265
+    _description = 'Asignar mecánico a líneas de servicio del pedido'  # Descripción  # noqa: E265
 
-    order_id = fields.Many2one('sale.order', required=True, ondelete='cascade')
-    company_id = fields.Many2one('res.company', readonly=True)
+    order_id = fields.Many2one('sale.order', required=True, ondelete='cascade')  # Pedido objetivo  # noqa: E265
+    company_id = fields.Many2one('res.company', readonly=True)  # Compañía (para dominio de empleado)  # noqa: E265
 
-    mechanic_id = fields.Many2one(
+    mechanic_id = fields.Many2one(  # Mecánico que se aplicará a las líneas  # noqa: E265
         'hr.employee',
         string='Mecánico',
         required=True,
-        domain="[('active','=',True), ('job_id.name', 'ilike', 'mecán'), '|', ('company_id','=',False), ('company_id','=', company_id)]",
-        help="Empleado que se asignará como mecánico a las líneas de servicio."
-    )
+        domain="[('active','=',True), ('job_id.name', 'ilike', 'mecán'), '|', ('company_id','=',False), ('company_id','=', company_id)]",  # noqa: E265
+        help="Empleado que se asignará como mecánico a las líneas de servicio.",  # noqa: E265
+    )  # noqa: E265
 
-    only_empty = fields.Boolean(
+    only_empty = fields.Boolean(  # Solo líneas sin mecánico  # noqa: E265
         string='Solo líneas sin mecánico',
         default=True,
-        help="Si está activo, solo actualizará las líneas de servicio que no tengan mecánico asignado."
-    )
+        help="Si está activo, solo actualizará las líneas de servicio que no tengan mecánico asignado.",  # noqa: E265
+    )  # noqa: E265
 
-    affected_count = fields.Integer(
+    affected_count = fields.Integer(  # Conteo previo de líneas afectadas  # noqa: E265
         string='Líneas afectadas',
         compute='_compute_preview',
-        help="Cantidad de líneas de servicio que se actualizarán con el mecánico seleccionado."
-    )
+        help="Cantidad de líneas de servicio que se actualizarán con el mecánico seleccionado.",  # noqa: E265
+    )  # noqa: E265
 
-    def _get_target_lines(self):
-        self.ensure_one()
-        lines = self.order_id.order_line.filtered(lambda l: l.product_id and l.product_id.type == 'service')
-        if self.only_empty:
-            lines = lines.filtered(lambda l: not l.mechanic_id)
-        return lines
+    # -------------------------------
+    # Helpers del wizard
+    # -------------------------------
+    def _get_target_lines(self):  # Obtiene las líneas objetivo según filtros  # noqa: E265
+        self.ensure_one()  # Un solo wizard  # noqa: E265
+        lines = self.order_id.order_line.filtered(lambda l: l.product_id and l.product_id.type == 'service')  # Solo servicios  # noqa: E265
+        if self.only_empty:  # Si solo vacías  # noqa: E265
+            lines = lines.filtered(lambda l: not l.mechanic_id)  # Sin mecánico  # noqa: E265
+        return lines  # Retorna recordset  # noqa: E265
 
-    @api.depends('order_id', 'only_empty')
-    def _compute_preview(self):
-        for w in self:
-            w.affected_count = len(w._get_target_lines()) if w.order_id else 0
+    @api.depends('order_id', 'only_empty')  # Recalcula al cambiar pedido o flag  # noqa: E265
+    def _compute_preview(self):  # Calcula affected_count  # noqa: E265
+        for w in self:  # Itera wizards  # noqa: E265
+            w.affected_count = len(w._get_target_lines()) if w.order_id else 0  # Conteo  # noqa: E265
 
-    def action_apply(self):
-        self.ensure_one()
-        lines = self._get_target_lines()
-        lines.write({'mechanic_id': self.mechanic_id.id})
-        return {'type': 'ir.actions.act_window_close'}
+    def action_apply(self):  # Aplica el mecánico a las líneas objetivo  # noqa: E265
+        self.ensure_one()  # Un solo wizard  # noqa: E265
+        lines = self._get_target_lines()  # Obtiene líneas  # noqa: E265
+        lines.write({'mechanic_id': self.mechanic_id.id})  # Escribe mecánico  # noqa: E265
+        return {'type': 'ir.actions.act_window_close'}  # Cierra modal  # noqa: E265
