@@ -27,6 +27,49 @@ class SaleOrder(models.Model):
             },
         }
 
+    # Flag para no repetir el aviso en este pedido
+    mechanic_warning_ack = fields.Boolean(default=False, copy=False)
+
+    @api.onchange('order_line.mechanic_id', 'order_line.product_id', 'order_line.display_mechanic_fields')
+    def _onchange_mechanic_global_warning(self):
+        """Muestra UN solo warning por pedido:
+        - Solo si hay líneas de servicio sin mecánico
+        - Y no existe aún ninguna línea de servicio con mecánico
+        - Y aún no se mostró el aviso (mechanic_warning_ack = False)
+        En cuanto el usuario seleccione al menos un mecánico en cualquier línea de servicio,
+        ya no se vuelve a mostrar.
+        """
+        for order in self:
+            if order.mechanic_warning_ack:
+                continue
+
+            # Filtramos líneas de servicio (según tu lógica: producto servicio y/o display flag)
+            service_lines = order.order_line.filtered(
+                lambda l: l.product_id and l.product_id.type == 'service'
+            )
+            if not service_lines:
+                continue
+
+            # ¿Hay al menos una línea de servicio con mecánico?
+            any_with_mechanic = any(l.mechanic_id for l in service_lines)
+
+            # ¿Hay alguna línea de servicio sin mecánico?
+            any_missing_mechanic = any(not l.mechanic_id for l in service_lines)
+
+            if (not any_with_mechanic) and any_missing_mechanic:
+                order.mechanic_warning_ack = True  # marcamos como avisado (no repetirá)
+                return {
+                    'warning': {
+                        'title': _('Falta seleccionar el mecánico'),
+                        'message': _(
+                            'Tienes líneas de SERVICIO sin mecánico. '
+                            'Selecciona un valor en "Columna de mecánicos". '
+                            'Este aviso no volverá a mostrarse en este pedido.'
+                        ),
+                    }
+                }
+        return {}
+
 
 class SaleOrderSetMechanicWizard(models.TransientModel):
     _name = 'sale.order.set.mechanic.wizard'

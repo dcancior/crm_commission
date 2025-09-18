@@ -20,6 +20,8 @@ class SaleOrderLine(models.Model):
         help="Empleado responsable de realizar el servicio.",
     )
 
+    
+
     mechanic_hours_required = fields.Float(
         string="Horas requeridas (x unidad)",
         related="product_id.product_tmpl_id.service_hours_required",
