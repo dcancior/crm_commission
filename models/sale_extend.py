@@ -8,7 +8,8 @@
 # ║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html   ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
-from odoo import models, fields, api
+from odoo import api, fields, models, _          # ← agrega _ aquí
+from odoo.exceptions import ValidationError      # si usas la constraint opcional
 
 class SaleOrderLine(models.Model):
     _inherit = "sale.order.line"
@@ -54,30 +55,44 @@ class SaleOrderLine(models.Model):
         store=True,  # recomendable para poder usarlo cómodo en tree y dominios
     )
 
-    
+
 
     @api.onchange('product_id', 'display_mechanic_fields', 'mechanic_id')
     def _onchange_mechanic_warning(self):
+        # Aviso si el producto es servicio y falta el mecánico
         for line in self:
-            if line.display_mechanic_fields and not line.mechanic_id:
+            if (
+                line.product_id
+                and line.product_id.type == 'service'
+                and line.display_mechanic_fields
+                and not line.mechanic_id
+            ):
                 return {
                     'warning': {
                         'title': _('Falta seleccionar el mecánico'),
                         'message': _(
                             'Esta línea requiere un mecánico. '
-                            'Por favor, selecciona un valor en el campo "Columna de mecánicos".'
-                        )
+                            'Selecciona un valor en el campo "Columna de mecánicos".'
+                        ),
                     }
                 }
+        # En otros casos no retornes nada / vacío
         return {}
 
 
-    # (Opcional) Validación dura al confirmar/guardar
-    @api.constrains('display_mechanic_fields', 'mechanic_id')
+    # (Opcional) Validación dura al guardar/confirmar
+    @api.constrains('product_id', 'display_mechanic_fields', 'mechanic_id')
     def _check_mechanic_required(self):
         for line in self:
-            if line.display_mechanic_fields and not line.mechanic_id:
-                raise ValidationError(_('Debes seleccionar un mecánico en las líneas que lo requieren.'))
+            if (
+                line.product_id
+                and line.product_id.type == 'service'
+                and line.display_mechanic_fields
+                and not line.mechanic_id
+            ):
+                raise ValidationError(
+                    _('Debes seleccionar un mecánico en las líneas de servicio que lo requieren.')
+                )
 
                 
 
