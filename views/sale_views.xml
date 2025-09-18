@@ -8,8 +8,8 @@
     <field name="arch" type="xml">
 
       <!-- Inyecta campos auxiliares en el TREE:
-           - display_mechanic_fields: flag existente
-           - product_type: related a product_id.type (store=True en el modelo)
+           - display_mechanic_fields: True si la línea es de servicio
+           - product_type: (opcional) related a product_id.type; puedes dejarlo por compatibilidad
            - mechanic_is_placeholder: True si el mecánico es “SELECCIONE UN MECÁNICO” -->
       <xpath expr="//field[@name='order_line']/tree" position="inside">
         <field name="display_mechanic_fields" invisible="1"/>
@@ -18,21 +18,24 @@
       </xpath>
 
       <!-- Decoración de FILA en naranja (warning) cuando:
-           - el producto es servicio, y
-           - no hay mecánico o el mecánico es el placeholder -->
+           - la línea es de servicio (display_mechanic_fields)
+           - y no tiene mecánico real (sin mecánico o con placeholder) -->
       <xpath expr="//field[@name='order_line']/tree" position="attributes">
-        <attribute name="decoration-warning">product_type == 'service' and (not mechanic_id or mechanic_is_placeholder)</attribute>
+        <attribute name="decoration-warning">(display_mechanic_fields) and (not mechanic_id or mechanic_is_placeholder)</attribute>
       </xpath>
 
-      <!-- Inserta la columna "Mecánico" antes del subtotal (sin required para no bloquear) -->
+      <!-- Columna "Mecánico" antes del subtotal (sin required para no bloquear) -->
       <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="before">
-        <field name="mechanic_id" string="Mecánico" optional="show"
+        <field name="mechanic_id"
+               string="Mecánico"
+               optional="show"
                domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
       </xpath>
 
       <!-- Campo costo mecánico después del subtotal (visible solo si display_mechanic_fields) -->
       <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="after">
-        <field name="mechanic_cost_subtotal" optional="hide"
+        <field name="mechanic_cost_subtotal"
+               optional="hide"
                attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
       </xpath>
 

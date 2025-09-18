@@ -1,5 +1,13 @@
-/* crm_commission/static/src/css/mechanic_highlight.css */
-.o_list_view tr.text-warning td[data-name="mechanic_id"],
-.o_list_view tr.table-warning td[data-name="mechanic_id"] { background-color: rgba(255, 193, 7, 0.18); }
-.o_list_view tr.text-warning td[data-name="mechanic_id"] .o_field_widget,
-.o_list_view tr.table-warning td[data-name="mechanic_id"] .o_field_widget { color: #856404; font-weight: 600; }
+/* más específico (por si el tema sobrescribe) */
+.o_list_view table.o_list_table tr.text-warning td[data-name="mechanic_id"],
+.o_list_view table.o_list_table tr.table-warning td[data-name="mechanic_id"] {
+  background-color: rgba(255, 193, 7, 0.18) !important;
+}
+
+.o_list_view table.o_list_table tr.text-warning td[data-name="mechanic_id"] .o_field_widget,
+.o_list_view table.o_list_table tr.table-warning td[data-name="mechanic_id"] .o_field_widget,
+.o_list_view table.o_list_table tr.text-warning td[data-name="mechanic_id"] input,
+.o_list_view table.o_list_table tr.table-warning td[data-name="mechanic_id"] input {
+  color: #856404 !important;
+  font-weight: 600;
+}
