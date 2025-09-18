@@ -1,54 +1,54 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
   <record id="view_order_form_mechanic_line" model="ir.ui.view"> <!-- Vista heredada para sale.order -->
-    <field name="name">sale.order.form.mechanic.line</field> <!-- Nombre interno de la vista -->
-    <field name="model">sale.order</field> <!-- Modelo principal -->
-    <field name="inherit_id" ref="sale.view_order_form"/> <!-- Hereda el formulario de pedidos de venta -->
-    <field name="arch" type="xml"> <!-- Inicio de modificaciones XML -->
+    <field name="name">sale.order.form.mechanic.line</field> <!-- Nombre interno -->
+    <field name="model">sale.order</field> <!-- Modelo -->
+    <field name="inherit_id" ref="sale.view_order_form"/> <!-- Hereda formulario estándar -->
+    <field name="arch" type="xml"> <!-- Inicio de cambios -->
 
-      <xpath expr="//field[@name='order_line']/tree" position="inside"> <!-- Inyecta campos auxiliares en el tree -->
-        <field name="display_mechanic_fields" invisible="1"/> <!-- Flag existente para visibilidad -->
-        <field name="product_type" invisible="1"/> <!-- Related a product_id.type (store=True en el modelo) -->
+      <xpath expr="//field[@name='order_line']/tree" position="inside"> <!-- Campos auxiliares en el tree -->
+        <field name="display_mechanic_fields" invisible="1"/> <!-- Flag existente -->
+        <field name="product_type" invisible="1"/> <!-- related=product_id.type (store=True en el modelo) -->
       </xpath>
 
-      <xpath expr="//field[@name='order_line']/tree" position="attributes"> <!-- Decora filas según condición -->
-        <attribute name="decoration-warning">product_type == 'service' and not mechanic_id</attribute> <!-- Naranja si es servicio y falta mecánico -->
+      <xpath expr="//field[@name='order_line']/tree" position="attributes"> <!-- Decoración de fila -->
+        <attribute name="decoration-warning">product_type == 'service' and not mechanic_id</attribute> <!-- Naranja si es servicio y no hay mecánico -->
       </xpath>
 
-      <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="before"> <!-- Inserta columna antes del subtotal -->
+      <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="before"> <!-- Columna mecánico antes del subtotal -->
         <field name="mechanic_id"
-               string="Columna de mecánicos" 
-               optional="show" 
-               domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]" 
-               /> <!-- Si quisieras bloquear, agrega attrs required con product_type='service' -->
+               string="Columna de mecánicos" <!-- Etiqueta -->
+               optional="show" <!-- Columna visible (usuario puede ocultarla) -->
+               domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]" /> <!-- Filtra sólo mecánicos -->
+               <!-- SIN attrs required: así NO bloquea el guardado por cada línea --> 
       </xpath>
 
-      <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="after"> <!-- Campo costo mecánico después del subtotal -->
+      <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="after"> <!-- Costos relacionados -->
         <field name="mechanic_cost_subtotal"
-               optional="hide" 
-               attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/> <!-- Visible sólo cuando aplica el flag -->
+               optional="hide" <!-- Columna ocultable -->
+               attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/> <!-- Sólo visible si aplica -->
       </xpath>
 
-      <xpath expr="//field[@name='order_line']/form" position="inside"> <!-- Inyecta flags en el formulario -->
-        <group invisible="1"> <!-- Grupo oculto para flags -->
-          <field name="display_mechanic_fields"/> <!-- Flag existente -->
-          <field name="product_type"/> <!-- Related product_id.type -->
+      <xpath expr="//field[@name='order_line']/form" position="inside"> <!-- Flags en el form -->
+        <group invisible="1"> <!-- Grupo oculto -->
+          <field name="display_mechanic_fields"/> <!-- Flag -->
+          <field name="product_type"/> <!-- Related -->
         </group>
       </xpath>
 
-      <xpath expr="//field[@name='order_line']/form//group[1]" position="after"> <!-- Grupo de campos del mecánico en el form -->
-        <group string="Mecánico"> <!-- Sección visible de mecánico -->
+      <xpath expr="//field[@name='order_line']/form//group[1]" position="after"> <!-- Grupo de mecánico en form -->
+        <group string="Mecánico"> <!-- Sección -->
           <field name="mechanic_id"
-                 domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]" /> <!-- Selector de mecánico -->
+                 domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]" /> <!-- Selector de mecánico sin required -->
           <field name="mechanic_hours_required" readonly="1"
-                 attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/> <!-- Horas requeridas (sólo si flag) -->
+                 attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/> <!-- Campo dependiente -->
           <field name="mechanic_cost_per_hour" readonly="1"
-                 attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/> <!-- Costo por hora (sólo si flag) -->
+                 attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/> <!-- Campo dependiente -->
           <field name="mechanic_cost_subtotal" readonly="1"
-                 attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/> <!-- Subtotal mecánico (sólo si flag) -->
+                 attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/> <!-- Campo dependiente -->
         </group>
       </xpath>
 
-    </field> <!-- Fin de modificaciones XML -->
+    </field> <!-- Fin cambios -->
   </record>
 </odoo>

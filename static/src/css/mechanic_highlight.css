@@ -1,11 +1,5 @@
-/* Pintar SOLO la celda mechanic_id cuando la fila tenga decoración "warning" */
-.o_list_view tr.text-warning td[data-name="mechanic_id"],
-.o_list_view tr.table-warning td[data-name="mechanic_id"] {
-    background-color: rgba(255, 193, 7, 0.18); /* naranja suave */
-}
-
+/* crm_commission/static/src/css/mechanic_highlight.css */
+.o_list_view tr.text-warning td[data-name="mechanic_id"],  /* Fila con decoración warning, celda mechanic_id */ 
+.o_list_view tr.table-warning td[data-name="mechanic_id"] { background-color: rgba(255, 193, 7, 0.18); } /* Naranja suave */
 .o_list_view tr.text-warning td[data-name="mechanic_id"] .o_field_widget,
-.o_list_view tr.table-warning td[data-name="mechanic_id"] .o_field_widget {
-    color: #856404; /* tono de texto warning bootstrap */
-    font-weight: 600;
-}
+.o_list_view tr.table-warning td[data-name="mechanic_id"] .o_field_widget { color: #856404; font-weight: 600; } /* Texto naranja oscuro */

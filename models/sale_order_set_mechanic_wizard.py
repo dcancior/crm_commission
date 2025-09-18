@@ -30,45 +30,47 @@ class SaleOrder(models.Model):
     # Flag para no repetir el aviso en este pedido
     mechanic_warning_ack = fields.Boolean(default=False, copy=False)
 
-    @api.onchange('order_line.mechanic_id', 'order_line.product_id', 'order_line.display_mechanic_fields')
-    def _onchange_mechanic_global_warning(self):
-        """Muestra UN solo warning por pedido:
-        - Solo si hay líneas de servicio sin mecánico
-        - Y no existe aún ninguna línea de servicio con mecánico
-        - Y aún no se mostró el aviso (mechanic_warning_ack = False)
-        En cuanto el usuario seleccione al menos un mecánico en cualquier línea de servicio,
-        ya no se vuelve a mostrar.
-        """
-        for order in self:
-            if order.mechanic_warning_ack:
-                continue
+    @api.onchange('order_line.mechanic_id', 'order_line.product_id', 'order_line.display_mechanic_fields')  # Disparadores del aviso  # noqa: E265
+    def _onchange_mechanic_global_warning(self):  # Aviso no bloqueante solo una vez por pedido  # noqa: E265
+        for order in self:  # Itera pedidos del recordset  # noqa: E265
+            if order.mechanic_warning_ack:  # Si ya avisó antes en este pedido  # noqa: E265
+                continue  # No volver a avisar  # noqa: E265
 
-            # Filtramos líneas de servicio (según tu lógica: producto servicio y/o display flag)
-            service_lines = order.order_line.filtered(
-                lambda l: l.product_id and l.product_id.type == 'service'
-            )
-            if not service_lines:
-                continue
+            # Filtramos líneas de servicio (usa product_type related=product_id.type)  # noqa: E265
+            service_lines = order.order_line.filtered(lambda l: l.product_id and l.product_id.type == 'service')  # noqa: E265
+            if not service_lines:  # Si no hay servicios, no avisar  # noqa: E265
+                continue  # Salta  # noqa: E265
 
-            # ¿Hay al menos una línea de servicio con mecánico?
-            any_with_mechanic = any(l.mechanic_id for l in service_lines)
+            any_with_mechanic = any(l.mechanic_id for l in service_lines)  # ¿Existe al menos una línea de servicio con mecánico?  # noqa: E265
+            any_missing_mechanic = any(not l.mechanic_id for l in service_lines)  # ¿Hay alguna de servicio sin mecánico?  # noqa: E265
 
-            # ¿Hay alguna línea de servicio sin mecánico?
-            any_missing_mechanic = any(not l.mechanic_id for l in service_lines)
-
-            if (not any_with_mechanic) and any_missing_mechanic:
-                order.mechanic_warning_ack = True  # marcamos como avisado (no repetirá)
-                return {
+            if (not any_with_mechanic) and any_missing_mechanic:  # Si no hay ninguna con mecánico y sí faltan  # noqa: E265
+                order.mechanic_warning_ack = True  # Marca que ya se avisó (no repetirá)  # noqa: E265
+                return {  # Devuelve warning no bloqueante  # noqa: E265
                     'warning': {
-                        'title': _('Falta seleccionar el mecánico'),
+                        'title': _('Falta seleccionar el mecánico'),  # Título del aviso  # noqa: E265
                         'message': _(
                             'Tienes líneas de SERVICIO sin mecánico. '
-                            'Selecciona un valor en "Columna de mecánicos". '
-                            'Este aviso no volverá a mostrarse en este pedido.'
-                        ),
+                            'Selecciona al menos una línea con mecánico. '
+                            'Este aviso se mostrará una sola vez por pedido.'
+                        ),  # Mensaje del aviso  # noqa: E265
                     }
+                }  # fin return  # noqa: E265
+
+        return {}  # No hay aviso  # noqa: E265
+
+    def action_confirm(self):  # Bloquea confirmar si no hay al menos un mecánico en servicios  # noqa: E265
+    for order in self:  # Itera pedidos  # noqa: E265
+        service_lines = order.order_line.filtered(lambda l: l.product_id and l.product_id.type == 'service')  # noqa: E265
+        if service_lines and not any(l.mechanic_id for l in service_lines):  # Si hay servicios y ninguno con mecánico  # noqa: E265
+            # raise ValidationError(_('Debes asignar al menos un mecánico en alguna línea de servicio.'))  # noqa: E265
+            return {  # Si no quieres bloquear, puedes devolver un warning no bloqueante  # noqa: E265
+                'warning': {
+                    'title': _('Falta seleccionar el mecánico'),
+                    'message': _('Debes asignar al menos un mecánico en alguna línea de servicio para confirmar.'),  # noqa: E265
                 }
-        return {}
+            }  # noqa: E265
+    return super().action_confirm()  # Llama confirm estándar  # noqa: E265
 
 
 class SaleOrderSetMechanicWizard(models.TransientModel):
