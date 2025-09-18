@@ -60,17 +60,17 @@ class SaleOrder(models.Model):
         return {}  # No hay aviso  # noqa: E265
 
     def action_confirm(self):  # Bloquea confirmar si no hay al menos un mecánico en servicios  # noqa: E265
-    for order in self:  # Itera pedidos  # noqa: E265
-        service_lines = order.order_line.filtered(lambda l: l.product_id and l.product_id.type == 'service')  # noqa: E265
-        if service_lines and not any(l.mechanic_id for l in service_lines):  # Si hay servicios y ninguno con mecánico  # noqa: E265
-            # raise ValidationError(_('Debes asignar al menos un mecánico en alguna línea de servicio.'))  # noqa: E265
-            return {  # Si no quieres bloquear, puedes devolver un warning no bloqueante  # noqa: E265
-                'warning': {
-                    'title': _('Falta seleccionar el mecánico'),
-                    'message': _('Debes asignar al menos un mecánico en alguna línea de servicio para confirmar.'),  # noqa: E265
-                }
-            }  # noqa: E265
-    return super().action_confirm()  # Llama confirm estándar  # noqa: E265
+        for order in self:  # Itera pedidos  # noqa: E265
+            service_lines = order.order_line.filtered(lambda l: l.product_id and l.product_id.type == 'service')  # noqa: E265
+            if service_lines and not any(l.mechanic_id for l in service_lines):  # Si hay servicios y ninguno con mecánico  # noqa: E265
+                # raise ValidationError(_('Debes asignar al menos un mecánico en alguna línea de servicio.'))  # noqa: E265
+                return {  # Si no quieres bloquear, puedes devolver un warning no bloqueante  # noqa: E265
+                    'warning': {
+                        'title': _('Falta seleccionar el mecánico'),
+                        'message': _('Debes asignar al menos un mecánico en alguna línea de servicio para confirmar.'),  # noqa: E265
+                    }
+                }  # noqa: E265
+        return super().action_confirm()  # Llama confirm estándar  # noqa: E265
 
 
 class SaleOrderSetMechanicWizard(models.TransientModel):
