@@ -32,5 +32,13 @@
         
         
     ],
+    'assets': {
+        'web.assets_backend': [
+            # ruta al CSS que colorea sólo la celda mechanic_id
+            'crm_commission/static/src/css/mechanic_highlight.css',
+            # (opcional) JS si lo llegas a usar
+            # 'crm_commission/static/src/js/mechanic_notify.js',
+        ],
+    },
     'installable': True,
 }
