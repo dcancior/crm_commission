@@ -26,11 +26,18 @@
             </xpath>
 
             <!-- NUEVO: agregar 'porcentaje_comision' justo después de list_price -->
+            <!-- NUEVO: agregar 'porcentaje_comision' justo después de list_price con etiqueta visible -->
             <xpath expr="//field[@name='list_price']" position="after">
-                <!-- Si tu Odoo tiene el widget percentage, lo usamos; si no, se verá como float normal -->
-                <field name="porcentaje_comision" string="Porcentaje de comisión" widget="percentage" attrs="{'invisible': [('type','!=','service')]}"/>
-                <!-- Alternativa sin widget (descomenta esta línea y comenta la anterior si prefieres float normal) -->
-                <!-- <field name="porcentaje_comision" string="Porcentaje de comisión"/> -->
+                <!-- Etiqueta visible -->
+                <label for="porcentaje_comision"
+                    string="Porcentaje"
+                    attrs="{'invisible': [('type','!=','service')]}"/>
+
+                <!-- Campo sin etiqueta propia (la da el <label>) -->
+                <field name="porcentaje_comision"
+                    widget="percentage"
+                    nolabel="1"
+                    attrs="{'invisible': [('type','!=','service')]}"/>
             </xpath>
         </field>
     </record>
