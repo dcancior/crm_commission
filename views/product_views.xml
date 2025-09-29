@@ -25,18 +25,13 @@
                 </group>
             </xpath>
 
-            <!-- NUEVO: agregar 'porcentaje_comision' justo después de list_price -->
-            <!-- NUEVO: agregar 'porcentaje_comision' justo después de list_price con etiqueta visible -->
-            <!-- NUEVO: agregar 'porcentaje_comision' justo después de list_price en una nueva línea -->
+            <!-- NUEVO: colocar 'Porcentaje' en una línea nueva debajo de list_price,
+                con el campo porcentaje_comision a la derecha en la misma fila -->
             <xpath expr="//field[@name='list_price']" position="after">
-                <newline/>
-                <label for="porcentaje_comision"
-                    string="Porcentaje"
-                    attrs="{'invisible': [('type','!=','service')]}"/>
-                <field name="porcentaje_comision"
-                    widget="percentage"
-                    nolabel="1"
-                    attrs="{'invisible': [('type','!=','service')]}"/>
+                <group col="2" attrs="{'invisible': [('type','!=','service')]}">
+                    <label for="porcentaje_comision" string="Porcentaje"/>
+                    <field name="porcentaje_comision" widget="percentage" nolabel="1"/>
+                </group>
             </xpath>
         </field>
     </record>
