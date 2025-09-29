@@ -18,37 +18,38 @@
     <field name="arch" type="xml">
 
       <!-- Inyecta campos auxiliares en el TREE -->
-      <xpath expr="//field[@name='order_line']/tree" position="inside">
+      <xpath expr="//field[@name='order_line']//tree" position="inside">
         <field name="display_mechanic_fields" invisible="1"/>
         <field name="product_type" invisible="1"/>
         <field name="mechanic_is_placeholder" invisible="1"/>
       </xpath>
 
       <!-- Decoración de fila en naranja si falta mecánico en servicio -->
-      <xpath expr="//field[@name='order_line']/tree" position="attributes">
+      <xpath expr="//field[@name='order_line']//tree" position="attributes">
         <attribute name="decoration-warning">
           (display_mechanic_fields) and (not mechanic_id or mechanic_is_placeholder)
         </attribute>
       </xpath>
 
-      <!-- ⚙️ INSERCIÓN PRINCIPAL: antes de price_subtotal (si existe en el árbol actual) -->
-      <xpath expr="//field[@name='order_line']/tree//field[@name='price_subtotal']" position="before">
+      <!-- ✅ INSERCIÓN ROBUSTA: inserta MECÁNICO como primera columna del tree -->
+      <xpath expr="//field[@name='order_line']//tree/field[1]" position="before">
         <field name="mechanic_id"
                string="Mecánico"
-               optional="show"
+               optional="no"
                domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
       </xpath>
 
-      <!-- 🛟 PLAN B: si el árbol no tiene price_subtotal en ese lugar, lo insertamos después de 'discount' -->
-      <xpath expr="//field[@name='order_line']/tree//field[@name='discount']" position="after">
+      <!-- (Opcional) Si quieres mantener tu inserción original por si aplica en otra variante:
+      <xpath expr="//field[@name='order_line']//tree//field[@name='price_subtotal']" position="before">
         <field name="mechanic_id"
                string="Mecánico"
                optional="show"
                domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
       </xpath>
+      -->
 
       <!-- Costo mecánico después del subtotal (visible solo si aplica) -->
-      <xpath expr="//field[@name='order_line']/tree//field[@name='price_subtotal']" position="after">
+      <xpath expr="//field[@name='order_line']//tree//field[@name='price_subtotal']" position="after">
         <field name="mechanic_cost_subtotal"
                optional="hide"
                attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
