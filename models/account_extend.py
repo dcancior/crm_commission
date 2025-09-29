@@ -16,13 +16,13 @@ class AccountMoveLine(models.Model):
     _inherit = "account.move.line"
 
     # Mecánico asociado a la línea (se mantiene igual)
-    #mechanic_id = fields.Many2one(
-    #    string="Mecánico",
-    #    "hr.employee",
-    #    help="Mecánico que realizó el servicio.",
-    #    index=True,
-    #    copy=False,
-    #)
+    mechanic_id = fields.Many2one(
+        string="Mecánico",
+        "hr.employee",
+        help="Mecánico que realizó el servicio.",
+        index=True,
+        copy=False,
+    )
 
     # ─────────────────────────────────────────────────────────────
     # META (deprecado lógicamente): ahora siempre 0 para evitar ruido
