@@ -17,39 +17,36 @@
     <field name="inherit_id" ref="sale.view_order_form"/>
     <field name="arch" type="xml">
 
-      <!-- Inyecta campos auxiliares en el TREE:
-           - display_mechanic_fields: True si la línea es de servicio
-           - product_type: (opcional) related a product_id.type; puedes dejarlo por compatibilidad
-           - mechanic_is_placeholder: True si el mecánico es “SELECCIONE UN MECÁNICO” -->
-      <xpath expr="//field[@name='order_line']/tree" position="inside">
+      <!-- 1) Flags dentro del TREE embebido (los necesitamos presentes) -->
+      <xpath expr="//field[@name='order_line']//tree" position="inside">
         <field name="display_mechanic_fields" invisible="1"/>
         <field name="product_type" invisible="1"/>
         <field name="mechanic_is_placeholder" invisible="1"/>
       </xpath>
 
-      <!-- Decoración de FILA en naranja (warning) cuando:
-           - la línea es de servicio (display_mechanic_fields)
-           - y no tiene mecánico real (sin mecánico o con placeholder) -->
-      <xpath expr="//field[@name='order_line']/tree" position="attributes">
-        <attribute name="decoration-warning">(display_mechanic_fields) and (not mechanic_id or mechanic_is_placeholder)</attribute>
+      <!-- 2) (Opcional) Decoración de fila; si te vuelve a marcar error, comenta este bloque -->
+      <xpath expr="//field[@name='order_line']//tree" position="attributes">
+        <attribute name="decoration-warning">
+          (display_mechanic_fields) and (not mechanic_id or mechanic_is_placeholder)
+        </attribute>
       </xpath>
 
-      <!-- Columna "Mecánico" antes del subtotal (sin required para no bloquear) -->
-      <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="before">
+      <!-- 3) ✅ Insertar MECÁNICO sin depender de anchors: lo agregamos DENTRO del tree -->
+      <xpath expr="//field[@name='order_line']//tree" position="inside">
         <field name="mechanic_id"
                string="Mecánico"
                optional="show"
                domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
       </xpath>
 
-      <!-- Campo costo mecánico después del subtotal (visible solo si display_mechanic_fields) -->
-      <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="after">
+      <!-- 4) (Opcional) Costo mecánico tras el subtotal; si no engancha, también puedes meterlo con 'inside' -->
+      <xpath expr="//field[@name='order_line']//tree//field[@name='price_subtotal']" position="after">
         <field name="mechanic_cost_subtotal"
                optional="hide"
                attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
       </xpath>
 
-      <!-- Inyecta flags también en el FORM (grupo oculto) -->
+      <!-- 5) Flags también en el FORM de línea -->
       <xpath expr="//field[@name='order_line']/form" position="inside">
         <group invisible="1">
           <field name="display_mechanic_fields"/>
@@ -58,15 +55,18 @@
         </group>
       </xpath>
 
-      <!-- Grupo visible de campos del mecánico en el FORM (sin required para no bloquear) -->
+      <!-- 6) Grupo visible en el FORM de línea -->
       <xpath expr="//field[@name='order_line']/form//group[1]" position="after">
         <group string="Mecánico">
           <field name="mechanic_id"
                  domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
+          <!-- Quita estos dos si NO existen en sale.order.line -->
+          <!--
           <field name="mechanic_hours_required" readonly="1"
                  attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
           <field name="mechanic_cost_per_hour" readonly="1"
                  attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+          -->
           <field name="mechanic_cost_subtotal" readonly="1"
                  attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
         </group>
