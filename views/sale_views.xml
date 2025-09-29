@@ -15,69 +15,69 @@
     <field name="name">sale.order.form.mechanic.line</field>
     <field name="model">sale.order</field>
     <field name="inherit_id" ref="sale.view_order_form"/>
-    <field name="arch" type="xml">
+      <field name="arch" type="xml">
 
-      <!-- Inyecta campos auxiliares en el TREE -->
-      <xpath expr="//field[@name='order_line']//tree" position="inside">
-        <field name="display_mechanic_fields" invisible="1"/>
-        <field name="product_type" invisible="1"/>
-        <field name="mechanic_is_placeholder" invisible="1"/>
-      </xpath>
+        <!-- Inyecta campos auxiliares en el TREE -->
+        <xpath expr="//field[@name='order_line']//tree" position="inside">
+          <field name="display_mechanic_fields" invisible="1"/>
+          <field name="product_type" invisible="1"/>
+          <field name="mechanic_is_placeholder" invisible="1"/>
+        </xpath>
 
-      <!-- Decoración de fila en naranja si falta mecánico en servicio -->
-      <xpath expr="//field[@name='order_line']//tree" position="attributes">
-        <attribute name="decoration-warning">
-          (display_mechanic_fields) and (not mechanic_id or mechanic_is_placeholder)
-        </attribute>
-      </xpath>
+        <!-- Decoración de fila en naranja si falta mecánico en servicio -->
+        <xpath expr="//field[@name='order_line']//tree" position="attributes">
+          <attribute name="decoration-warning">
+            (display_mechanic_fields) and (not mechanic_id or mechanic_is_placeholder)
+          </attribute>
+        </xpath>
 
-      <!-- ✅ INSERCIÓN ROBUSTA: inserta MECÁNICO como primera columna del tree -->
-      <xpath expr="//field[@name='order_line']/tree//field[@name='price_subtotal']" position="before"></xpath>
-        <field name="mechanic_id"
-               string="Mecánico"
-               optional="no"
-               domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
-      </xpath>
-
-      <!-- (Opcional) Si quieres mantener tu inserción original por si aplica en otra variante:
-      <xpath expr="//field[@name='order_line']//tree//field[@name='price_subtotal']" position="before">
-        <field name="mechanic_id"
-               string="Mecánico"
-               optional="show"
-               domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
-      </xpath>
-      -->
-
-      <!-- Costo mecánico después del subtotal (visible solo si aplica) -->
-      <xpath expr="//field[@name='order_line']//tree//field[@name='price_subtotal']" position="after">
-        <field name="mechanic_cost_subtotal"
-               optional="hide"
-               attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
-      </xpath>
-
-      <!-- Flags también en el FORM (grupo oculto) -->
-      <xpath expr="//field[@name='order_line']/form" position="inside">
-        <group invisible="1">
-          <field name="display_mechanic_fields"/>
-          <field name="product_type"/>
-          <field name="mechanic_is_placeholder"/>
-        </group>
-      </xpath>
-
-      <!-- Grupo visible de campos del mecánico en el FORM -->
-      <xpath expr="//field[@name='order_line']/form//group[1]" position="after">
-        <group string="Mecánico">
+        <!-- ✅ INSERCIÓN ROBUSTA: inserta MECÁNICO como primera columna del tree -->
+        <xpath expr="//field[@name='order_line']/tree//field[@name='price_subtotal']" position="before"></xpath>
           <field name="mechanic_id"
-                 domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
-          <field name="mechanic_hours_required" readonly="1"
-                 attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
-          <field name="mechanic_cost_per_hour" readonly="1"
-                 attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
-          <field name="mechanic_cost_subtotal" readonly="1"
-                 attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
-        </group>
-      </xpath>
+                string="Mecánico"
+                optional="no"
+                domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
+        </xpath>
 
+        <!-- (Opcional) Si quieres mantener tu inserción original por si aplica en otra variante:
+        <xpath expr="//field[@name='order_line']//tree//field[@name='price_subtotal']" position="before">
+          <field name="mechanic_id"
+                string="Mecánico"
+                optional="show"
+                domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
+        </xpath>
+        -->
+
+        <!-- Costo mecánico después del subtotal (visible solo si aplica) -->
+        <xpath expr="//field[@name='order_line']//tree//field[@name='price_subtotal']" position="after">
+          <field name="mechanic_cost_subtotal"
+                optional="hide"
+                attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+        </xpath>
+
+        <!-- Flags también en el FORM (grupo oculto) -->
+        <xpath expr="//field[@name='order_line']/form" position="inside">
+          <group invisible="1">
+            <field name="display_mechanic_fields"/>
+            <field name="product_type"/>
+            <field name="mechanic_is_placeholder"/>
+          </group>
+        </xpath>
+
+        <!-- Grupo visible de campos del mecánico en el FORM -->
+        <xpath expr="//field[@name='order_line']/form//group[1]" position="after">
+          <group string="Mecánico">
+            <field name="mechanic_id"
+                  domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
+            <field name="mechanic_hours_required" readonly="1"
+                  attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+            <field name="mechanic_cost_per_hour" readonly="1"
+                  attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+            <field name="mechanic_cost_subtotal" readonly="1"
+                  attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+          </group>
+        </xpath>
+      </field>  
     </field>
   </record>
 
