@@ -32,7 +32,7 @@
       </xpath>
 
       <!-- ✅ INSERCIÓN ROBUSTA: inserta MECÁNICO como primera columna del tree -->
-      <xpath expr="//field[@name='order_line']//tree/field[1]" position="before">
+      <xpath expr="//field[@name='order_line']/tree//field[@name='price_subtotal']" position="before"></xpath>
         <field name="mechanic_id"
                string="Mecánico"
                optional="no"
