@@ -82,8 +82,8 @@
   </record>
 
   <!-- ================================================================
-       1) Vista ÁRBOL de sale.order.line: agregar columna "Mecánico"
-       Heredamos la vista base del módulo sale: sale.view_order_line_tree
+       Vista ÁRBOL de sale.order.line: agregar columna "Mecánico"
+       Hereda la vista base del módulo sale: sale.view_order_line_tree
        ================================================================ -->
   <record id="view_order_line_tree_mechanic" model="ir.ui.view">
     <field name="name">sale.order.line.tree.mechanic</field>
@@ -91,31 +91,21 @@
     <field name="inherit_id" ref="sale.view_order_line_tree"/>
     <field name="arch" type="xml">
 
-      <!-- Inserción principal: antes de price_subtotal -->
-      <xpath expr="//tree//field[@name='price_subtotal']" position="before">
+      <!-- ✅ Inserta MECÁNICO como PRIMERA columna del tree (siempre existe field[1]) -->
+      <xpath expr="//tree/field[1]" position="before">
         <field name="mechanic_id"
                string="Mecánico"
                optional="show"
                domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
       </xpath>
 
-      <!-- Plan B: si en tu instancia el árbol no tiene price_subtotal en ese punto,
-           insertamos después de 'discount' -->
-      <xpath expr="//tree//field[@name='discount']" position="after">
-        <field name="mechanic_id"
-               string="Mecánico"
-               optional="show"
-               domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
-      </xpath>
-
-      <!-- (Opcional) Si quieres ver también el costo mecánico en el árbol -->
+      <!-- (Opcional) si quieres añadir también el costo mecánico tras el subtotal -->
       <!--
       <xpath expr="//tree//field[@name='price_subtotal']" position="after">
         <field name="mechanic_cost_subtotal" optional="hide"/>
       </xpath>
       -->
-
     </field>
   </record>
-  
+
 </odoo>
