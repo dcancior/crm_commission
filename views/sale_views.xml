@@ -15,6 +15,7 @@
     <field name="name">sale.order.form.mechanic.line</field>
     <field name="model">sale.order</field>
     <field name="inherit_id" ref="sale.view_order_form"/>
+    <field name="priority">99</field>
     <field name="arch" type="xml">
 
       <!-- 1) Flags dentro del TREE embebido (los necesitamos presentes) -->
@@ -31,15 +32,15 @@
         </attribute>
       </xpath>
 
-      <!-- 3) ✅ Insertar MECÁNICO sin depender de anchors: lo agregamos DENTRO del tree -->
-      <!-- Modificar el xpath del mechanic_id -->
-      <xpath expr="//field[@name='order_line']//tree//field[@name='product_id']" position="after">
-          <field name="mechanic_id"
-                string="Mecánico"
-                optional="show"
-                force_save="1"
-                domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
-      </xpath>
+      <!-- Intentar una ubicación más específica -->
+        <xpath expr="//notebook//field[@name='order_line']/tree" position="inside">
+            <field name="mechanic_id"
+                   string="Mecánico"
+                   optional="show"
+                   force_save="1"
+                   attrs="{'invisible': [('display_mechanic_fields','!=',True)]}"
+                   domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
+        </xpath>
 
       <!-- 4) (Opcional) Costo mecánico tras el subtotal; si no engancha, también puedes meterlo con 'inside' -->
       <xpath expr="//field[@name='order_line']//tree//field[@name='price_subtotal']" position="after">
