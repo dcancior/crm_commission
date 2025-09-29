@@ -11,58 +11,230 @@
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
 
+
 class MechanicCommissionEntry(models.Model):
+    """
+    ==============================================================================
+    Modelo: mechanic.commission.entry
+    ==============================================================================
+    Propósito
+    ---------
+    Registrar una **entrada de comisión** por mecánico vinculada a **una línea
+    de factura** (account.move.line). Este modelo funciona como **tabla de
+    almacenamiento** del resultado del cálculo (snapshot), junto con metadatos
+    útiles (factura, línea, producto, cantidades, etc.).
+
+    Qué hace / Qué NO hace
+    ----------------------
+    ✔ Guarda quién (employee_id), qué línea (invoice_line_id), de qué factura
+      (invoice_id), y los importes relevantes (subtotal_customer, payout).
+    ✔ Permite control de pago (is_paid, paid_date, paid_by, pay_note).
+    ✔ Evita duplicados por (employee_id, invoice_line_id) a nivel SQL.
+
+    ✖ No realiza aquí el cálculo automático de la comisión. La idea es que el
+      cálculo suceda en otra parte (por ejemplo, al confirmar factura o desde
+      account.move.line) y el resultado **se persista** aquí en `payout`.
+      Esto deja el modelo limpio y reutilizable sin acoplarlo a reglas de negocio.
+
+    Relación con la NUEVA lógica de porcentaje
+    ------------------------------------------
+    - Si la nueva política es:
+        comisión = list_price * (porcentaje_comision / 100) * cantidad
+      ese cálculo ocurre **fuera** (p. ej. en account.move.line) y **se pasa** a
+      este modelo. Este modelo no conoce `porcentaje_comision` ni `list_price`.
+    - Los campos `hours` y `cost_per_hour` quedan como metadatos históricos
+      (legacy). Puedes dejarlos en 0 o usarlos solo en reportes si alguna vez
+      hubo cálculos por horas.
+
+    Cuándo crear registros aquí
+    ---------------------------
+    - Al validar la factura, o al confirmar un documento operativo, o mediante
+      un botón/cron. Lo importante es **llenar payout** con el valor ya calculado.
+    - La restricción SQL impedirá que, para la misma línea y mecánico, se duplique.
+
+    Orden y nombre visible
+    ----------------------
+    - _order prioriza las entradas más recientes por `invoice_date`.
+    - _rec_name usa `invoice_name` para listas y vistas kanban/tree (legible).
+    """
+
     _name = 'mechanic.commission.entry'
     _description = 'Entrada de comisión por servicio mecánico'
     _order = 'invoice_date desc, id desc'
     _rec_name = 'invoice_name'
 
-    company_id = fields.Many2one('res.company', default=lambda self: self.env.company, required=True)
+    # ─────────────────────────────────────────────────────────────────────────────
+    # CONTEXTO / EMPRESA
+    # ─────────────────────────────────────────────────────────────────────────────
+    company_id = fields.Many2one(
+        'res.company',
+        default=lambda self: self.env.company,
+        required=True,
+        help="Compañía a la que pertenece este cálculo de comisión."
+    )
 
-    employee_id = fields.Many2one('hr.employee', string='Mecánico', required=True, index=True)
-    user_id = fields.Many2one('res.users', string='Usuario', related='employee_id.user_id', store=True)
+    # ─────────────────────────────────────────────────────────────────────────────
+    # RELACIÓN CON EMPLEADO / USUARIO
+    # ─────────────────────────────────────────────────────────────────────────────
+    employee_id = fields.Many2one(
+        'hr.employee',
+        string='Mecánico',
+        required=True,
+        index=True,
+        help="Empleado (mecánico) que realizó el servicio."
+    )
+    user_id = fields.Many2one(
+        'res.users',
+        string='Usuario',
+        related='employee_id.user_id',
+        store=True,
+        help="Usuario del sistema vinculado al empleado (útil para filtros/reportes)."
+    )
 
-    invoice_id = fields.Many2one('account.move', string='Factura', ondelete='set null', index=True)
-    invoice_line_id = fields.Many2one('account.move.line', string='Línea de factura', ondelete='set null', index=True)
-    invoice_name = fields.Char(string='Factura (folio/cliente)')
-    invoice_date = fields.Date(string='Fecha factura')
+    # ─────────────────────────────────────────────────────────────────────────────
+    # RELACIÓN CON FACTURACIÓN
+    # ─────────────────────────────────────────────────────────────────────────────
+    invoice_id = fields.Many2one(
+        'account.move',
+        string='Factura',
+        ondelete='set null',
+        index=True,
+        help="Factura de cliente donde se facturó el servicio."
+    )
+    invoice_line_id = fields.Many2one(
+        'account.move.line',
+        string='Línea de factura',
+        ondelete='set null',
+        index=True,
+        help="Línea de factura asociada a este registro de comisión."
+    )
+    invoice_name = fields.Char(
+        string='Factura (folio/cliente)',
+        help="Nombre amigable de la factura, por ejemplo: FOLIO - Cliente."
+    )
+    invoice_date = fields.Date(
+        string='Fecha factura',
+        help="Fecha de emisión de la factura (se usa para ordenar/filtrar)."
+    )
 
-    product_id = fields.Many2one('product.product', string='Servicio', index=True)
-    product_name = fields.Char(string='Producto/Servicio')
-    quantity = fields.Float(string='Cantidad', digits='Product Unit of Measure')
-    hours = fields.Float(string='Horas', digits='Product Unit of Measure')
-    # NUEVO: costo por hora (persistente)
-    cost_per_hour = fields.Monetary(string='Costo por hora', currency_field='currency_id')
+    # ─────────────────────────────────────────────────────────────────────────────
+    # PRODUCTO / SERVICIO Y MÉTRICAS
+    # ─────────────────────────────────────────────────────────────────────────────
+    product_id = fields.Many2one(
+        'product.product',
+        string='Servicio',
+        index=True,
+        help="Producto o servicio de la línea facturada."
+    )
+    product_name = fields.Char(
+        string='Producto/Servicio',
+        help="Nombre del producto/servicio al momento de calcular la comisión (snapshot)."
+    )
+    quantity = fields.Float(
+        string='Cantidad',
+        digits='Product Unit of Measure',
+        help="Cantidad facturada del servicio/producto (unidades)."
+    )
 
-    subtotal_customer = fields.Monetary(string='Subtotal al cliente', currency_field='currency_id')
-    payout = fields.Monetary(string='Comisión del Mecánico', currency_field='currency_id')
+    # Campos legacy (por si hubo modelo de comisión por horas en el pasado).
+    # Si ya migraste a porcentaje, puedes dejarlos en 0 y mantenerlos por compatibilidad.
+    hours = fields.Float(
+        string='Horas',
+        digits='Product Unit of Measure',
+        help="Horas trabajadas reportadas para el servicio (si aplica)."
+    )
+    cost_per_hour = fields.Monetary(
+        string='Costo por hora',
+        currency_field='currency_id',
+        help="Costo por hora utilizado para calcular la comisión (si aplica)."
+    )
 
-    currency_id = fields.Many2one('res.currency', default=lambda self: self.env.company.currency_id, required=True)
+    subtotal_customer = fields.Monetary(
+        string='Subtotal al cliente',
+        currency_field='currency_id',
+        help="Subtotal cobrado al cliente por la línea (sin impuestos)."
+    )
+    payout = fields.Monetary(
+        string='Comisión del Mecánico',
+        currency_field='currency_id',
+        help="Importe de la comisión a pagar al mecánico (resultado calculado)."
+    )
 
-    # Control de pago de la comisión
-    is_paid = fields.Boolean(string='Pagado', default=False)
-    paid_date = fields.Datetime(string='Fecha y hora de pago')
-    paid_by = fields.Many2one('res.users', string='Pagado por')
-    pay_note = fields.Char(string='Nota pago')
+    currency_id = fields.Many2one(
+        'res.currency',
+        default=lambda self: self.env.company.currency_id,
+        required=True,
+        help="Moneda para los importes monetarios del registro."
+    )
 
-    # Auxiliar para filtros por periodo
-    month = fields.Char(string='Mes (MM)', size=2, index=True)
-    year = fields.Char(string='Año (YYYY)', size=4, index=True)
+    # ─────────────────────────────────────────────────────────────────────────────
+    # CONTROL DE PAGO DE COMISIÓN
+    # ─────────────────────────────────────────────────────────────────────────────
+    is_paid = fields.Boolean(
+        string='Pagado',
+        default=False,
+        help="Marcar cuando la comisión haya sido liquidada."
+    )
+    paid_date = fields.Datetime(
+        string='Fecha y hora de pago',
+        help="Momento en que se realizó el pago de la comisión."
+    )
+    paid_by = fields.Many2one(
+        'res.users',
+        string='Pagado por',
+        help="Usuario responsable de registrar el pago (auditoría)."
+    )
+    pay_note = fields.Char(
+        string='Nota pago',
+        help="Observaciones o referencia del pago (folio, transferencia, etc.)."
+    )
+
+    # ─────────────────────────────────────────────────────────────────────────────
+    # CAMPOS AUXILIARES PARA FILTROS POR PERIODO
+    # ─────────────────────────────────────────────────────────────────────────────
+    month = fields.Char(
+        string='Mes (MM)',
+        size=2,
+        index=True,
+        help='Mes en formato "MM" (ej. "01" para enero).'
+    )
+    year = fields.Char(
+        string='Año (YYYY)',
+        size=4,
+        index=True,
+        help='Año en formato "YYYY" (ej. "2025").'
+    )
 
     pago_comision = fields.Selection(
         [('efect', 'Efectivo'), ('trans', 'Transferencia')],
-        string='Pago comisión'
+        string='Pago comisión',
+        help="Método utilizado para pagar la comisión."
     )
 
+    # ─────────────────────────────────────────────────────────────────────────────
+    # RESTRICCIONES SQL
+    # ─────────────────────────────────────────────────────────────────────────────
     _sql_constraints = [
-        # Evita duplicados por misma línea de factura para el mismo mecánico
-        ('uniq_employee_invoice_line',
-         'unique(employee_id, invoice_line_id)',
-         'Ya existe una entrada de comisión para esta línea y mecánico.'),
+        # Evita duplicados: un mismo mecánico no puede tener dos entradas para
+        # la misma línea de factura (protección de consistencia).
+        (
+            'uniq_employee_invoice_line',
+            'unique(employee_id, invoice_line_id)',
+            'Ya existe una entrada de comisión para esta línea y mecánico.'
+        ),
     ]
 
+    # ─────────────────────────────────────────────────────────────────────────────
+    # VALIDACIONES PYTHON / ORM
+    # ─────────────────────────────────────────────────────────────────────────────
     @api.constrains('month', 'year')
     def _check_period(self):
+        """
+        Valida el formato de periodo (si se capturó):
+          - month debe ser 'MM' (2 dígitos)
+          - year debe ser 'YYYY' (4 dígitos)
+        No bloquea si están vacíos: se permiten registros sin periodo definido.
+        """
         for r in self:
             if r.month and (len(r.month) != 2 or not r.month.isdigit()):
                 raise ValidationError(_('Mes inválido: use formato "MM".'))
