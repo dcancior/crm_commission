@@ -11,16 +11,26 @@
 -->
 
 <odoo>
+    <!-- Extensión existente: parámetros de servicio -->
     <record id="view_product_form_mechanic_fields" model="ir.ui.view">
         <field name="name">product.template.form.mechanic.fields</field>
         <field name="model">product.template</field>
         <field name="inherit_id" ref="product.product_template_form_view"/>
         <field name="arch" type="xml">
+            <!-- Agrega el grupo sólo para productos tipo servicio -->
             <xpath expr="//field[@name='type']" position="after">
                 <group string="Parámetros de servicio (mecánico)" attrs="{'invisible': [('type','!=','service')]}">
-                    <field name="service_hours_required"/>
-                    <field name="service_cost_per_hour"/>
+                    <field name="service_hours_required" invisible="1"/>
+                    <field name="service_cost_per_hour" invisible="1"/>
                 </group>
+            </xpath>
+
+            <!-- NUEVO: agregar 'porcentaje_comision' justo después de list_price -->
+            <xpath expr="//field[@name='list_price']" position="after">
+                <!-- Si tu Odoo tiene el widget percentage, lo usamos; si no, se verá como float normal -->
+                <field name="porcentaje_comision" string="Porcentaje de comisión" widget="percentage" attrs="{'invisible': [('type','!=','service')]}"/>
+                <!-- Alternativa sin widget (descomenta esta línea y comenta la anterior si prefieres float normal) -->
+                <!-- <field name="porcentaje_comision" string="Porcentaje de comisión"/> -->
             </xpath>
         </field>
     </record>
