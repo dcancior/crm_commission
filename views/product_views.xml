@@ -27,13 +27,12 @@
 
             <!-- NUEVO: agregar 'porcentaje_comision' justo después de list_price -->
             <!-- NUEVO: agregar 'porcentaje_comision' justo después de list_price con etiqueta visible -->
+            <!-- NUEVO: agregar 'porcentaje_comision' justo después de list_price en una nueva línea -->
             <xpath expr="//field[@name='list_price']" position="after">
-                <!-- Etiqueta visible -->
+                <newline/>
                 <label for="porcentaje_comision"
                     string="Porcentaje"
                     attrs="{'invisible': [('type','!=','service')]}"/>
-
-                <!-- Campo sin etiqueta propia (la da el <label>) -->
                 <field name="porcentaje_comision"
                     widget="percentage"
                     nolabel="1"
