@@ -20,6 +20,7 @@ class SaleOrderLine(models.Model):  # Clase que hereda las líneas de pedido
         "hr.employee",  # Modelo de empleado
         string="Mecánico",  # Etiqueta visible
         help="Empleado responsable de realizar el servicio.",  # Ayuda
+        tracking=True,  # Rastrear cambios
         required=False,  # No bloquear por requerido
     )  # Fin mechanic_id
 
