@@ -25,7 +25,7 @@
             (display_mechanic_fields) and (not mechanic_id or mechanic_is_placeholder)
           </attribute>
         </xpath>
-        <xpath expr="//field[@name='order_line']/tree//field[@name='price_subtotal']" position="before">
+        <xpath expr="//field[@name='order_line']/tree//field[@name='price_unit']" position="after">
           <field name="mechanic_id"
                 string="Mecánico"
                 optional="no"
