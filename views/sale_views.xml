@@ -33,7 +33,8 @@
       </xpath>
 
       <!-- Intentar una ubicación más específica -->
-        <xpath expr="//notebook//field[@name='order_line']/tree" position="inside">
+        <!--<xpath expr="//notebook//field[@name='order_line']/tree" position="inside">-->
+        <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="before">
             <field name="mechanic_id"
                    string="Mecánico"
                    optional="show"
