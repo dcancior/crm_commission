@@ -277,7 +277,8 @@ class MechanicCommissionWizard(models.TransientModel):
 
     @api.onchange('employee_id', 'month', 'year')
     def _onchange_build_lines(self):
-        """Construye las líneas del wizard basadas en facturas confirmadas."""
+        """Construye las líneas del wizard basadas en facturas confirmadas.
+        Calcula comisiones basadas en porcentaje del subtotal."""
         for w in self:
             if not (w.employee_id and w.month and w.year):
                 w.line_ids = [(5, 0, 0)]
@@ -311,13 +312,12 @@ class MechanicCommissionWizard(models.TransientModel):
 
             # Procesar cada línea
             for line in inv_lines:
-                # Obtener porcentaje de comisión del producto
-                # Obtener porcentaje de comisión del producto (ya viene como 50.0 para 50%)
-                porcentaje = line.product_id.product_tmpl_id.porcentaje_comision or 0.0
-                subtotal = line.price_subtotal or 0.0
+                # Obtener porcentaje y subtotal
+                porcentaje = float(line.product_id.product_tmpl_id.porcentaje_comision or 0.0)
+                subtotal = float(line.price_subtotal or 0.0)
                 
-                # Calcular monto de comisión
-                commission = subtotal * (porcentaje / 100)  # Si porcentaje es 50, será 1000 * 0.5 = 500
+                # Calcular comisión: si subtotal=1000 y porcentaje=50, commission=500
+                commission = subtotal * porcentaje / 100.0
 
                 vals_base = {
                     'company_id': w.env.company.id,
@@ -330,8 +330,8 @@ class MechanicCommissionWizard(models.TransientModel):
                     'product_name': line.product_id.display_name,
                     'quantity': line.quantity or 0.0,
                     'subtotal_customer': subtotal,
-                    'porcentaje_comision': porcentaje,  # Porcentaje como número entero (ej: 50 para 50%)
-                    'commission_amount': commission,    # Monto calculado
+                    'porcentaje_comision': porcentaje,  # Guardamos 50.0 para 50%
+                    'commission_amount': commission,     # Para subtotal=1000 y 50%, será 500
                     'currency_id': line.currency_id.id or w.env.company.currency_id.id,
                     'month': str(month).zfill(2),
                     'year': str(year),

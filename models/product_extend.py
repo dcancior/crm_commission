@@ -30,7 +30,7 @@ class ProductTemplate(models.Model):
 
     porcentaje_comision = fields.Float(
         string='% Comisión',
-        help='Porcentaje de comisión (ejemplo: 50 para 50%)',
-        digits=(16, 2),
+        help='Porcentaje de comisión (ejemplo: 50.0 para 50%)',
+        digits=(5, 2),  # 5 dígitos en total, 2 decimales -> permite hasta 999.99
         default=0.0,
     )
