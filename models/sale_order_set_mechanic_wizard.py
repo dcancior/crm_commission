@@ -33,9 +33,9 @@ class SaleOrder(models.Model):  # noqa: E265
 
     def _action_confirm(self):
         """Asegura que warehouse_id sea un recordset antes de confirmar"""
-        for order in self:
-            if isinstance(order.warehouse_id, int):
-                order.warehouse_id = self.env['stock.warehouse'].browse(order.warehouse_id)
+        self.ensure_one()
+        if isinstance(self.warehouse_id, int):
+            self.warehouse_id = self.env['stock.warehouse'].browse(self.warehouse_id)
         return super()._action_confirm()
 
     mechanic_warning_ack = fields.Boolean(  # Flag para no repetir el aviso en el pedido

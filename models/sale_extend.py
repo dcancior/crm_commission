@@ -72,49 +72,45 @@ class SaleOrderLine(models.Model):  # Clase que hereda las líneas de pedido
 
 
     def _action_launch_stock_rule(self, previous_product_uom_qty=False):
-        """Sobrescribe para manejar warehouse_id correctamente"""
+        """Gestión de reglas de stock para productos"""
+        procurements = []
         for line in self:
-            if not line.product_id.type == 'service':
-                # Asegurar que warehouse_id sea un recordset
-                if isinstance(line.order_id.warehouse_id, int):
-                    line.order_id.warehouse_id = self.env['stock.warehouse'].browse(line.order_id.warehouse_id)
+            if line.product_id.type != 'service':
+                # Preparar valores para procurement
+                values = line._prepare_procurement_values(line.order_id.procurement_group_id)
                 
-                vals = line._prepare_procurement_values(group_id=line.order_id.procurement_group_id)
-                
-                if vals.get('warehouse_id', False):
-                    procurements = []
-                    procurement_rule = line.env['stock.rule']._get_rule(
-                        line.product_id,
-                        line.order_id.partner_shipping_id.property_stock_customer,
-                        vals
-                    )
-                    
-                    if procurement_rule:
-                        procurements.append(self.env['procurement.group'].Procurement(
-                            line.product_id,
-                            line.product_uom_qty,
-                            line.product_uom,
-                            line.order_id.partner_shipping_id.property_stock_customer,
-                            line.name,
-                            line.order_id.name,
-                            line.order_id.company_id,
-                            vals
-                        ))
-                        
-                    if procurements:
-                        self.env['procurement.group'].run(procurements)
-        
+                # Convertir warehouse_id si es necesario
+                warehouse = values.get('warehouse_id')
+                if isinstance(warehouse, int):
+                    warehouse = self.env['stock.warehouse'].browse(warehouse)
+                values['warehouse_id'] = warehouse
+
+                procurement = self.env['procurement.group'].Procurement(
+                    line.product_id,
+                    line.product_uom_qty,
+                    line.product_uom,
+                    line.order_id.partner_shipping_id.property_stock_customer,
+                    line.name,
+                    line.order_id.name,
+                    line.order_id.company_id,
+                    values
+                )
+                procurements.append(procurement)
+
+        if procurements:
+            self.env['procurement.group'].run(procurements)
         return True
 
     def _prepare_procurement_values(self, group_id=False):
-        """Sobrescribe para asegurar que warehouse_id sea un recordset"""
+        """Prepara valores para procurement asegurando warehouse_id correcto"""
         self.ensure_one()
         values = super()._prepare_procurement_values(group_id=group_id)
         
-        # Asegurar que warehouse_id sea un recordset
-        if values.get('warehouse_id') and isinstance(values['warehouse_id'], int):
-            values['warehouse_id'] = self.env['stock.warehouse'].browse(values['warehouse_id'])
-            
+        # Convertir warehouse_id si es necesario
+        if values.get('warehouse_id'):
+            if isinstance(values['warehouse_id'], int):
+                values['warehouse_id'] = self.env['stock.warehouse'].browse(values['warehouse_id'])
+        
         return values
 
     @api.onchange('product_id')
