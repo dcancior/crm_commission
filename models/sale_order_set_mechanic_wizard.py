@@ -31,6 +31,13 @@ class SaleOrder(models.Model):  # noqa: E265
             },
         }  # noqa: E265
 
+    def _action_confirm(self):
+        # Asegurarse que warehouse_id sea un recordset
+        for order in self:
+            if order.warehouse_id and isinstance(order.warehouse_id, int):
+                order.warehouse_id = self.env['stock.warehouse'].browse(order.warehouse_id)
+        return super()._action_confirm()
+
 
 # -------------------------------------------------------------------
 # WIZARD: Asignar mecánico masivo a líneas de servicio del pedido

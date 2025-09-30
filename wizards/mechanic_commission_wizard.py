@@ -319,7 +319,7 @@ class MechanicCommissionWizard(models.TransientModel):
                 # Cálculo de comisión por porcentaje
                 subtotal = line.price_subtotal or 0.0
                 porcentaje = getattr(line.product_id.product_tmpl_id, 'porcentaje_comision', 0.0) or 0.0
-                commission = subtotal * (porcentaje / 100.0)
+                commission = subtotal * porcentaje  # Ya viene como decimal, no necesita división
 
                 # Preparar valores para el entry
                 vals_base = {

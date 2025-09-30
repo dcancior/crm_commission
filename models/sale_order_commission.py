@@ -26,3 +26,6 @@ class SaleOrder(models.Model):
             percent = user.sale_team_id.commission_percent if user and user.sale_team_id else 0.0
             order.commission_percent = percent
             order.commission_amount = order.amount_untaxed * (percent / 100.0)
+
+
+    
