@@ -29,9 +29,8 @@ class ProductTemplate(models.Model):
 
 
     porcentaje_comision = fields.Float(
-        string="Porcentaje de comisión",
-        help="Porcentaje de comisión que se aplicará al mecánico por este servicio",
+        string='% Comisión',
+        help='Porcentaje de comisión (ejemplo: 50 para 50%)',
         digits=(16, 2),
         default=0.0,
-        tracking=True,
     )

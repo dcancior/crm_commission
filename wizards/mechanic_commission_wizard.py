@@ -312,11 +312,12 @@ class MechanicCommissionWizard(models.TransientModel):
             # Procesar cada línea
             for line in inv_lines:
                 # Obtener porcentaje de comisión del producto
+                # Obtener porcentaje de comisión del producto (ya viene como 50.0 para 50%)
                 porcentaje = line.product_id.product_tmpl_id.porcentaje_comision or 0.0
                 subtotal = line.price_subtotal or 0.0
                 
                 # Calcular monto de comisión
-                commission = subtotal * (porcentaje / 100)
+                commission = subtotal * (porcentaje / 100)  # Si porcentaje es 50, será 1000 * 0.5 = 500
 
                 vals_base = {
                     'company_id': w.env.company.id,
