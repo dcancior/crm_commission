@@ -20,6 +20,14 @@ class AccountMoveLine(models.Model):
         related="product_id.product_tmpl_id.porcentaje_comision_mecanico",
         store=True,
     )
+    
+    porcentaje_comision = fields.Float(
+        string="Porcentaje de comisión",
+        help="Porcentaje de comisión aplicado a este producto.",
+        digits=(16, 2),
+        related="product_id.product_tmpl_id.porcentaje_comision",
+        store=True,
+    )
 
     mechanic_id = fields.Many2one(
         "hr.employee",
