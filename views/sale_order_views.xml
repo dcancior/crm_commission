@@ -9,8 +9,6 @@
 ║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html     ║
 ╚════════════════════════════════════════════════════════════════════╝
 -->
-
-<?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="view_order_form_inherit_commission" model="ir.ui.view">
         <field name="name">sale.order.form.inherit.commission</field>
