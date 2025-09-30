@@ -34,6 +34,13 @@ class MechanicCommissionEntry(models.Model):
     # NUEVO: costo por hora (persistente)
     cost_per_hour = fields.Monetary(string='Costo por hora', currency_field='currency_id')
 
+     # Agregar campo faltante
+    price_unit = fields.Float(
+        string='Precio Unitario',
+        digits='Product Price',
+        help='Precio unitario del servicio',
+    )
+
     # Campos para comisión
     porcentaje_comision = fields.Float(
         string='Porcentaje comisión',

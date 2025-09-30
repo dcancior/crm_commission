@@ -277,6 +277,11 @@ class MechanicCommissionWizard(models.TransientModel):
 
     @api.onchange('employee_id', 'month', 'year')
     def _onchange_build_lines(self):
+        """Construye las líneas del wizard basadas en facturas confirmadas.
+        
+        La comisión se calcula como porcentaje del subtotal de cada línea.
+        Solo considera líneas de servicio asignadas al mecánico seleccionado.
+        """
         for w in self:
             lines_cmds = []
 
@@ -284,36 +289,39 @@ class MechanicCommissionWizard(models.TransientModel):
                 w.line_ids = [(5, 0, 0)]
                 continue
 
+            # Determinar rango de fechas del mes
             year = int(w.year)
             month = int(w.month)
             last_day = calendar.monthrange(year, month)[1]
             date_start = f"{year}-{str(month).zfill(2)}-01"
             date_end = f"{year}-{str(month).zfill(2)}-{last_day}"
 
-            # FACTURAS DEL CLIENTE confirmadas (sin importar estado de pago)
+            # Buscar facturas confirmadas del mes
             moves = w.env['account.move'].search([
                 ('move_type', '=', 'out_invoice'),
-                ('state', '=', 'posted'),  # Solo confirmadas
+                ('state', '=', 'posted'),
                 ('invoice_date', '>=', date_start),
                 ('invoice_date', '<=', date_end),
             ])
 
-            # LÍNEAS DE SERVICIO DEL mecánico seleccionado
+            # Filtrar líneas de servicio del mecánico
             inv_lines = moves.mapped('invoice_line_ids').filtered(
-                lambda l: l.product_id.type == 'service'
-                        and getattr(l, 'mechanic_id', False)
-                        and l.mechanic_id.id == w.employee_id.id
+                lambda l: (l.product_id.type == 'service' and 
+                        l.mechanic_id and 
+                        l.mechanic_id.id == w.employee_id.id)
             )
 
             Entry = w.env['mechanic.commission.entry']
             entries_to_keep = Entry.browse()
 
+            # Procesar cada línea encontrada
             for line in inv_lines:
-                # Calculamos la comisión basada en el porcentaje
+                # Cálculo de comisión por porcentaje
                 subtotal = line.price_subtotal or 0.0
-                porcentaje = line.porcentaje_comision or 0.0
+                porcentaje = getattr(line.product_id.product_tmpl_id, 'porcentaje_comision', 0.0) or 0.0
                 commission = subtotal * (porcentaje / 100.0)
 
+                # Preparar valores para el entry
                 vals_base = {
                     'company_id': w.env.company.id,
                     'employee_id': w.employee_id.id,
@@ -324,7 +332,6 @@ class MechanicCommissionWizard(models.TransientModel):
                     'product_id': line.product_id.id,
                     'product_name': line.product_id.display_name,
                     'quantity': line.quantity or 0.0,
-                    'price_unit': line.price_unit or 0.0,
                     'subtotal_customer': subtotal,
                     'porcentaje_comision': porcentaje,
                     'commission_amount': commission,
@@ -334,10 +341,12 @@ class MechanicCommissionWizard(models.TransientModel):
                     'payment_state': line.move_id.payment_state,
                 }
 
+                # Buscar entry existente o crear nuevo
                 entry = Entry.search([
                     ('employee_id', '=', w.employee_id.id),
                     ('invoice_line_id', '=', line.id)
                 ], limit=1)
+
                 if entry:
                     entry.write(vals_base)
                 else:
@@ -345,7 +354,7 @@ class MechanicCommissionWizard(models.TransientModel):
 
                 entries_to_keep |= entry
 
-            # Construir comandos (aplicando filtro si corresponde)
+            # Construir comandos para el O2M
             lines_cmds = [
                 (0, 0, {
                     'commission_entry_id': e.id,
@@ -353,6 +362,7 @@ class MechanicCommissionWizard(models.TransientModel):
                 for e in entries_to_keep.sorted(lambda r: (r.invoice_date or fields.Date.today(), r.id))
             ]
 
+            # Aplicar filtro si está configurado
             if w.report_paid_filter == 'paid':
                 lines_cmds = [cmd for cmd in lines_cmds if cmd and cmd[2] and
                             w.env['mechanic.commission.entry'].browse(cmd[2]['commission_entry_id']).is_paid]
@@ -360,6 +370,7 @@ class MechanicCommissionWizard(models.TransientModel):
                 lines_cmds = [cmd for cmd in lines_cmds if cmd and cmd[2] and
                             not w.env['mechanic.commission.entry'].browse(cmd[2]['commission_entry_id']).is_paid]
 
+            # Actualizar líneas del wizard
             w.line_ids = [(5, 0, 0)] + lines_cmds
 
     @api.onchange('report_paid_filter')
