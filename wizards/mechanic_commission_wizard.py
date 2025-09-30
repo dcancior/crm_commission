@@ -67,8 +67,10 @@ class MechanicCommissionWizard(models.TransientModel):
         currency_field="currency_id",
     )
     currency_id = fields.Many2one(
-        "res.currency",
+        'res.currency',
+        string='Moneda',
         default=lambda self: self.env.company.currency_id.id,
+        required=True,
     )
 
     # O2M NO compute: lo pobla exclusivamente _onchange_build_lines()

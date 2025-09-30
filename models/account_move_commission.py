@@ -62,8 +62,9 @@ class AccountMove(models.Model):
         ('paid', 'Pagada')
     ], string='Estado de Comisión', default='pending', tracking=True)
     
-    commission_amount = fields.Float(
+    commission_amount = fields.Monetary(
         string='Monto de Comisión',
+        currency_field='currency_id',
         compute='_compute_commission_amount',
         store=True,
     )
