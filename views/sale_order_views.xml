@@ -10,28 +10,31 @@
 ╚════════════════════════════════════════════════════════════════════╝
 -->
 
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="view_order_form_inherit_commission" model="ir.ui.view">
         <field name="name">sale.order.form.inherit.commission</field>
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
-            <xpath expr="//sheet" position="inside">
-                <group string="Comisiones"
-                       groups="crm_commission.group_sale_order_commission_fields">
-                    <field name="seller_name" readonly="1"/>
-                    <field name="commission_percent" readonly="1"/>
-                    <field name="commission_amount" readonly="1"/>
-                </group>
+            <!-- Modificar líneas de orden -->
+            <xpath expr="//field[@name='order_line']/tree//field[@name='product_id']" position="after">
+                <field name="mechanic_id" 
+                       optional="show"
+                       attrs="{'column_invisible': [('parent.state', 'in', ('draft','sent'))],
+                              'required': [('product_type', '=', 'service')]}"/>
+                <field name="porcentaje_comision" 
+                       optional="show"/>
+                <field name="product_type" invisible="1"/>
             </xpath>
 
-            <!-- NUEVO: colocar 'Porcentaje' en una línea nueva debajo de list_price,
-                con el campo porcentaje_comision a la derecha en la misma fila -->
-            <xpath expr="//field[@name='taxes_id']" position="before">
-                <group col="2" attrs="{'invisible': [('type','!=','service')]}">
-                    <label for="porcentaje_comision" string="Porcentaje"/>
-                    <field name="porcentaje_comision" widget="percentage" nolabel="1"/>
-                </group>
+            <!-- Agregar campos en la forma -->
+            <xpath expr="//field[@name='order_line']/form//field[@name='product_id']" position="after">
+                <field name="mechanic_id" 
+                       attrs="{'invisible': [('product_type', '!=', 'service')],
+                              'required': [('product_type', '=', 'service')]}"/>
+                <field name="porcentaje_comision"/>
+                <field name="product_type" invisible="1"/>
             </xpath>
         </field>
     </record>
