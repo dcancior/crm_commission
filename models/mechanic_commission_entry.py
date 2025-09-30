@@ -1,71 +1,15 @@
-# -*- coding: utf-8 -*-
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║  DCR INFORMATIC SERVICES SAS DE CV                               ║
-# ║  Web: https://www.dcrsoluciones.com                              ║
-# ║  Contacto: info@dcrsoluciones.com                                ║
-# ║                                                                  ║
-# ║  Este módulo está bajo licencia (LGPLv3).                        ║
-# ║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html   ║
-# ╚══════════════════════════════════════════════════════════════════╝
 
 from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
 
 
 class MechanicCommissionEntry(models.Model):
-    """
-    ==============================================================================
-    Modelo: mechanic.commission.entry
-    ==============================================================================
-    Propósito
-    ---------
-    Registrar una **entrada de comisión** por mecánico vinculada a **una línea
-    de factura** (account.move.line). Este modelo funciona como **tabla de
-    almacenamiento** del resultado del cálculo (snapshot), junto con metadatos
-    útiles (factura, línea, producto, cantidades, etc.).
-
-    Qué hace / Qué NO hace
-    ----------------------
-    ✔ Guarda quién (employee_id), qué línea (invoice_line_id), de qué factura
-      (invoice_id), y los importes relevantes (subtotal_customer, payout).
-    ✔ Permite control de pago (is_paid, paid_date, paid_by, pay_note).
-    ✔ Evita duplicados por (employee_id, invoice_line_id) a nivel SQL.
-
-    ✖ No realiza aquí el cálculo automático de la comisión. La idea es que el
-      cálculo suceda en otra parte (por ejemplo, al confirmar factura o desde
-      account.move.line) y el resultado **se persista** aquí en `payout`.
-      Esto deja el modelo limpio y reutilizable sin acoplarlo a reglas de negocio.
-
-    Relación con la NUEVA lógica de porcentaje
-    ------------------------------------------
-    - Si la nueva política es:
-        comisión = list_price * (porcentaje_comision / 100) * cantidad
-      ese cálculo ocurre **fuera** (p. ej. en account.move.line) y **se pasa** a
-      este modelo. Este modelo no conoce `porcentaje_comision` ni `list_price`.
-    - Los campos `hours` y `cost_per_hour` quedan como metadatos históricos
-      (legacy). Puedes dejarlos en 0 o usarlos solo en reportes si alguna vez
-      hubo cálculos por horas.
-
-    Cuándo crear registros aquí
-    ---------------------------
-    - Al validar la factura, o al confirmar un documento operativo, o mediante
-      un botón/cron. Lo importante es **llenar payout** con el valor ya calculado.
-    - La restricción SQL impedirá que, para la misma línea y mecánico, se duplique.
-
-    Orden y nombre visible
-    ----------------------
-    - _order prioriza las entradas más recientes por `invoice_date`.
-    - _rec_name usa `invoice_name` para listas y vistas kanban/tree (legible).
-    """
-
     _name = 'mechanic.commission.entry'
     _description = 'Entrada de comisión por servicio mecánico'
     _order = 'invoice_date desc, id desc'
     _rec_name = 'invoice_name'
 
-    # ─────────────────────────────────────────────────────────────────────────────
-    # CONTEXTO / EMPRESA
-    # ─────────────────────────────────────────────────────────────────────────────
+    
     company_id = fields.Many2one(
         'res.company',
         default=lambda self: self.env.company,
@@ -73,9 +17,6 @@ class MechanicCommissionEntry(models.Model):
         help="Compañía a la que pertenece este cálculo de comisión."
     )
 
-    # ─────────────────────────────────────────────────────────────────────────────
-    # RELACIÓN CON EMPLEADO / USUARIO
-    # ─────────────────────────────────────────────────────────────────────────────
     employee_id = fields.Many2one(
         'hr.employee',
         string='Mecánico',
@@ -91,9 +32,6 @@ class MechanicCommissionEntry(models.Model):
         help="Usuario del sistema vinculado al empleado (útil para filtros/reportes)."
     )
 
-    # ─────────────────────────────────────────────────────────────────────────────
-    # RELACIÓN CON FACTURACIÓN
-    # ─────────────────────────────────────────────────────────────────────────────
     invoice_id = fields.Many2one(
         'account.move',
         string='Factura',
@@ -117,9 +55,6 @@ class MechanicCommissionEntry(models.Model):
         help="Fecha de emisión de la factura (se usa para ordenar/filtrar)."
     )
 
-    # ─────────────────────────────────────────────────────────────────────────────
-    # PRODUCTO / SERVICIO Y MÉTRICAS
-    # ─────────────────────────────────────────────────────────────────────────────
     product_id = fields.Many2one(
         'product.product',
         string='Servicio',
@@ -136,8 +71,7 @@ class MechanicCommissionEntry(models.Model):
         help="Cantidad facturada del servicio/producto (unidades)."
     )
 
-    # Campos legacy (por si hubo modelo de comisión por horas en el pasado).
-    # Si ya migraste a porcentaje, puedes dejarlos en 0 y mantenerlos por compatibilidad.
+
     hours = fields.Float(
         string='Horas',
         digits='Product Unit of Measure',
@@ -167,9 +101,6 @@ class MechanicCommissionEntry(models.Model):
         help="Moneda para los importes monetarios del registro."
     )
 
-    # ─────────────────────────────────────────────────────────────────────────────
-    # CONTROL DE PAGO DE COMISIÓN
-    # ─────────────────────────────────────────────────────────────────────────────
     is_paid = fields.Boolean(
         string='Pagado',
         default=False,
@@ -189,9 +120,6 @@ class MechanicCommissionEntry(models.Model):
         help="Observaciones o referencia del pago (folio, transferencia, etc.)."
     )
 
-    # ─────────────────────────────────────────────────────────────────────────────
-    # CAMPOS AUXILIARES PARA FILTROS POR PERIODO
-    # ─────────────────────────────────────────────────────────────────────────────
     month = fields.Char(
         string='Mes (MM)',
         size=2,
@@ -211,12 +139,7 @@ class MechanicCommissionEntry(models.Model):
         help="Método utilizado para pagar la comisión."
     )
 
-    # ─────────────────────────────────────────────────────────────────────────────
-    # RESTRICCIONES SQL
-    # ─────────────────────────────────────────────────────────────────────────────
     _sql_constraints = [
-        # Evita duplicados: un mismo mecánico no puede tener dos entradas para
-        # la misma línea de factura (protección de consistencia).
         (
             'uniq_employee_invoice_line',
             'unique(employee_id, invoice_line_id)',
@@ -224,9 +147,6 @@ class MechanicCommissionEntry(models.Model):
         ),
     ]
 
-    # ─────────────────────────────────────────────────────────────────────────────
-    # VALIDACIONES PYTHON / ORM
-    # ─────────────────────────────────────────────────────────────────────────────
     @api.constrains('month', 'year')
     def _check_period(self):
         """
