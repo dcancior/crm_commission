@@ -72,10 +72,39 @@ class SaleOrderLine(models.Model):  # Clase que hereda las líneas de pedido
 
     def _action_launch_stock_rule(self, previous_product_uom_qty=False):
         """Asegura que warehouse_id sea un recordset antes de crear reglas de stock"""
+        procurements = []
         for line in self:
-            if line.order_id.warehouse_id and isinstance(line.order_id.warehouse_id, int):
-                line.order_id.warehouse_id = self.env['stock.warehouse'].browse(line.order_id.warehouse_id)
-        return super()._action_launch_stock_rule(previous_product_uom_qty)
+            if not line.product_id.type == 'service':
+                # Convertir warehouse_id si es necesario
+                if isinstance(line.order_id.warehouse_id, int):
+                    line.order_id.warehouse_id = self.env['stock.warehouse'].browse(line.order_id.warehouse_id)
+                
+                vals = line._prepare_procurement_values(group_id=line.order_id.procurement_group_id)
+                
+                # Asegurar que warehouse_id sea un recordset en vals
+                if 'warehouse_id' in vals and isinstance(vals['warehouse_id'], int):
+                    vals['warehouse_id'] = self.env['stock.warehouse'].browse(vals['warehouse_id'])
+                
+                procurements.append(self.env['procurement.group'].Procurement(
+                    line.product_id,
+                    line.product_uom_qty,
+                    line.product_uom,
+                    line.order_id.partner_shipping_id.property_stock_customer,
+                    line.name,
+                    line.order_id.name,
+                    line.order_id.company_id,
+                    vals
+                ))
+        if procurements:
+            self.env['procurement.group'].run(procurements)
+        return True
+
+    def _prepare_procurement_values(self, group_id=False):
+        """Asegura que warehouse_id sea un recordset en los valores de procurement"""
+        values = super()._prepare_procurement_values(group_id=group_id)
+        if 'warehouse_id' in values and isinstance(values['warehouse_id'], int):
+            values['warehouse_id'] = self.env['stock.warehouse'].browse(values['warehouse_id'])
+        return values
 
     @api.onchange('product_id')
     def _onchange_product_id_mechanic(self):
