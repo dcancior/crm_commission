@@ -71,8 +71,8 @@ class SaleOrderLine(models.Model):  # Clase que hereda las líneas de pedido
     )  # Fin mechanic_is_placeholder
 
     def _action_launch_stock_rule(self, previous_product_uom_qty=False):
+        """Asegura que warehouse_id sea un recordset antes de crear reglas de stock"""
         for line in self:
-            # Asegurarse que el warehouse_id sea un recordset
             if line.order_id.warehouse_id and isinstance(line.order_id.warehouse_id, int):
                 line.order_id.warehouse_id = self.env['stock.warehouse'].browse(line.order_id.warehouse_id)
         return super()._action_launch_stock_rule(previous_product_uom_qty)
