@@ -1,13 +1,14 @@
-# models/procurement_group_patch.py
+# crm_commission/models/procurement_group_patch.py
 from odoo import models
 
 class ProcurementGroup(models.Model):
     _inherit = 'procurement.group'
 
-    def run(self, procurements):
-        # Sanitiza valores *antes* del super().run()
+    def run(self, procurements, *args, **kwargs):
+        # Sanitiza valores antes del super().run() (blindaje global)
         for p in procurements:
             vals = p.values
+
             wh = vals.get('warehouse_id')
             if isinstance(wh, int):
                 vals['warehouse_id'] = self.env['stock.warehouse'].browse(wh)
@@ -27,4 +28,5 @@ class ProcurementGroup(models.Model):
                 if route_ids:
                     vals['route_ids'] = self.env['stock.route'].browse(route_ids)
 
-        return super().run(procurements)
+        # ¡OJO! Mantén kwargs como raise_user_error para no romper la llamada del core.
+        return super().run(procurements, *args, **kwargs)
