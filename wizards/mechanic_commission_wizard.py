@@ -27,6 +27,7 @@ class MechanicCommissionWizard(models.TransientModel):
         "hr.employee",
         string="Mecánico",
         required=True,
+        domain="[('job_id.name', 'ilike', 'Mecánic')]",  # Filtra por puesto de trabajo
     )
     month = fields.Selection(
         MONTHS,
