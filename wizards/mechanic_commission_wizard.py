@@ -313,12 +313,12 @@ class MechanicCommissionWizard(models.TransientModel):
             # Procesar cada línea
             for line in inv_lines:
                 # Obtener porcentaje directo (sin convertir) y subtotal
-                porcentaje = line.product_id.product_tmpl_id.porcentaje_comision
-                subtotal = line.price_subtotal
+                porcentaje = float(line.product_id.product_tmpl_id.porcentaje_comision)
+                subtotal = float(line.price_subtotal)
                 
                 # Calcular comisión directamente
                 # Ejemplo: si subtotal=1000 y porcentaje=50, commission=500
-                commission = (subtotal * porcentaje) / 100
+                commission = subtotal * (porcentaje / 100)
 
                 vals_base = {
                     'company_id': w.env.company.id,

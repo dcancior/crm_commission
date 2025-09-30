@@ -43,15 +43,22 @@ class MechanicCommissionEntry(models.Model):
 
     # Campos para comisión
     porcentaje_comision = fields.Float(
-        string='Porcentaje comisión',
-        digits=(16,2),
-        help='Porcentaje de comisión aplicado al servicio'
+        string='% Comisión',
+        digits=(16, 2),  # Para manejar números enteros
+        help='Porcentaje de comisión (ejemplo: 50 para 50%)'
     )
+
     commission_amount = fields.Monetary(
-        string='Monto comisión',
+        string='Monto Comisión',
         currency_field='currency_id',
-        help='Monto de comisión calculado'
+        compute='_compute_commission_amount',
+        store=True
     )
+
+    @api.depends('subtotal_customer', 'porcentaje_comision')
+    def _compute_commission_amount(self):
+        for record in self:
+            record.commission_amount = record.subtotal_customer * (record.porcentaje_comision / 100)
 
     subtotal_customer = fields.Monetary(string='Subtotal al cliente', currency_field='currency_id')
     payout = fields.Monetary(string='Comisión del Mecánico', currency_field='currency_id')
