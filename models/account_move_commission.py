@@ -56,14 +56,41 @@ class AccountMove(models.Model):
         store=True                           # se guarda en BD (útil para reportes)
     )
 
-    # Importe monetario de la comisión comercial calculada.
-    # Fórmula: amount_untaxed * (commission_percent / 100)
-    commission_amount = fields.Monetary(
-        string='Monto Comisión',
-        compute='_compute_commission_data',
-        store=True,                          # persistido para búsquedas/agrupaciones
-        currency_field='currency_id'         # respeta la moneda de la factura
+    commission_state = fields.Selection([
+        ('pending', 'Pendiente'),
+        ('calculated', 'Calculada'),
+        ('paid', 'Pagada')
+    ], string='Estado de Comisión', default='pending', tracking=True)
+    
+    commission_amount = fields.Float(
+        string='Monto de Comisión',
+        compute='_compute_commission_amount',
+        store=True,
     )
+
+    @api.depends('payment_state', 'invoice_line_ids', 'invoice_line_ids.product_id', 
+                'invoice_line_ids.price_total')
+    def _compute_commission_amount(self):
+        for move in self:
+            if move.move_type != 'out_invoice' or move.payment_state != 'paid':
+                move.commission_amount = 0.0
+                continue
+
+            commission = 0.0
+            for line in move.invoice_line_ids:
+                if line.product_id.type == 'service' and line.product_id.porcentaje_comision > 0:
+                    commission += (line.price_total * line.product_id.porcentaje_comision) / 100
+            
+            move.commission_amount = commission
+            if commission > 0:
+                move.commission_state = 'calculated'
+
+    def action_register_payment(self):
+        res = super(AccountMove, self).action_register_payment()
+        # Cuando se registra el pago, actualizamos el estado de la comisión
+        if self.payment_state == 'paid':
+            self.commission_state = 'paid'
+        return res
 
     @api.depends('invoice_user_id', 'amount_untaxed')
     def _compute_commission_data(self):

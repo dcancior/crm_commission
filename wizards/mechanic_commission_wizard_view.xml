@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <odoo>
     <record id="view_mechanic_commission_wizard_form" model="ir.ui.view">
         <field name="name">mechanic.commission.wizard.form</field>
@@ -18,53 +19,60 @@
                     <!-- KPIs -->
                     <group col="4">
                         <field name="services_count" readonly="1"/>
-                        <field name="total_hours" readonly="1"/>
-                        <field name="amount_invoiced" readonly="1"/>
-                        <field name="payout_total" readonly="1"/>
+                        <field name="amount_invoiced" readonly="1" sum="Total Facturado"/>
+                        <field name="total_commission" readonly="1" sum="Total Comisiones"/>
+                        <field name="payout_total" readonly="1" sum="Total Pagado"/>
                     </group>
 
                     <!-- Detalle -->
                     <notebook>
-                        <page string="Detalle de líneas facturadas (pagadas)">
+                        <page string="Detalle de líneas facturadas">
                             <field name="line_ids" nolabel="1"
-                                context="{'no_open': 1}"
-                                options="{'no_create': True}">
+                                   context="{'no_open': 1}"
+                                   options="{'no_create': True}">
                                 <tree editable="bottom" create="0" edit="0" delete="0">
                                     <!-- columnas -->
                                     <field name="invoice_name" readonly="1"/>
+                                    <field name="invoice_date" readonly="1"/>
                                     <field name="product_name" readonly="1"/>
-                                    <field name="hours" readonly="1"/>
-                                    <field name="payout" readonly="1"/>
-                                    <!-- Estado de pago (editable) -->
-                                    <field name="is_paid"/>
-                                    <!-- Forma de pago (editable, visible solo si is_paid) -->
-                                    <field name="pago_comision"/>
+                                    <field name="price_unit" readonly="1" sum="Total Precio"/>
                                     <field name="quantity" readonly="1"/>
-                                    <field name="cost_per_hour" readonly="1"/>
+                                    <field name="price_subtotal" readonly="1" sum="Total"/>
+                                    <field name="porcentaje_comision" readonly="1"/>
+                                    <field name="commission_amount" readonly="1" sum="Total Comisión"/>
+                                    <field name="payment_state" readonly="1"/>
+                                    <field name="is_paid"/>
+                                    <field name="pago_comision" attrs="{'readonly': [('is_paid', '=', False)]}"/>
                                     <field name="paid_date" readonly="1"/>
                                     <field name="paid_by" readonly="1"/>
                                 </tree>
 
-                                <!-- Subform cuando (por cualquier razón) se intente abrir la línea -->
                                 <form string="Detalle de comisión">
                                     <group>
-                                        <!-- Ocultamos los M2O técnicos -->
+                                        <!-- Campos técnicos -->
                                         <field name="wizard_id" invisible="1"/>
                                         <field name="commission_entry_id" invisible="1"/>
-
-                                        <!-- Solo lectura para visualizar -->
+                                    </group>
+                                    
+                                    <group string="Información de Factura">
                                         <field name="invoice_name" readonly="1"/>
                                         <field name="invoice_date" readonly="1"/>
+                                        <field name="payment_state" readonly="1"/>
+                                    </group>
+                                    
+                                    <group string="Detalles del Servicio">
                                         <field name="product_name" readonly="1"/>
+                                        <field name="price_unit" readonly="1"/>
                                         <field name="quantity" readonly="1"/>
-                                        <field name="hours" readonly="1"/>
-                                        <field name="subtotal_customer" readonly="1"/>
-                                        <field name="payout" readonly="1"/>
-                                        <field name="cost_per_hour" readonly="1"/>
-
-                                        <field name="is_paid" readonly="1"/>
-                                        <field name="pago_comision"/>
-
+                                        <field name="price_subtotal" readonly="1"/>
+                                        <field name="porcentaje_comision" readonly="1"/>
+                                        <field name="commission_amount" readonly="1"/>
+                                    </group>
+                                    
+                                    <group string="Estado de Pago">
+                                        <field name="is_paid"/>
+                                        <field name="pago_comision" 
+                                               attrs="{'readonly': [('is_paid', '=', False)]}"/>
                                         <field name="paid_date" readonly="1"/>
                                         <field name="paid_by" readonly="1"/>
                                     </group>
@@ -75,27 +83,40 @@
                 </sheet>
 
                 <footer>
-                    <button name="action_save_lines" type="object" string="Guardar cambios" class="oe_highlight"/>
-                    <button name="action_mark_all_paid" type="object" string="Marcar todas como pagadas" class="oe_highlight"/>
-                    <button string="Cerrar" special="cancel"/>
-                    <button name="action_print_pdf" type="object" string="Descargar PDF"/>
+                    <button name="action_save_lines" 
+                            type="object" 
+                            string="Guardar cambios" 
+                            class="oe_highlight"/>
+                    <button name="action_mark_all_paid" 
+                            type="object" 
+                            string="Marcar todas como pagadas" 
+                            class="oe_highlight"/>
+                    <button string="Cerrar" 
+                            special="cancel"/>
+                    <button name="action_print_pdf" 
+                            type="object" 
+                            string="Descargar PDF"/>
                 </footer>
             </form>
         </field>
     </record>
 
-    <act_window id="action_mechanic_commission_wizard"
-                name="Reporte de Comisiones (Mecánicos)"
-                res_model="mechanic.commission.wizard"
-                view_mode="form"
-                target="new"/>
+    <!-- Acción del Wizard -->
+    <record id="action_mechanic_commission_wizard" model="ir.actions.act_window">
+        <field name="name">Reporte de Comisiones (Mecánicos)</field>
+        <field name="res_model">mechanic.commission.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
 
+    <!-- Menú principal -->
     <menuitem id="menu_mechanic_commission_root"
               name="Comisiones Mecánicos"
               sequence="100"
               groups="crm_commission.group_mechanic_commission_view"
               web_icon="crm_commission,static/description/icon_mechanic.svg"/>
 
+    <!-- Submenú para el reporte -->
     <menuitem id="menu_mechanic_commission_report"
               name="Reporte mensual"
               parent="menu_mechanic_commission_root"
@@ -103,8 +124,7 @@
               sequence="10"
               groups="crm_commission.group_mechanic_commission_view"/>
 
-
-
+    <!-- Wizard de pago masivo -->
     <record id="view_mechanic_commission_mass_pay_wizard_form" model="ir.ui.view">
         <field name="name">mechanic.commission.mass.pay.wizard.form</field>
         <field name="model">mechanic.commission.mass.pay.wizard</field>
@@ -116,11 +136,17 @@
                     <field name="pay_note"/>
                 </group>
                 <group>
-                    <field name="entry_ids" widget="many2many_tags" options="{'no_open': True, 'no_create': True}"/>
+                    <field name="entry_ids" 
+                           widget="many2many_tags" 
+                           options="{'no_open': True, 'no_create': True}"/>
                 </group>
                 <footer>
-                    <button name="action_confirm" type="object" string="Aplicar" class="oe_highlight"/>
-                    <button string="Cancelar" special="cancel"/>
+                    <button name="action_confirm" 
+                            type="object" 
+                            string="Aplicar" 
+                            class="oe_highlight"/>
+                    <button string="Cancelar" 
+                            special="cancel"/>
                 </footer>
             </form>
         </field>
