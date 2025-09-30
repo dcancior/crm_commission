@@ -51,6 +51,14 @@ class SaleOrderLine(models.Model):  # Clase que hereda las líneas de pedido
         help="Horas requeridas × costo por hora × cantidad.",  # Ayuda
     )  # Fin mechanic_cost_subtotal
 
+    porcentaje_comision = fields.Float(
+        string='% Comisión',
+        help='Porcentaje de comisión para el mecánico',
+        digits=(16, 2),
+        related='product_id.product_tmpl_id.porcentaje_comision',
+        store=True,
+    )
+
     product_type = fields.Selection(  # Tipo del producto (para decoración/condiciones)
         related="product_id.type",  # Related al tipo
         store=True,  # Almacenar para usar en tree
@@ -61,6 +69,18 @@ class SaleOrderLine(models.Model):  # Clase que hereda las líneas de pedido
         compute="_compute_mechanic_is_placeholder",  # Cómputo
         store=False,  # No almacenar
     )  # Fin mechanic_is_placeholder
+
+
+    @api.onchange('product_id')
+    def _onchange_product_id_mechanic(self):
+        for line in self:
+            if line.product_id and line.product_id.type == 'service':
+                # Si cambia el producto y es servicio, mantener mechanic_id
+                continue
+            else:
+                # Si no es servicio, limpiar mechanic_id
+                line.mechanic_id = False
+
 
     @api.depends("mechanic_id")  # Recalcular cuando cambia el mecánico
     def _compute_mechanic_is_placeholder(self):  # Marca si el mecánico es el placeholder
