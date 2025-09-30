@@ -13,17 +13,19 @@ from odoo import models, fields, api
 class AccountMoveLine(models.Model):
     _inherit = "account.move.line"
 
+    # NUEVO: porcentaje comisión del MECÁNICO (en %), tomado del template
     porcentaje_comision_mecanico = fields.Float(
         string="Porcentaje de comisión",
-        help="Porcentaje de comisión aplicado a este producto.",
+        help="Porcentaje de comisión aplicado a este producto para el mecánico (en %).",
         digits=(16, 2),
         related="product_id.product_tmpl_id.porcentaje_comision_mecanico",
         store=True,
     )
-    
+
+    # (Opcional) Campo legado de ventas. Si ya no lo usas en ningún lado, elimínalo.
     porcentaje_comision = fields.Float(
-        string="Porcentaje de comisión",
-        help="Porcentaje de comisión aplicado a este producto.",
+        string="Porcentaje de comisión (ventas) [LEGACY]",
+        help="Campo legado para comisión de ventas. No se usa para mecánicos.",
         digits=(16, 2),
         related="product_id.product_tmpl_id.porcentaje_comision",
         store=True,
@@ -56,30 +58,30 @@ class AccountMoveLine(models.Model):
         store=False,
     )
 
-    # Nuevo campo para mostrar el monto de la comisión
+    # Monto de la comisión del MECÁNICO
     commission_amount = fields.Monetary(
         string="Monto Comisión",
         compute="_compute_commission_amount",
         currency_field="currency_id",
         store=True,
-        help="Monto de comisión calculado sobre el precio de venta",
+        help="Monto de comisión para el mecánico calculado sobre el subtotal.",
     )
 
-    @api.depends('product_id', 'price_subtotal', 'quantity', 'porcentaje_comision_mecanico')
+    @api.depends('product_id', 'price_subtotal', 'quantity', 'porcentaje_comision_mecanico', 'mechanic_id')
     def _compute_commission_amount(self):
-        """Calcula la comisión basada en el porcentaje del precio de venta"""
+        """Calcula la comisión del MECÁNICO basada en % del subtotal (price_subtotal)."""
         for line in self:
-            if (line.product_id and 
-                line.product_id.type == "service" and 
-                line.mechanic_id and 
-                line.porcentaje_comision):
-                # Calculamos la comisión sobre el subtotal (precio * cantidad)
-                line.commission_amount = line.price_subtotal * (line.porcentaje_comision_mecanico / 100.0)
-                
+            if (
+                line.product_id
+                and line.product_id.type == "service"
+                and line.mechanic_id
+                and line.porcentaje_comision_mecanico
+            ):
+                line.commission_amount = (line.price_subtotal or 0.0) * (line.porcentaje_comision_mecanico / 100.0)
             else:
                 line.commission_amount = 0.0
 
-    # Opcional: Añadir validación para asegurar que se seleccione un mecánico
+    # Opcional: advertir si falta mecánico en servicios
     @api.onchange('product_id')
     def _onchange_product_id_mechanic(self):
         for line in self:
@@ -99,9 +101,7 @@ class AccountMoveLine(models.Model):
             line.mechanic_hours_required = tmpl.service_hours_required if tmpl else 0.0
             line.mechanic_cost_per_hour = tmpl.service_cost_per_hour if tmpl else 0.0
 
-    @api.depends(
-        "quantity", "product_id", "mechanic_hours_required", "mechanic_cost_per_hour"
-    )
+    @api.depends("quantity", "product_id", "mechanic_hours_required", "mechanic_cost_per_hour")
     def _compute_mechanic_cost(self):
         for line in self:
             if line.product_id and line.product_id.type == "service":

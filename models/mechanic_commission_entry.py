@@ -31,23 +31,19 @@ class MechanicCommissionEntry(models.Model):
     product_name = fields.Char(string='Producto/Servicio')
     quantity = fields.Float(string='Cantidad', digits='Product Unit of Measure')
     hours = fields.Float(string='Horas', digits='Product Unit of Measure')
-    # NUEVO: costo por hora (persistente)
+
+    # Persistencia de costos (si los usas)
     cost_per_hour = fields.Monetary(string='Costo por hora', currency_field='currency_id')
+    price_unit = fields.Float(string='Precio Unitario', digits='Product Price', help='Precio unitario del servicio')
 
-     # Agregar campo faltante
-    price_unit = fields.Float(
-        string='Precio Unitario',
-        digits='Product Price',
-        help='Precio unitario del servicio',
+    # --- Porcentaje de comisión del MECÁNICO (en %) ---
+    porcentaje_comision_mecanico = fields.Float(
+        string='% Comisión mecánico',
+        digits=(16, 2),
+        help='Porcentaje de comisión para mecánicos (ejemplo: 50 = 50%).',
     )
 
-    # Campos para comisión
-    porcentaje_comision = fields.Float(
-        string='% Comisión',
-        digits=(16, 2),  # Para manejar números enteros
-        help='Porcentaje de comisión (ejemplo: 50 para 50%)'
-    )
-
+    # Monto calculado de la comisión (compute sobre subtotal * %)
     commission_amount = fields.Monetary(
         string='Monto Comisión',
         currency_field='currency_id',
@@ -57,12 +53,13 @@ class MechanicCommissionEntry(models.Model):
 
     @api.onchange('porcentaje_comision_mecanico')
     def _onchange_normalize_pct(self):
+        """Si capturan decimal (0.15), normaliza a % (15)."""
         for r in self:
             if r.porcentaje_comision_mecanico and 0 < r.porcentaje_comision_mecanico <= 1:
-                # Si parece decimal (0.15), conviértelo a %
-                r.porcentaje_comision_mecanico = r.porcentaje_comision_mecanico * 100.0
+                r.porcentaje_comision_mecanico *= 100.0
+            elif r.porcentaje_comision_mecanico and r.porcentaje_comision_mecanico > 100:
+                r.porcentaje_comision_mecanico = 100.0
 
-    # Comisión calculada sobre subtotal * (% / 100)
     @api.depends('subtotal_customer', 'porcentaje_comision_mecanico')
     def _compute_commission_amount(self):
         for record in self:
@@ -75,13 +72,13 @@ class MechanicCommissionEntry(models.Model):
 
     currency_id = fields.Many2one('res.currency', default=lambda self: self.env.company.currency_id, required=True)
 
-    # Control de pago de la comisión
+    # Control de pago
     is_paid = fields.Boolean(string='Pagado', default=False)
     paid_date = fields.Datetime(string='Fecha y hora de pago')
     paid_by = fields.Many2one('res.users', string='Pagado por')
     pay_note = fields.Char(string='Nota pago')
 
-    # Auxiliar para filtros por periodo
+    # Filtros por periodo
     month = fields.Char(string='Mes (MM)', size=2, index=True)
     year = fields.Char(string='Año (YYYY)', size=4, index=True)
 
@@ -91,7 +88,6 @@ class MechanicCommissionEntry(models.Model):
     )
 
     _sql_constraints = [
-        # Evita duplicados por misma línea de factura para el mismo mecánico
         ('uniq_employee_invoice_line',
          'unique(employee_id, invoice_line_id)',
          'Ya existe una entrada de comisión para esta línea y mecánico.'),
