@@ -13,6 +13,14 @@ from odoo import models, fields, api
 class AccountMoveLine(models.Model):
     _inherit = "account.move.line"
 
+    porcentaje_comision = fields.Float(
+        string="Porcentaje de comisión",
+        help="Porcentaje de comisión aplicado a este producto.",
+        digits=(16, 2),
+        related="product_id.product_tmpl_id.porcentaje_comision",
+        store=True,
+    )
+
     mechanic_id = fields.Many2one(
         "hr.employee",
         string="Mecánico",
@@ -39,6 +47,41 @@ class AccountMoveLine(models.Model):
         currency_field="currency_id",
         store=False,
     )
+
+    # Nuevo campo para mostrar el monto de la comisión
+    commission_amount = fields.Monetary(
+        string="Monto Comisión",
+        compute="_compute_commission_amount",
+        currency_field="currency_id",
+        store=True,
+        help="Monto de comisión calculado sobre el precio de venta",
+    )
+
+    @api.depends('product_id', 'price_subtotal', 'quantity', 'porcentaje_comision')
+    def _compute_commission_amount(self):
+        """Calcula la comisión basada en el porcentaje del precio de venta"""
+        for line in self:
+            if (line.product_id and 
+                line.product_id.type == "service" and 
+                line.mechanic_id and 
+                line.porcentaje_comision):
+                # Calculamos la comisión sobre el subtotal (precio * cantidad)
+                line.commission_amount = (line.price_subtotal * (line.porcentaje_comision / 100.0))
+            else:
+                line.commission_amount = 0.0
+
+    # Opcional: Añadir validación para asegurar que se seleccione un mecánico
+    @api.onchange('product_id')
+    def _onchange_product_id_mechanic(self):
+        for line in self:
+            if line.product_id and line.product_id.type == 'service':
+                if not line.mechanic_id:
+                    return {
+                        'warning': {
+                            'title': 'Mecánico requerido',
+                            'message': 'Por favor seleccione el mecánico que realizará el servicio.'
+                        }
+                    }
 
     @api.depends("product_id")
     def _compute_mechanic_meta(self):

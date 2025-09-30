@@ -19,6 +19,7 @@ class ProductTemplate(models.Model):
         digits=(16, 2),
         default=0.0,
     )
+    
     service_cost_per_hour = fields.Float(
         string="Costo por hora (mecánico)",
         help="Costo que se paga al mecánico por hora para este servicio.",
@@ -26,3 +27,11 @@ class ProductTemplate(models.Model):
         default=0.0,
     )
 
+
+    porcentaje_comision = fields.Float(
+        string="Porcentaje de comisión",
+        help="Porcentaje de comisión que se aplicará al mecánico por este servicio",
+        digits=(16, 2),
+        default=0.0,
+        tracking=True,
+    )
