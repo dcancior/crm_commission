@@ -78,11 +78,6 @@ class SaleOrderLine(models.Model):  # Clase que hereda las líneas de pedido
             if line.product_id.type != 'service':
                 # Preparar valores para procurement
                 values = line._prepare_procurement_values(line.order_id.procurement_group_id)
-                
-                # Asegurar que warehouse_id sea un recordset
-                if isinstance(values.get('warehouse_id'), int):
-                    values['warehouse_id'] = self.env['stock.warehouse'].browse(values['warehouse_id'])
-
                 # Crear procurement
                 procurements.append(self.env['procurement.group'].Procurement(
                     line.product_id,
@@ -101,15 +96,28 @@ class SaleOrderLine(models.Model):  # Clase que hereda las líneas de pedido
         return True
 
     def _prepare_procurement_values(self, group_id=False):
-        """Prepara valores para procurement asegurando warehouse_id correcto"""
+        """Prepara valores para procurement asegurando warehouse_id como RECORDSET."""
         self.ensure_one()
         values = super()._prepare_procurement_values(group_id=group_id)
-        
-        # Asegurar que warehouse_id sea un recordset
-        if values.get('warehouse_id'):
-            if isinstance(values['warehouse_id'], int):
-                values['warehouse_id'] = self.env['stock.warehouse'].browse(values['warehouse_id'])
-        
+
+        # 1) Fuerza warehouse_id como recordset (nunca como int)
+        wh = self.order_id.warehouse_id  # recordset o False
+        values['warehouse_id'] = wh or self.env['stock.warehouse'].browse()
+
+        # 2) (Opcional, por robustez) Normaliza route_ids si algún módulo los pasa como IDs
+        #    Odoo espera recordset.
+        routes = values.get('route_ids')
+        if routes and isinstance(routes, (list, tuple)):
+            # Si trae mezcla de IDs/records, normaliza a recordset
+            route_ids = []
+            for r in routes:
+                if hasattr(r, 'id'):
+                    route_ids.append(r.id)
+                elif isinstance(r, int):
+                    route_ids.append(r)
+            if route_ids:
+                values['route_ids'] = self.env['stock.route'].browse(route_ids)
+
         return values
 
     @api.onchange('product_id')
