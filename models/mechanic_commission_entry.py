@@ -34,6 +34,18 @@ class MechanicCommissionEntry(models.Model):
     # NUEVO: costo por hora (persistente)
     cost_per_hour = fields.Monetary(string='Costo por hora', currency_field='currency_id')
 
+    # Campos para comisión
+    porcentaje_comision = fields.Float(
+        string='Porcentaje comisión',
+        digits=(16,2),
+        help='Porcentaje de comisión aplicado al servicio'
+    )
+    commission_amount = fields.Monetary(
+        string='Monto comisión',
+        currency_field='currency_id',
+        help='Monto de comisión calculado'
+    )
+
     subtotal_customer = fields.Monetary(string='Subtotal al cliente', currency_field='currency_id')
     payout = fields.Monetary(string='Comisión del Mecánico', currency_field='currency_id')
 
@@ -60,6 +72,8 @@ class MechanicCommissionEntry(models.Model):
          'unique(employee_id, invoice_line_id)',
          'Ya existe una entrada de comisión para esta línea y mecánico.'),
     ]
+
+    payment_state = fields.Selection(related='invoice_id.payment_state', store=True)
 
     @api.constrains('month', 'year')
     def _check_period(self):

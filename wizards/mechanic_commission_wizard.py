@@ -401,58 +401,87 @@ class MechanicCommissionWizard(models.TransientModel):
 
 
 class MechanicCommissionWizardLine(models.TransientModel):
+    """Línea del wizard para gestionar comisiones de mecánicos.
+    Permite visualizar y gestionar el pago de comisiones por servicios."""
+    
     _name = 'mechanic.commission.wizard.line'
     _description = 'Línea wizard comisión mecánicos'
 
-    wizard_id = fields.Many2one('mechanic.commission.wizard', required=True, ondelete='cascade')
-    commission_entry_id = fields.Many2one('mechanic.commission.entry', required=True, ondelete='cascade')
+    wizard_id = fields.Many2one(
+        'mechanic.commission.wizard', 
+        required=True, 
+        ondelete='cascade'
+    )
+    commission_entry_id = fields.Many2one(
+        'mechanic.commission.entry', 
+        required=True, 
+        ondelete='cascade'
+    )
 
-    ## Copias para visualización -> AHORA RELATED
-    invoice_name = fields.Char(related='commission_entry_id.invoice_name', readonly=True)
-    invoice_date = fields.Date(related='commission_entry_id.invoice_date', readonly=True)
-    product_name = fields.Char(related='commission_entry_id.product_name', readonly=True)
-    quantity = fields.Float(related='commission_entry_id.quantity', readonly=True)
-    hours = fields.Float(related='commission_entry_id.hours', readonly=True)
-    subtotal_customer = fields.Monetary(related='commission_entry_id.subtotal_customer',
-                                        currency_field='currency_id', readonly=True)
-    payout = fields.Monetary(related='commission_entry_id.payout',
-                            currency_field='currency_id', readonly=True)
-
-    # Usa la moneda de la entrada (más correcto que la del wizard)
-    currency_id = fields.Many2one(related='commission_entry_id.currency_id', readonly=True)
-
-    price_subtotal = fields.Monetary(
-        string='Subtotal',
-        related='commission_entry_id.subtotal_customer',
-        currency_field='currency_id',
+    # Campos informativos de la factura (solo lectura)
+    invoice_name = fields.Char(
+        string='Referencia Factura',
+        related='commission_entry_id.invoice_name', 
         readonly=True
     )
+    invoice_date = fields.Date(
+        string='Fecha Factura',
+        related='commission_entry_id.invoice_date', 
+        readonly=True
+    )
+    product_name = fields.Char(
+        string='Servicio',
+        related='commission_entry_id.product_name', 
+        readonly=True
+    )
+    quantity = fields.Float(
+        string='Cantidad',
+        related='commission_entry_id.quantity', 
+        readonly=True
+    )
+    
+    # Campos monetarios
+    currency_id = fields.Many2one(
+        related='commission_entry_id.currency_id', 
+        readonly=True
+    )
+    subtotal_customer = fields.Monetary(
+        string='Subtotal Cliente',
+        related='commission_entry_id.subtotal_customer',
+        currency_field='currency_id', 
+        readonly=True
+    )
+
+    # Campos de comisión
     porcentaje_comision = fields.Float(
+        string='% Comisión',
         related='commission_entry_id.porcentaje_comision',
         readonly=True
     )
     commission_amount = fields.Monetary(
+        string='Monto Comisión',
         related='commission_entry_id.commission_amount',
         currency_field='currency_id',
         readonly=True
     )
 
-    # Ya la tienes related; la dejamos igual
-    cost_per_hour = fields.Monetary(
-        string='Costo por hora',
-        readonly=True,
-        currency_field='currency_id',
-        related='commission_entry_id.cost_per_hour'
+    # Estado y control de pagos
+    is_paid = fields.Boolean(
+        string='Pagado', 
+        related='commission_entry_id.is_paid', 
+        readonly=False
     )
-
-    # Estado de pago (editable)
-    is_paid = fields.Boolean(string='Pagado', related='commission_entry_id.is_paid', readonly=False)
-
-    # Metadata pago (solo lectura aquí, se setea al escribir)
-    paid_date = fields.Datetime(related='commission_entry_id.paid_date', readonly=True)
-    paid_by = fields.Many2one('res.users', related='commission_entry_id.paid_by', readonly=True)
-
-    # Forma de pago (editable, persiste en entry)
+    paid_date = fields.Datetime(
+        string='Fecha de pago',
+        related='commission_entry_id.paid_date', 
+        readonly=True
+    )
+    paid_by = fields.Many2one(
+        'res.users',
+        string='Pagado por',
+        related='commission_entry_id.paid_by', 
+        readonly=True
+    )
     pago_comision = fields.Selection(
         [('efect', 'Efectivo'), ('trans', 'Transferencia')],
         string='Forma de pago',
@@ -462,29 +491,38 @@ class MechanicCommissionWizardLine(models.TransientModel):
     )
 
     def write(self, vals):
+        """Sobrescribe el método write para gestionar el pago de comisiones.
+        
+        Funcionalidades:
+        1. Marca/desmarca como pagado y registra metadata
+        2. Permite elegir forma de pago (efectivo/transferencia)
+        3. Registra automáticamente fecha y usuario que realiza el pago
+        """
         res = super().write(vals)
         for line in self:
             entry = line.commission_entry_id
             if not entry:
                 continue
 
-            # Toggle desde check
+            # Al marcar/desmarcar como pagado
             if 'is_paid' in vals:
                 if vals['is_paid']:
                     entry.write({
                         'is_paid': True,
                         'paid_date': fields.Datetime.now(),
                         'paid_by': self.env.user.id,
+                        # Si no tiene forma de pago, asigna efectivo por defecto
                         **({} if entry.pago_comision else {'pago_comision': 'efect'}),
                     })
                 else:
+                    # Al desmarcar como pagado, limpia la metadata
                     entry.write({
                         'is_paid': False,
                         'paid_date': False,
                         'paid_by': False,
                     })
 
-            # Elegir forma de pago => marcar pagado + metadata
+            # Al seleccionar forma de pago
             if 'pago_comision' in vals and vals['pago_comision']:
                 entry.write({
                     'pago_comision': vals['pago_comision'],
