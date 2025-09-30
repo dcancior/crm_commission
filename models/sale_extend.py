@@ -79,13 +79,12 @@ class SaleOrderLine(models.Model):  # Clase que hereda las líneas de pedido
                 # Preparar valores para procurement
                 values = line._prepare_procurement_values(line.order_id.procurement_group_id)
                 
-                # Convertir warehouse_id si es necesario
-                warehouse = values.get('warehouse_id')
-                if isinstance(warehouse, int):
-                    warehouse = self.env['stock.warehouse'].browse(warehouse)
-                values['warehouse_id'] = warehouse
+                # Asegurar que warehouse_id sea un recordset
+                if isinstance(values.get('warehouse_id'), int):
+                    values['warehouse_id'] = self.env['stock.warehouse'].browse(values['warehouse_id'])
 
-                procurement = self.env['procurement.group'].Procurement(
+                # Crear procurement
+                procurements.append(self.env['procurement.group'].Procurement(
                     line.product_id,
                     line.product_uom_qty,
                     line.product_uom,
@@ -94,10 +93,10 @@ class SaleOrderLine(models.Model):  # Clase que hereda las líneas de pedido
                     line.order_id.name,
                     line.order_id.company_id,
                     values
-                )
-                procurements.append(procurement)
+                ))
 
         if procurements:
+            # Usar el método run directamente
             self.env['procurement.group'].run(procurements)
         return True
 
@@ -106,7 +105,7 @@ class SaleOrderLine(models.Model):  # Clase que hereda las líneas de pedido
         self.ensure_one()
         values = super()._prepare_procurement_values(group_id=group_id)
         
-        # Convertir warehouse_id si es necesario
+        # Asegurar que warehouse_id sea un recordset
         if values.get('warehouse_id'):
             if isinstance(values['warehouse_id'], int):
                 values['warehouse_id'] = self.env['stock.warehouse'].browse(values['warehouse_id'])
