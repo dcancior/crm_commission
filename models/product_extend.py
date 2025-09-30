@@ -8,7 +8,7 @@
 # ║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html   ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
-from odoo import models, fields
+from odoo import models, fields, api
 
 class ProductTemplate(models.Model):
     _inherit = "product.template"
