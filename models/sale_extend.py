@@ -70,40 +70,51 @@ class SaleOrderLine(models.Model):  # Clase que hereda las líneas de pedido
         store=False,  # No almacenar
     )  # Fin mechanic_is_placeholder
 
+
     def _action_launch_stock_rule(self, previous_product_uom_qty=False):
-        """Asegura que warehouse_id sea un recordset antes de crear reglas de stock"""
-        procurements = []
+        """Sobrescribe para manejar warehouse_id correctamente"""
         for line in self:
             if not line.product_id.type == 'service':
-                # Convertir warehouse_id si es necesario
+                # Asegurar que warehouse_id sea un recordset
                 if isinstance(line.order_id.warehouse_id, int):
                     line.order_id.warehouse_id = self.env['stock.warehouse'].browse(line.order_id.warehouse_id)
                 
                 vals = line._prepare_procurement_values(group_id=line.order_id.procurement_group_id)
                 
-                # Asegurar que warehouse_id sea un recordset en vals
-                if 'warehouse_id' in vals and isinstance(vals['warehouse_id'], int):
-                    vals['warehouse_id'] = self.env['stock.warehouse'].browse(vals['warehouse_id'])
-                
-                procurements.append(self.env['procurement.group'].Procurement(
-                    line.product_id,
-                    line.product_uom_qty,
-                    line.product_uom,
-                    line.order_id.partner_shipping_id.property_stock_customer,
-                    line.name,
-                    line.order_id.name,
-                    line.order_id.company_id,
-                    vals
-                ))
-        if procurements:
-            self.env['procurement.group'].run(procurements)
+                if vals.get('warehouse_id', False):
+                    procurements = []
+                    procurement_rule = line.env['stock.rule']._get_rule(
+                        line.product_id,
+                        line.order_id.partner_shipping_id.property_stock_customer,
+                        vals
+                    )
+                    
+                    if procurement_rule:
+                        procurements.append(self.env['procurement.group'].Procurement(
+                            line.product_id,
+                            line.product_uom_qty,
+                            line.product_uom,
+                            line.order_id.partner_shipping_id.property_stock_customer,
+                            line.name,
+                            line.order_id.name,
+                            line.order_id.company_id,
+                            vals
+                        ))
+                        
+                    if procurements:
+                        self.env['procurement.group'].run(procurements)
+        
         return True
 
     def _prepare_procurement_values(self, group_id=False):
-        """Asegura que warehouse_id sea un recordset en los valores de procurement"""
+        """Sobrescribe para asegurar que warehouse_id sea un recordset"""
+        self.ensure_one()
         values = super()._prepare_procurement_values(group_id=group_id)
-        if 'warehouse_id' in values and isinstance(values['warehouse_id'], int):
+        
+        # Asegurar que warehouse_id sea un recordset
+        if values.get('warehouse_id') and isinstance(values['warehouse_id'], int):
             values['warehouse_id'] = self.env['stock.warehouse'].browse(values['warehouse_id'])
+            
         return values
 
     @api.onchange('product_id')
@@ -172,46 +183,5 @@ class SaleOrderLine(models.Model):  # Clase que hereda las líneas de pedido
             line.display_mechanic_fields = bool(line.product_id) and (line.product_id.detailed_type == "service")  # True solo si es servicio
 
 
-# -----------------------------------------------------------------------------
-# PEDIDO DE VENTA (AVISO UNA SOLA VEZ, NO BLOQUEANTE)
-# -----------------------------------------------------------------------------
-class SaleOrder(models.Model):  # Clase que hereda sale.order
-    _inherit = "sale.order"  # Herencia de sale.order
 
-    mechanic_warning_ack = fields.Boolean(  # Flag para no repetir el aviso en el pedido
-        default=False,  # Valor por defecto
-        copy=False,  # No copiar al duplicar
-    )  # Fin mechanic_warning_ack
-
-    @api.onchange(  # Onchange a nivel pedido para avisar una sola vez
-        "order_line.mechanic_id",
-        "order_line.product_id",
-        "order_line.display_mechanic_fields",
-        "order_line.mechanic_is_placeholder",
-    )
-    def _onchange_mechanic_global_warning(self):  # Método onchange global
-        for order in self:  # Itera pedidos
-            if order.mechanic_warning_ack:  # Si ya se mostró, no repetir
-                continue  # Salta a siguiente
-            # Líneas de servicio del pedido
-            service_lines = order.order_line.filtered(lambda l: l.product_id and l.product_id.type == "service")  # Solo servicios
-            if not service_lines:  # Si no hay servicios, no avisar
-                continue  # Salta
-            # ¿Alguna línea tiene mecánico REAL? (no placeholder)
-            any_real_mechanic = any(l.mechanic_id and not l.mechanic_is_placeholder for l in service_lines)  # True si hay alguno real
-            # ¿Quedan pendientes? (sin mecánico o con placeholder)
-            any_pending = any((not l.mechanic_id) or l.mechanic_is_placeholder for l in service_lines)  # True si faltan reales
-            # Avisar solo si NO hay ninguno real y sí hay pendientes
-            if (not any_real_mechanic) and any_pending:  # Condición de aviso único
-                order.mechanic_warning_ack = True  # Marca como avisado
-                return {  # Retorna warning no bloqueante
-                    "warning": {
-                        "title": _("Falta seleccionar el mecánico"),  # Título
-                        "message": _(
-                            "Tienes líneas de SERVICIO sin mecánico real. "
-                            "Asigna al menos UN mecánico. "
-                            "Este aviso se mostrará solo una vez."
-                        ),  # Mensaje
-                    }
-                }  # Fin return
-        return {}  # No hay aviso
+    
