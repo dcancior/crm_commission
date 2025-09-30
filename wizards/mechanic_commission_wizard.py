@@ -278,25 +278,29 @@ class MechanicCommissionWizard(models.TransientModel):
     @api.onchange('employee_id', 'month', 'year')
     def _onchange_build_lines(self):
         """Construye las líneas del wizard basadas en facturas confirmadas.
-        
-        La comisión se calcula como porcentaje del subtotal de cada línea.
-        Solo considera líneas de servicio asignadas al mecánico seleccionado.
+
+        Reglas:
+        - Solo considera líneas de servicio asignadas al mecánico seleccionado.
+        - La comisión se calcula como % del subtotal (price_subtotal).
+        - Prioriza datos ya calculados en la línea de factura:
+            * porcentaje_comision (en %)
+            * commission_amount (monto)
+        Si faltan, toma del template y recalcula.
         """
         for w in self:
-            lines_cmds = []
-
+            # Limpia por defecto
             if not (w.employee_id and w.month and w.year):
                 w.line_ids = [(5, 0, 0)]
                 continue
 
-            # Determinar rango de fechas del mes
+            # Rango de fechas del mes
             year = int(w.year)
             month = int(w.month)
             last_day = calendar.monthrange(year, month)[1]
             date_start = f"{year}-{str(month).zfill(2)}-01"
             date_end = f"{year}-{str(month).zfill(2)}-{last_day}"
 
-            # Buscar facturas confirmadas del mes
+            # Facturas del periodo (posteadas)
             moves = w.env['account.move'].search([
                 ('move_type', '=', 'out_invoice'),
                 ('state', '=', 'posted'),
@@ -304,11 +308,14 @@ class MechanicCommissionWizard(models.TransientModel):
                 ('invoice_date', '<=', date_end),
             ])
 
-            # Filtrar líneas de servicio del mecánico
+            # Líneas de servicio del mecánico seleccionado
             inv_lines = moves.mapped('invoice_line_ids').filtered(
-                lambda l: (l.product_id.type == 'service' and 
-                        l.mechanic_id and 
-                        l.mechanic_id.id == w.employee_id.id)
+                lambda l: (
+                    l.product_id
+                    and l.product_id.type == 'service'
+                    and l.mechanic_id
+                    and l.mechanic_id.id == w.employee_id.id
+                )
             )
 
             Entry = w.env['mechanic.commission.entry']
@@ -316,35 +323,47 @@ class MechanicCommissionWizard(models.TransientModel):
 
             # Procesar cada línea encontrada
             for line in inv_lines:
-                # Cálculo de comisión por porcentaje
                 subtotal = line.price_subtotal or 0.0
-                porcentaje = getattr(line.product_id.product_tmpl_id, 'porcentaje_comision', 0.0) or 0.0
-                commission = subtotal * (porcentaje / 100.0)
 
-                # Preparar valores para el entry
+                # 1) Porcentaje (%): prioriza el de la línea; si no, toma del template
+                porcentaje = 0.0
+                if hasattr(line, 'porcentaje_comision') and line.porcentaje_comision:
+                    # Valor en %
+                    porcentaje = line.porcentaje_comision
+                else:
+                    # Del template (asumido también en %)
+                    porcentaje = (getattr(line.product_id.product_tmpl_id, 'porcentaje_comision', 0.0) or 0.0)
+
+                # 2) Comisión ($): si la línea ya la trae, úsala; si no, calcula
+                if hasattr(line, 'commission_amount') and line.commission_amount:
+                    commission = line.commission_amount
+                else:
+                    commission = subtotal * (porcentaje / 100.0)
+
+                # Preparar valores a persistir en el entry
                 vals_base = {
                     'company_id': w.env.company.id,
                     'employee_id': w.employee_id.id,
                     'invoice_id': line.move_id.id,
                     'invoice_line_id': line.id,
-                    'invoice_name': f'{line.move_id.name or line.move_id.payment_reference or ""} - {line.move_id.partner_id.display_name}',
+                    'invoice_name': f"{line.move_id.name or line.move_id.payment_reference or ''} - {line.move_id.partner_id.display_name}",
                     'invoice_date': line.move_id.invoice_date,
                     'product_id': line.product_id.id,
                     'product_name': line.product_id.display_name,
                     'quantity': line.quantity or 0.0,
                     'subtotal_customer': subtotal,
-                    'porcentaje_comision': porcentaje,
-                    'commission_amount': commission,
+                    'porcentaje_comision': porcentaje,       # <-- % (15 = 15%)
+                    'commission_amount': commission,         # <-- Monto $
                     'currency_id': line.currency_id.id or w.env.company.currency_id.id,
                     'month': str(month).zfill(2),
                     'year': str(year),
                     'payment_state': line.move_id.payment_state,
                 }
 
-                # Buscar entry existente o crear nuevo
+                # Buscar/actualizar/crear entry
                 entry = Entry.search([
                     ('employee_id', '=', w.employee_id.id),
-                    ('invoice_line_id', '=', line.id)
+                    ('invoice_line_id', '=', line.id),
                 ], limit=1)
 
                 if entry:
@@ -354,23 +373,17 @@ class MechanicCommissionWizard(models.TransientModel):
 
                 entries_to_keep |= entry
 
-            # Construir comandos para el O2M
-            lines_cmds = [
-                (0, 0, {
-                    'commission_entry_id': e.id,
-                })
-                for e in entries_to_keep.sorted(lambda r: (r.invoice_date or fields.Date.today(), r.id))
-            ]
-
-            # Aplicar filtro si está configurado
+            # Aplica filtro (si corresponde) directamente sobre el recordset
             if w.report_paid_filter == 'paid':
-                lines_cmds = [cmd for cmd in lines_cmds if cmd and cmd[2] and
-                            w.env['mechanic.commission.entry'].browse(cmd[2]['commission_entry_id']).is_paid]
+                entries_to_keep = entries_to_keep.filtered(lambda e: e.is_paid)
             elif w.report_paid_filter == 'unpaid':
-                lines_cmds = [cmd for cmd in lines_cmds if cmd and cmd[2] and
-                            not w.env['mechanic.commission.entry'].browse(cmd[2]['commission_entry_id']).is_paid]
+                entries_to_keep = entries_to_keep.filtered(lambda e: not e.is_paid)
 
-            # Actualizar líneas del wizard
+            # Construir comandos O2M en orden por fecha y id
+            sorted_entries = entries_to_keep.sorted(lambda r: (r.invoice_date or fields.Date.today(), r.id))
+            lines_cmds = [(0, 0, {'commission_entry_id': e.id}) for e in sorted_entries]
+
+            # Refresca el O2M del wizard
             w.line_ids = [(5, 0, 0)] + lines_cmds
 
     @api.onchange('report_paid_filter')
@@ -466,16 +479,21 @@ class MechanicCommissionWizardLine(models.TransientModel):
 
     # Campos de comisión
     porcentaje_comision = fields.Float(
-        string='% Comisión',
+    string='% Comisión',
         related='commission_entry_id.porcentaje_comision',
-        readonly=True
+        readonly=True,
+        store=False,
+        related_sudo=True,
     )
+    
     commission_amount = fields.Monetary(
-        string='Monto Comisión',
-        related='commission_entry_id.commission_amount',
-        currency_field='currency_id',
-        readonly=True
-    )
+    string='Monto Comisión',
+    related='commission_entry_id.commission_amount',
+    currency_field='currency_id',
+    readonly=True,
+    store=False,
+    related_sudo=True,
+)
 
     # Estado y control de pagos
     is_paid = fields.Boolean(
