@@ -34,6 +34,13 @@ class MechanicCommissionWizard(models.TransientModel):
         required=True,
         default=lambda self: datetime.now().strftime("%m"),
     )
+
+    total_commission = fields.Monetary(
+        string="Total Comisiones",
+        compute="_compute_totals",
+        store=False,
+        currency_field="currency_id",
+    )
     month_name = fields.Char(string="Mes (nombre)", compute="_compute_month_name", store=False)
 
     year = fields.Selection(
