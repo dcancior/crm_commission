@@ -421,6 +421,22 @@ class MechanicCommissionWizardLine(models.TransientModel):
     # Usa la moneda de la entrada (más correcto que la del wizard)
     currency_id = fields.Many2one(related='commission_entry_id.currency_id', readonly=True)
 
+    price_subtotal = fields.Monetary(
+        string='Subtotal',
+        related='commission_entry_id.subtotal_customer',
+        currency_field='currency_id',
+        readonly=True
+    )
+    porcentaje_comision = fields.Float(
+        related='commission_entry_id.porcentaje_comision',
+        readonly=True
+    )
+    commission_amount = fields.Monetary(
+        related='commission_entry_id.commission_amount',
+        currency_field='currency_id',
+        readonly=True
+    )
+
     # Ya la tienes related; la dejamos igual
     cost_per_hour = fields.Monetary(
         string='Costo por hora',
