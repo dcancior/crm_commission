@@ -55,10 +55,20 @@ class MechanicCommissionEntry(models.Model):
         store=True
     )
 
+    @api.onchange('porcentaje_comision')
+    def _onchange_normalize_pct(self):
+        for r in self:
+            if r.porcentaje_comision and 0 < r.porcentaje_comision <= 1:
+                # Si parece decimal (0.15), conviértelo a %
+                r.porcentaje_comision = r.porcentaje_comision * 100.0
+
+    # Comisión calculada sobre subtotal * (% / 100)
     @api.depends('subtotal_customer', 'porcentaje_comision')
     def _compute_commission_amount(self):
         for record in self:
-            record.commission_amount = record.subtotal_customer * (record.porcentaje_comision / 100)
+            subtotal = record.subtotal_customer or 0.0
+            pct = record.porcentaje_comision or 0.0  # en %
+            record.commission_amount = subtotal * (pct / 100.0)
 
     subtotal_customer = fields.Monetary(string='Subtotal al cliente', currency_field='currency_id')
     payout = fields.Monetary(string='Comisión del Mecánico', currency_field='currency_id')

@@ -66,7 +66,7 @@ class AccountMoveLine(models.Model):
                 line.mechanic_id and 
                 line.porcentaje_comision):
                 # Calculamos la comisión sobre el subtotal (precio * cantidad)
-                line.commission_amount = (line.price_subtotal * (line.porcentaje_comision / 100.0))
+                line.commission_amount = line.price_subtotal * (line.porcentaje_comision / 100.0)
             else:
                 line.commission_amount = 0.0
 
