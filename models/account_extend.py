@@ -13,11 +13,11 @@ from odoo import models, fields, api
 class AccountMoveLine(models.Model):
     _inherit = "account.move.line"
 
-    porcentaje_comision = fields.Float(
+    porcentaje_comision_mecanico = fields.Float(
         string="Porcentaje de comisión",
         help="Porcentaje de comisión aplicado a este producto.",
         digits=(16, 2),
-        related="product_id.product_tmpl_id.porcentaje_comision",
+        related="product_id.product_tmpl_id.porcentaje_comision_mecanico",
         store=True,
     )
 
@@ -57,7 +57,7 @@ class AccountMoveLine(models.Model):
         help="Monto de comisión calculado sobre el precio de venta",
     )
 
-    @api.depends('product_id', 'price_subtotal', 'quantity', 'porcentaje_comision')
+    @api.depends('product_id', 'price_subtotal', 'quantity', 'porcentaje_comision_mecanico')
     def _compute_commission_amount(self):
         """Calcula la comisión basada en el porcentaje del precio de venta"""
         for line in self:
@@ -66,7 +66,8 @@ class AccountMoveLine(models.Model):
                 line.mechanic_id and 
                 line.porcentaje_comision):
                 # Calculamos la comisión sobre el subtotal (precio * cantidad)
-                line.commission_amount = line.price_subtotal * (line.porcentaje_comision / 100.0)
+                line.commission_amount = line.price_subtotal * (line.porcentaje_comision_mecanico / 100.0)
+                
             else:
                 line.commission_amount = 0.0
 

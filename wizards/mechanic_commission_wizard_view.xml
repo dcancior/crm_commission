@@ -28,7 +28,7 @@
                                     <field name="product_name" readonly="1"/>
                                     <field name="quantity" readonly="1"/>
                                     <field name="subtotal_customer" readonly="1" sum="Total Venta"/>
-                                    <field name="porcentaje_comision" readonly="1" widget="float_factor" options="{'factor': 0.01}"/>
+                                    <field name="porcentaje_comision_mecanico" readonly="1" widget="float_factor" options="{'factor': 0.01}"/>
                                     <field name="commission_amount" readonly="1" sum="Total Comisión"/>
                                     <field name="is_paid"/>
                                     <field name="pago_comision"/>

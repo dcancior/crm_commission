@@ -28,9 +28,20 @@ class ProductTemplate(models.Model):
     )
 
 
-    porcentaje_comision = fields.Float(
+    porcentaje_comision_mecanico = fields.Float(
         string='% Comisión',
-        help='Porcentaje de comisión (ejemplo: 50.0 para 50%)',
-        digits=(5, 2),  # 5 dígitos en total, 2 decimales -> permite hasta 999.99
+        help='Porcentaje de comisión (ejemplo: ingrese 25 para 25%)',
+        digits=(5, 2),  # 5 dígitos en total, 2 decimales
         default=0.0,
     )
+
+    @api.onchange('porcentaje_comision_mecanico')
+    def _onchange_porcentaje_comision_mecanico(self):
+        """Asegura que el porcentaje se guarde como número entero"""
+        for record in self:
+            # Si el valor es menor a 1, lo multiplicamos por 100
+            if 0 < record.porcentaje_comision_mecanico < 1:
+                record.porcentaje_comision_mecanico = record.porcentaje_comision_mecanico * 100
+            # Limitar a un máximo de 100%
+            elif record.porcentaje_comision_mecanico > 100:
+                record.porcentaje_comision_mecanico = 100

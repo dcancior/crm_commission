@@ -27,8 +27,8 @@
                 con el campo porcentaje_comision a la derecha en la misma fila -->
             <xpath expr="//field[@name='taxes_id']" position="before">
                 <group col="2" attrs="{'invisible': [('type','!=','service')]}">
-                    <label for="porcentaje_comision" string="Porcentaje"/>
-                    <field name="porcentaje_comision" widget="percentage" nolabel="1"/>
+                    <label for="porcentaje_comision_mecanico" string="Porcentaje"/>
+                    <field name="porcentaje_comision_mecanico" widget="percentage" nolabel="1"/>
                 </group>
             </xpath>
         </field>

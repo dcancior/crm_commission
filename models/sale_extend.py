@@ -51,11 +51,11 @@ class SaleOrderLine(models.Model):  # Clase que hereda las líneas de pedido
         help="Horas requeridas × costo por hora × cantidad.",  # Ayuda
     )  # Fin mechanic_cost_subtotal
 
-    porcentaje_comision = fields.Float(
+    porcentaje_comision_mecanico = fields.Float(
         string='% Comisión',
         help='Porcentaje de comisión para el mecánico',
         digits=(16, 2),
-        related='product_id.product_tmpl_id.porcentaje_comision',
+        related='product_id.product_tmpl_id.porcentaje_comision_mecanico',
         store=True,
     )
 
