@@ -32,18 +32,19 @@ class MechanicCommissionEntry(models.Model):
     quantity = fields.Float(string='Cantidad', digits='Product Unit of Measure')
     hours = fields.Float(string='Horas', digits='Product Unit of Measure')
 
-    # Persistencia de costos (si los usas)
     cost_per_hour = fields.Monetary(string='Costo por hora', currency_field='currency_id')
     price_unit = fields.Float(string='Precio Unitario', digits='Product Price', help='Precio unitario del servicio')
 
-    # --- Porcentaje de comisión del MECÁNICO (en %) ---
+    # ✅ Campo correcto en ENTRY
     porcentaje_comision_mecanico = fields.Float(
         string='% Comisión mecánico',
         digits=(16, 2),
         help='Porcentaje de comisión para mecánicos (ejemplo: 50 = 50%).',
     )
 
-    # Monto calculado de la comisión (compute sobre subtotal * %)
+    # ⛔️ BORRADO: campo viejo que ya no se usa
+    # porcentaje_comision = fields.Float(...)
+
     commission_amount = fields.Monetary(
         string='Monto Comisión',
         currency_field='currency_id',
@@ -72,13 +73,11 @@ class MechanicCommissionEntry(models.Model):
 
     currency_id = fields.Many2one('res.currency', default=lambda self: self.env.company.currency_id, required=True)
 
-    # Control de pago
     is_paid = fields.Boolean(string='Pagado', default=False)
     paid_date = fields.Datetime(string='Fecha y hora de pago')
     paid_by = fields.Many2one('res.users', string='Pagado por')
     pay_note = fields.Char(string='Nota pago')
 
-    # Filtros por periodo
     month = fields.Char(string='Mes (MM)', size=2, index=True)
     year = fields.Char(string='Año (YYYY)', size=4, index=True)
 

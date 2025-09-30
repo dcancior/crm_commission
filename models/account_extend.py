@@ -13,23 +13,17 @@ from odoo import models, fields, api
 class AccountMoveLine(models.Model):
     _inherit = "account.move.line"
 
-    # NUEVO: porcentaje comisión del MECÁNICO (en %), tomado del template
+    # Porcentaje de comisión del MECÁNICO (en %), tomado del template
     porcentaje_comision_mecanico = fields.Float(
         string="Porcentaje de comisión",
-        help="Porcentaje de comisión aplicado a este producto para el mecánico (en %).",
+        help="Porcentaje de comisión aplicado a este servicio para el mecánico (en %).",
         digits=(16, 2),
         related="product_id.product_tmpl_id.porcentaje_comision_mecanico",
         store=True,
     )
 
-    # (Opcional) Campo legado de ventas. Si ya no lo usas en ningún lado, elimínalo.
-    porcentaje_comision = fields.Float(
-        string="Porcentaje de comisión (ventas) [LEGACY]",
-        help="Campo legado para comisión de ventas. No se usa para mecánicos.",
-        digits=(16, 2),
-        related="product_id.product_tmpl_id.porcentaje_comision",
-        store=True,
-    )
+    # ⛔️ BORRADO: campo legado que causaba el KeyError (related a un field inexistente)
+    # porcentaje_comision = fields.Float(...)
 
     mechanic_id = fields.Many2one(
         "hr.employee",
@@ -58,7 +52,6 @@ class AccountMoveLine(models.Model):
         store=False,
     )
 
-    # Monto de la comisión del MECÁNICO
     commission_amount = fields.Monetary(
         string="Monto Comisión",
         compute="_compute_commission_amount",
@@ -81,7 +74,6 @@ class AccountMoveLine(models.Model):
             else:
                 line.commission_amount = 0.0
 
-    # Opcional: advertir si falta mecánico en servicios
     @api.onchange('product_id')
     def _onchange_product_id_mechanic(self):
         for line in self:
