@@ -18,8 +18,17 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='type']" position="after">
                 <group string="Parámetros de servicio (mecánico)" attrs="{'invisible': [('type','!=','service')]}">
-                    <field name="service_hours_required"/>
-                    <field name="service_cost_per_hour"/>
+                    <field name="service_hours_required" invisible="1"/>
+                    <field name="service_cost_per_hour" invisible="1"/>
+                </group>
+            </xpath>
+
+            <!-- NUEVO: colocar 'Porcentaje' en una línea nueva debajo de list_price,
+                con el campo porcentaje_comision a la derecha en la misma fila -->
+            <xpath expr="//field[@name='taxes_id']" position="before">
+                <group col="2" attrs="{'invisible': [('type','!=','service')]}">
+                    <label for="porcentaje_comision" string="Porcentaje"/>
+                    <field name="porcentaje_comision" widget="percentage" nolabel="1"/>
                 </group>
             </xpath>
         </field>

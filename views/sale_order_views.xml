@@ -22,9 +22,7 @@
                        optional="show"
                        attrs="{'column_invisible': [('parent.state', 'in', ('draft','sent'))],
                               'required': [('product_type', '=', 'service')]}"/>
-                <field name="porcentaje_comision" 
-                       optional="show"/>
-                <field name="product_type" invisible="1"/>
+                
             </xpath>
 
             <!-- Agregar campos en la forma -->
@@ -32,7 +30,7 @@
                 <field name="mechanic_id" 
                        attrs="{'invisible': [('product_type', '!=', 'service')],
                               'required': [('product_type', '=', 'service')]}"/>
-                <field name="porcentaje_comision"/>
+                
                 <field name="product_type" invisible="1"/>
             </xpath>
         </field>
