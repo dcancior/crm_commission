@@ -35,13 +35,15 @@ class ProductTemplate(models.Model):
         default=0.0,
     )
 
+
+    #Si el porcentaje es mayor a 100, mostrar advertencia
     @api.onchange('porcentaje_comision_mecanico')
     def _onchange_porcentaje_comision_mecanico(self):
-        """Asegura que el porcentaje se guarde como número entero"""
-        for record in self:
-            # Si el valor es menor a 1, lo multiplicamos por 100
-            if 0 < record.porcentaje_comision_mecanico < 1:
-                record.porcentaje_comision_mecanico = record.porcentaje_comision_mecanico * 100
-            # Limitar a un máximo de 100%
-            elif record.porcentaje_comision_mecanico > 100:
-                record.porcentaje_comision_mecanico = 100
+        self.ensure_one()
+        if self.porcentaje_comision_mecanico and self.porcentaje_comision_mecanico > 100:
+            return {
+                'warning': {
+                    'title': _('Porcentaje inválido'),
+                    'message': _('El porcentaje no puede ser mayor a 100. Por favor corrige el valor.'),
+                }
+            }
