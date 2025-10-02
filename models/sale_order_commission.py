@@ -136,7 +136,7 @@ class SaleOrder(models.Model):
                 )
                 raise UserError(_(
                     "Antes de confirmar, selecciona un Mecánico en todas las líneas de servicio "
-                    "resaltadas en naranja (excepto productos 'PAQ*').\n\nFaltan en:\n%s"
+                    "resaltadas en naranja.\n\nFaltan en:\n%s"
                 ) % details)
 
         return super().action_confirm()
