@@ -82,6 +82,14 @@ class SaleOrder(models.Model):
                 }  # Fin return
         return {}  # No hay aviso
 
+    def _get_lines_missing_mechanic(self):
+        """Devuelve las líneas de servicio que requieren mecánico pero no lo tienen
+        o traen un placeholder (misma lógica que la decoración-warning)."""
+        self.ensure_one()
+        return self.order_line.filtered(
+            lambda l: l.display_mechanic_fields and (not l.mechanic_id or l.mechanic_is_placeholder)
+        )
+
     def action_confirm(self):
         for order in self:
             lines = order._get_lines_missing_mechanic()
