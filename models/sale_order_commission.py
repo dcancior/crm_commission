@@ -78,8 +78,23 @@ class SaleOrder(models.Model):
         }
 
     # -------------------------------------------------------------------------
-    # Aviso no bloqueante: DESACTIVADO en borrador
-    # (si no quieres el aviso nunca, devuelve {} sin más)
+    # Helper: detectar si una línea está exenta por regla "PAQ*"
+    # -------------------------------------------------------------------------
+    @staticmethod
+    def _is_paq_line(line):
+        """
+        Devuelve True si el nombre del producto de la línea comienza con 'PAQ',
+        ignorando espacios y mayúsculas/minúsculas.
+        """
+        name = (
+            (line.product_id.display_name or line.product_id.name or '')
+            .strip()
+            .upper()
+        )
+        return name.startswith('PAQ')
+
+    # -------------------------------------------------------------------------
+    # Aviso no bloqueante: DESACTIVADO en borrador (lo dejamos neutro)
     # -------------------------------------------------------------------------
     mechanic_warning_ack = fields.Boolean(
         string='Aviso de mecánico mostrado',
@@ -88,34 +103,20 @@ class SaleOrder(models.Model):
     )
 
     @api.onchange('order_line')
-    def _onchange_mechanic_global_warning(self):
-        """No mostrar advertencia cuando la cotización está en borrador."""
-        for order in self:
-            if order.state == 'draft':
-                return {}
-        # Si quisieras mantener el aviso en otros estados (p.ej. 'sent'),
-        # puedes pegar aquí la lógica anterior. Por ahora, no mostramos nada.
-        return {}
+    def _onchange_
 
-    # -------------------------------------------------------------------------
-    # Bloqueo SOLO al confirmar: NO permite confirmar si hay líneas “pintadas”
-    # (mismo criterio que la decoración-warning en la vista)
-    # -------------------------------------------------------------------------
-    def action_confirm(self):
-        for order in self:
-            # Condición en-línea para que UI y validación estén sincronizadas
-            lines = order.order_line.filtered(
-                lambda l: getattr(l, 'display_mechanic_fields', False)
-                and (not getattr(l, 'mechanic_id', False) or getattr(l, 'mechanic_is_placeholder', False))
-            )
-            if lines:
-                details = "\n".join(
-                    f"• {l.product_id.display_name or l.name} (línea {l.sequence or '-'})"
-                    for l in lines
-                )
-                raise UserError(_(
-                    "Antes de confirmar, selecciona un Mecánico en todas las líneas de servicio "
-                    "resaltadas en naranja.\n\nFaltan en:\n%s"
-                ) % details)
+    mechanic_exempt = fields.Boolean(
+        string='Exento de mecánico',
+        compute='_compute_mechanic_exempt',
+        store=True,
+    )
 
-        return super().action_confirm()
+    @api.depends('product_id', 'product_id.name', 'product_id.display_name', 'display_mechanic_fields')
+    def _compute_mechanic_exempt(self):
+        for line in self:
+            # Solo tiene sentido exentar si la línea “aplica” para mecánico
+            if not getattr(line, 'display_mechanic_fields', False):
+                line.mechanic_exempt = False
+                continue
+            name = (line.product_id.display_name or line.product_id.name or '').strip().upper()
+            line.mechanic_exempt = name.startswith('PAQ')

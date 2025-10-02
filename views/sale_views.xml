@@ -15,7 +15,6 @@
   <record id="view_order_form_mechanic_line" model="ir.ui.view">
     <field name="name">sale.order.form.mechanic.line</field>
     <field name="model">sale.order</field>
-    <!-- Se hereda la vista estándar del pedido de venta -->
     <field name="inherit_id" ref="sale.view_order_form"/>
 
     <field name="arch" type="xml">
@@ -26,41 +25,23 @@
       y reglas de visualización/alerta. La lógica se activa sólo en líneas de tipo servicio.
       -->
 
-      <!--
-      1) INYECCIÓN DE “FLAGS” EN EL TREE DE order_line
-         - display_mechanic_fields: booleano que indica si esta línea debe mostrar campos del mecánico
-           (normalmente, si product_id.type == 'service' o según tu criterio de negocio).
-         - product_type: related a product_id.type (opcional / histórico).
-         - mechanic_is_placeholder: booleano para detectar si el mecánico elegido es un “placeholder”
-           (p.ej. registro con nombre “SELECCIONE UN MECÁNICO”).
-         Todos invisibles: sirven para reglas (decoración/attrs) sin contaminar la UI.
-      -->
+      <!-- 1) Inyección de flags en el TREE -->
       <xpath expr="//field[@name='order_line']/tree" position="inside">
         <field name="display_mechanic_fields" invisible="1"/>
         <field name="product_type" invisible="1"/>
         <field name="mechanic_is_placeholder" invisible="1"/>
+        <!-- NUEVO: bandera para exentar líneas cuyo producto empiece con 'PAQ' -->
+        <field name="mechanic_exempt" invisible="1"/>
       </xpath>
 
-      <!--
-      2) DECORACIÓN DE FILA (WARNING)
-         Pinta la fila en naranja cuando:
-         - La línea es de servicio (display_mechanic_fields == True)
-         - Y no hay mecánico real asignado (no mechanic_id) o el seleccionado es placeholder
-         Resultado: un “semáforo” visual que invita a completar el mecánico antes de confirmar.
-      -->
+      <!-- 2) Decoración de fila (warning) con exención por 'PAQ*' -->
       <xpath expr="//field[@name='order_line']/tree" position="attributes">
         <attribute name="decoration-warning">
-          (display_mechanic_fields) and (not mechanic_id or mechanic_is_placeholder)
+          (display_mechanic_fields) and (not mechanic_id or mechanic_is_placeholder) and (not mechanic_exempt)
         </attribute>
       </xpath>
 
-      <!--
-      3) COLUMNA "Mecánico" EN EL TREE (ANTES DEL SUBTOTAL)
-         - No required: evita bloquear la captura masiva; el “empujón” lo da la decoración.
-         - optional="show": permite que el usuario o modo de lista decida ocultarlo/mostrarlo.
-         - domain: filtra a empleados/partners (según tu modelo) activos y cuyo job sea “Mecánico”.
-           Ojo: el filtro por job_id.name depende de tu modelo/relación.
-      -->
+      <!-- 3) Columna "Mecánico" antes del subtotal -->
       <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="before">
         <field name="mechanic_id"
                string="Mecánico"
@@ -68,36 +49,25 @@
                domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
       </xpath>
 
-      <!--
-      4) COSTO DEL MECÁNICO EN EL TREE (DESPUÉS DEL SUBTOTAL)
-         - Se muestra sólo si la línea “aplica” para mecánico (display_mechanic_fields == True).
-         - optional="hide": por defecto oculto en vistas compactas; el usuario puede activarlo si quiere.
-      -->
+      <!-- 4) Costo mecánico después del subtotal -->
       <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="after">
         <field name="mechanic_cost_subtotal"
                optional="hide"
                attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
       </xpath>
 
-      <!--
-      5) INYECCIÓN DE FLAGS EN EL FORM DE LA LÍNEA
-         - Grupo invisible: mismos flags que en el tree, para poder usar reglas en modo formulario.
-      -->
+      <!-- 5) Inyección de flags en el FORM (grupo oculto) -->
       <xpath expr="//field[@name='order_line']/form" position="inside">
         <group invisible="1">
           <field name="display_mechanic_fields"/>
           <field name="product_type"/>
           <field name="mechanic_is_placeholder"/>
+          <!-- NUEVO: misma bandera en el form -->
+          <field name="mechanic_exempt"/>
         </group>
       </xpath>
 
-      <!--
-      6) GRUPO VISIBLE “Mecánico” EN EL FORM
-         - Incluye selección del mecánico (mismo domain que en tree).
-         - Muestra horas requeridas, costo por hora y subtotal, sólo cuando corresponde (display_mechanic_fields).
-         - readonly en totales/derivados: asume que vienen calculados por compute o onchange en el modelo.
-         - No required: coherente con la filosofía “alerto con decoración, no bloqueo”.
-      -->
+      <!-- 6) Grupo visible “Mecánico” en el FORM -->
       <xpath expr="//field[@name='order_line']/form//group[1]" position="after">
         <group string="Mecánico">
           <field name="mechanic_id"
