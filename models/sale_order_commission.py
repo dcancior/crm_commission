@@ -103,37 +103,40 @@ class SaleOrder(models.Model):
     )
 
     @api.onchange('order_line')
-    def _onchange_
+    def _onchange_mechanic_global_warning(self):
+        """No mostrar advertencia cuando la cotización está en borrador."""
+        for order in self:
+            if order.state == 'draft':
+                return {}
+        return {}
 
-    mechanic_exempt = fields.Boolean(
-        string='Exento de mecánico',
-        compute='_compute_mechanic_exempt',
-        store=True,
-    )
+    # -------------------------------------------------------------------------
+    # Bloqueo SOLO al confirmar:
+    # - Requiere mecánico para líneas de servicio "pintadas"
+    # - EXCEPTO si el producto comienza con 'PAQ'
+    # -------------------------------------------------------------------------
+    def action_confirm(self):
+        for order in self:
+            lines = order.order_line.filtered(
+                lambda l:
+                    # Debe aplicar la lógica de mecánico (tu flag de servicio)
+                    getattr(l, 'display_mechanic_fields', False)
+                    # Pero NO si es un producto "PAQ*"
+                    and not self._is_paq_line(l)
+                    # Y además falta el mecánico real (o es placeholder)
+                    and (
+                        not getattr(l, 'mechanic_id', False)
+                        or getattr(l, 'mechanic_is_placeholder', False)
+                    )
+            )
+            if lines:
+                details = "\n".join(
+                    f"• {l.product_id.display_name or l.name} (línea {l.sequence or '-'})"
+                    for l in lines
+                )
+                raise UserError(_(
+                    "Antes de confirmar, selecciona un Mecánico en todas las líneas de servicio "
+                    "resaltadas en naranja (excepto productos 'PAQ*').\n\nFaltan en:\n%s"
+                ) % details)
 
-    @api.depends('product_id', 'product_id.name', 'product_id.display_name', 'display_mechanic_fields')
-    def _compute_mechanic_exempt(self):
-        for line in self:
-            # Solo tiene sentido exentar si la línea “aplica” para mecánico
-            if not getattr(line, 'display_mechanic_fields', False):
-                line.mechanic_exempt = False
-                continue
-            name = (line.product_id.display_name or line.product_id.name or '').strip().upper()
-            line.mechanic_exempt = name.startswith('PAQ')
-
-
-    mechanic_exempt = fields.Boolean(
-        string='Exento de mecánico',
-        compute='_compute_mechanic_exempt',
-        store=True,
-    )
-
-    @api.depends('product_id', 'product_id.name', 'product_id.display_name', 'display_mechanic_fields')
-    def _compute_mechanic_exempt(self):
-        for line in self:
-            # Solo tiene sentido exentar si la línea “aplica” para mecánico
-            if not getattr(line, 'display_mechanic_fields', False):
-                line.mechanic_exempt = False
-                continue
-            name = (line.product_id.display_name or line.product_id.name or '').strip().upper()
-            line.mechanic_exempt = name.startswith('PAQ')
+        return super().action_confirm()

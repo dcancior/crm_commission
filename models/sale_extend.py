@@ -116,8 +116,18 @@ class SaleOrderLine(models.Model):  # Clase que hereda las líneas de pedido
             # detailed_type en Odoo 16: 'service', 'product', 'consu'
             line.display_mechanic_fields = bool(line.product_id) and (line.product_id.detailed_type == "service")  # True solo si es servicio
 
+    mechanic_exempt = fields.Boolean(
+        string='Exento de mecánico',
+        compute='_compute_mechanic_exempt',
+        store=True,
+    )
 
-# -----------------------------------------------------------------------------
-# PEDIDO DE VENTA (AVISO UNA SOLA VEZ, NO BLOQUEANTE)
-# -----------------------------------------------------------------------------
-
+    @api.depends('product_id', 'product_id.name', 'product_id.display_name', 'display_mechanic_fields')
+    def _compute_mechanic_exempt(self):
+        for line in self:
+            # Solo tiene sentido exentar si la línea “aplica” para mecánico
+            if not getattr(line, 'display_mechanic_fields', False):
+                line.mechanic_exempt = False
+                continue
+            name = (line.product_id.display_name or line.product_id.name or '').strip().upper()
+            line.mechanic_exempt = name.startswith('PAQ')
