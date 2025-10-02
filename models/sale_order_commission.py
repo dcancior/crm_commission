@@ -120,3 +120,20 @@ class SaleOrder(models.Model):
                 continue
             name = (line.product_id.display_name or line.product_id.name or '').strip().upper()
             line.mechanic_exempt = name.startswith('PAQ')
+
+
+    mechanic_exempt = fields.Boolean(
+        string='Exento de mecánico',
+        compute='_compute_mechanic_exempt',
+        store=True,
+    )
+
+    @api.depends('product_id', 'product_id.name', 'product_id.display_name', 'display_mechanic_fields')
+    def _compute_mechanic_exempt(self):
+        for line in self:
+            # Solo tiene sentido exentar si la línea “aplica” para mecánico
+            if not getattr(line, 'display_mechanic_fields', False):
+                line.mechanic_exempt = False
+                continue
+            name = (line.product_id.display_name or line.product_id.name or '').strip().upper()
+            line.mechanic_exempt = name.startswith('PAQ')
