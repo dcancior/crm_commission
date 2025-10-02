@@ -8,8 +8,10 @@
 # ║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html   ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
-from odoo import api, models, _
-from odoo.exceptions import ValidationError, UserError
+# -*- coding: utf-8 -*-
+from odoo import api, fields, models, _           # ← agrega "fields"
+from odoo.exceptions import ValidationError, UserError  # ← por si usas validaciones/bloqueos
+
 
 class SaleOrder(models.Model):
     _inherit = 'sale.order'
