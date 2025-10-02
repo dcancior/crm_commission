@@ -78,7 +78,8 @@ class SaleOrder(models.Model):
         }
 
     # -------------------------------------------------------------------------
-    # Aviso no bloqueante en modo edición (una sola vez por pedido)
+    # Aviso no bloqueante: DESACTIVADO en borrador
+    # (si no quieres el aviso nunca, devuelve {} sin más)
     # -------------------------------------------------------------------------
     mechanic_warning_ack = fields.Boolean(
         string='Aviso de mecánico mostrado',
@@ -88,42 +89,12 @@ class SaleOrder(models.Model):
 
     @api.onchange('order_line')
     def _onchange_mechanic_global_warning(self):
-        """Si hay líneas de servicio sin mecánico real, muestra un warning una sola vez."""
+        """No mostrar advertencia cuando la cotización está en borrador."""
         for order in self:
-            if order.mechanic_warning_ack:
-                continue
-
-            def _is_service_line(l):
-                # Preferimos el flag display_mechanic_fields; si no existe, caemos a tipo 'service'
-                if hasattr(l, 'display_mechanic_fields'):
-                    return bool(getattr(l, 'display_mechanic_fields', False))
-                return bool(getattr(getattr(l, 'product_id', False), 'type', '') == 'service')
-
-            service_lines = order.order_line.filtered(_is_service_line)
-            if not service_lines:
-                continue
-
-            any_real_mechanic = any(
-                getattr(l, 'mechanic_id', False) and not getattr(l, 'mechanic_is_placeholder', False)
-                for l in service_lines
-            )
-            any_pending = any(
-                (not getattr(l, 'mechanic_id', False)) or getattr(l, 'mechanic_is_placeholder', False)
-                for l in service_lines
-            )
-
-            if (not any_real_mechanic) and any_pending:
-                order.mechanic_warning_ack = True
-                return {
-                    "warning": {
-                        "title": _("Falta seleccionar el mecánico"),
-                        "message": _(
-                            "Tienes líneas de SERVICIO sin mecánico real. "
-                            "Asigna al menos UN mecánico. "
-                            "Este aviso se mostrará solo una vez."
-                        ),
-                    }
-                }
+            if order.state == 'draft':
+                return {}
+        # Si quisieras mantener el aviso en otros estados (p.ej. 'sent'),
+        # puedes pegar aquí la lógica anterior. Por ahora, no mostramos nada.
         return {}
 
     # -------------------------------------------------------------------------
@@ -132,7 +103,7 @@ class SaleOrder(models.Model):
     # -------------------------------------------------------------------------
     def action_confirm(self):
         for order in self:
-            # Condición en-línea para evitar problemas de carga/actualización de módulos
+            # Condición en-línea para que UI y validación estén sincronizadas
             lines = order.order_line.filtered(
                 lambda l: getattr(l, 'display_mechanic_fields', False)
                 and (not getattr(l, 'mechanic_id', False) or getattr(l, 'mechanic_is_placeholder', False))
@@ -148,9 +119,3 @@ class SaleOrder(models.Model):
                 ) % details)
 
         return super().action_confirm()
-
-    # -------------------------------------------------------------------------
-    # NOTA: No hay constraints activos para bloquear el guardado en borrador/sent.
-    # Si en el futuro quisieras bloquear también el guardado, se puede añadir
-    # una @api.constrains(...) como la que te dejé de ejemplo, pero está omitida.
-    # -------------------------------------------------------------------------
