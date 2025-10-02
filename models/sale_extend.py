@@ -20,14 +20,14 @@ class SaleOrderLine(models.Model):
       - Asociar (opcionalmente) un mecánico a líneas de servicio.
       - Mostrar/ocultar campos de mecánico de forma contextual (solo en servicios).
       - Calcular el subtotal de mano de obra (horas * costo/hora * cantidad).
-      - Detectar si el mecánico seleccionado es un 'placeholder' (SELECCIONAR).
+      - Detectar si el mecánico seleccionado es un 'placeholder' (SELECCIONAR/variantes).
       - Exentar líneas de la regla de mecánico si el producto inicia con 'PAQ'.
 
     Principios:
       - No se marcan campos como 'required' para no bloquear captura en borrador.
       - La validación dura sucede al confirmar el pedido (en otra clase/modelo).
-      - Se privilegian 'related' y 'compute' sin store para mantener la UI reactiva
-        y evitar duplicar datos, salvo cuando se usa en decoraciones/filtrado.
+      - Se privilegian 'related' y 'compute' sin store para mantener la UI reactiva,
+        salvo cuando se usan en decoraciones/filtrado (store=True).
     """
     _inherit = "sale.order.line"  # Heredamos el modelo base de líneas de venta
 
@@ -83,7 +83,7 @@ class SaleOrderLine(models.Model):
         string="Mecánico placeholder",
         compute="_compute_mechanic_is_placeholder",
         store=False,  # Indicador dinámico; no requiere persistencia
-        # True cuando mechanic_id apunta al registro 'SELECCIONAR' (placeholder).
+        # True cuando mechanic_id apunta a un registro placeholder (p.ej. 'SELECCIONAR').
     )
 
     @api.depends("mechanic_id")
@@ -93,8 +93,8 @@ class SaleOrderLine(models.Model):
 
         Por qué:
           - La UI usa este flag para decorar en naranja (warning) y para validar al confirmar.
-        Riesgo:
-          - Dependencia por nombre. Si el placeholder cambia, conviene usar hr.employee.is_placeholder.
+        Recomendación:
+          - Si es posible, añade hr.employee.is_placeholder (Boolean) y úsalo en vez del nombre.
         """
         for line in self:
             name = (line.mechanic_id.name or "").strip().upper()
@@ -103,64 +103,95 @@ class SaleOrderLine(models.Model):
     @api.onchange("product_id")
     def _onchange_autoset_placeholder_mechanic(self):
         """
-        UX: Si la línea es de servicio y no hay mecánico, autoasigna el placeholder.
+        UX: Si la línea es de servicio (display_mechanic_fields) y no hay mecánico,
+        autoasigna el placeholder, EXCEPTO cuando la línea está exenta (PAQ*).
 
-        Beneficio:
-          - Permite que la UI muestre inmediatamente el campo y reglas asociadas
-            (decoraciones, visibilidad), sin forzar al usuario a decidir un mecánico real.
+        Beneficios:
+          - Unifica el criterio con la decoración de la vista y con el bloqueo al confirmar.
+          - Evita depender de 'type' vs 'detailed_type' entre versiones.
+          - Respeta la exención para productos 'PAQ*' (paquetes).
         """
         for line in self:
-            if line.product_id and line.product_id.type == "service" and not line.mechanic_id:
+            # 1) ¿La línea aplica la lógica de mecánico? (servicio)
+            is_service_line = bool(getattr(line, 'display_mechanic_fields', False))
+
+            # 2) ¿Está exenta? Preferimos el flag; si no existe, calculamos por nombre 'PAQ*'
+            if hasattr(line, 'mechanic_exempt'):
+                is_exempt = bool(line.mechanic_exempt)
+            else:
+                name = (getattr(line.product_id, 'display_name', '') or getattr(line.product_id, 'name', '') or '').strip().upper()
+                is_exempt = name.startswith('PAQ')
+
+            # 3) Solo autoasignar si: es servicio, NO exento, y aún no hay mecánico
+            if is_service_line and (not is_exempt) and (not line.mechanic_id):
                 placeholder = line._get_placeholder_mechanic()
                 if placeholder:
                     line.mechanic_id = placeholder  # Asignación no bloqueante
 
     def _get_placeholder_mechanic(self):
         """
-        Retorna un empleado-placeholder 'SELECCIONAR' solo si:
+        Retorna un empleado-placeholder solo si:
         - La línea es de SERVICIO, y
-        - El nombre del producto NO comienza con 'PAQ' (paquetes).
+        - El nombre del producto NO comienza con 'PAQ'.
 
-        Algoritmo (cuando aplica):
-        1) Busca exacto name == 'SELECCIONAR' acotando por compañía del pedido o global.
-        2) Si no encuentra, cae a ILIKE 'SELECCIONAR' (fallback laxo).
+        Estrategia de búsqueda (multi-compañía):
+        1) Si existe hr.employee.is_placeholder => úsalo (True).
+        2) Intento exacto con nombres comunes:
+            - 'SELECCIONAR'
+            - 'SELECCIONE UN MECÁNICO'
+            - 'SELECCIONE UN MECANICO' (sin acento)
+        3) Fallback: ILIKE por prefijo 'SELECCION%' (cubre 'SELECCIONAR/SELECCIONE', con o sin acento).
 
         Devuelve:
-        - hr.employee(0) si no aplica o no encuentra.
-        - hr.employee(1) con el placeholder cuando aplica y existe.
+        - hr.employee(1) si encuentra placeholder
+        - recordset vacío si no aplica o no encuentra
         """
         self.ensure_one()
 
-        # --- Guardas de aplicación ---
         product = self.product_id
-        # En Odoo 16 existe 'detailed_type'; si no, caemos a 'type'
+        # Determina si es servicio (compatibilidad: detailed_type o type)
         detailed_type = getattr(product, 'detailed_type', False) or getattr(product, 'type', False)
         is_service = bool(product) and (detailed_type == 'service')
 
-        # Normalizamos nombre para detectar 'PAQ*'
+        # Exención por 'PAQ*'
         prod_name = (getattr(product, 'display_name', '') or getattr(product, 'name', '') or '').strip().upper()
-        starts_with_paq = prod_name.startswith('PAQ')
+        if (not is_service) or prod_name.startswith('PAQ'):
+            return self.env['hr.employee'].browse(False)  # no aplica
 
         Employee = self.env["hr.employee"]
-
-        # Si NO es servicio o es un paquete 'PAQ*', no autoasignamos placeholder
-        if (not is_service) or starts_with_paq:
-            return Employee.browse(False)  # recordset vacío
-
-        # --- Búsqueda del placeholder cuando SÍ aplica ---
         company_id = (self.order_id.company_id.id if self.order_id else self.env.company.id)
 
-        # 1) Búsqueda exacta por nombre, permitiendo global o compañía actual
-        emp = Employee.search([
-            ("name", "=", "SELECCIONAR"),
-            "|", ("company_id", "=", False), ("company_id", "=", company_id),
-        ], limit=1)
+        def _with_company(dom):
+            # Permite placeholder global (company_id False) o de la compañía actual
+            return ['|', ('company_id', '=', False), ('company_id', '=', company_id)] + dom
 
-        # 2) Fallback laxo por ILIKE si no se encontró exacto
+        # 1) Si existe el campo booleano is_placeholder, úsalo (la mejor práctica)
+        if 'is_placeholder' in Employee._fields:
+            emp = Employee.search(_with_company([('is_placeholder', '=', True), ('active', '=', True)]), limit=1)
+            if not emp:
+                # Intento sin 'active' por si está archivado accidentalmente
+                emp = Employee.search(_with_company([('is_placeholder', '=', True)]), limit=1)
+            if emp:
+                return emp
+
+        # 2) Intento exacto con nombres comunes
+        exact_names = [
+            'SELECCIONAR',
+            'SELECCIONE UN MECÁNICO',
+            'SELECCIONE UN MECANICO',  # sin acento
+        ]
+        emp = Employee.search(_with_company([('name', 'in', exact_names), ('active', '=', True)]), limit=1)
         if not emp:
-            emp = Employee.search([("name", "ilike", "SELECCIONAR")], limit=1)
+            emp = Employee.search(_with_company([('name', 'in', exact_names)]), limit=1)
+        if emp:
+            return emp
 
-        return emp
+        # 3) Fallback flexible (prefijo 'SELECCION%', case-insensitive)
+        emp = Employee.search(_with_company([('name', 'ilike', 'SELECCION%'), ('active', '=', True)]), limit=1)
+        if not emp:
+            emp = Employee.search(_with_company([('name', 'ilike', 'SELECCION%')]), limit=1)
+
+        return emp  # puede ser vacío si no existe placeholder
 
     # -------------------------------------------------------------------------
     # CÁLCULO DE COSTOS
