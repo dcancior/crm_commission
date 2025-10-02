@@ -8,7 +8,8 @@
 # ║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html   ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
-from odoo import models, fields, api
+from odoo import api, models, _
+from odoo.exceptions import ValidationError, UserError
 
 class SaleOrder(models.Model):
     _inherit = 'sale.order'
@@ -79,29 +80,16 @@ class SaleOrder(models.Model):
                 }  # Fin return
         return {}  # No hay aviso
 
-    def _get_lines_missing_mechanic(self):
-        self.ensure_one()
-        return self.order_line.filtered(
-            lambda l: l.display_mechanic_fields and (not l.mechanic_id or l.mechanic_is_placeholder)
-        )
-
-    @api.constrains(
-        'order_line',
-        'order_line.mechanic_id',
-        'order_line.display_mechanic_fields',
-        'order_line.mechanic_is_placeholder'
-    )
-    def _constrain_mechanic_on_save(self):
+    def action_confirm(self):
         for order in self:
-            # Limítalo a estados de cotización
-            if order.state in ('draft', 'sent'):
-                lines = order._get_lines_missing_mechanic()
-                if lines:
-                    details = "\n".join(
-                        f"• {l.product_id.display_name or l.name} (línea {l.sequence or '-'})"
-                        for l in lines
-                    )
-                    raise ValidationError(_(
-                        "No puedes guardar la cotización porque hay líneas de servicio "
-                        "sin Mecánico real seleccionado.\n\nCompleta estas líneas:\n%s"
-                    ) % details)
+            lines = order._get_lines_missing_mechanic()
+            if lines:
+                details = "\n".join(
+                    f"• {l.product_id.display_name or l.name} (línea {l.sequence or '-'})"
+                    for l in lines
+                )
+                raise UserError(_(
+                    "Antes de confirmar, selecciona un Mecánico en todas las líneas de servicio "
+                    "resaltadas en naranja.\n\nFaltan en:\n%s"
+                ) % details)
+        return super().action_confirm()
