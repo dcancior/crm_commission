@@ -120,43 +120,4 @@ class SaleOrderLine(models.Model):  # Clase que hereda las líneas de pedido
 # -----------------------------------------------------------------------------
 # PEDIDO DE VENTA (AVISO UNA SOLA VEZ, NO BLOQUEANTE)
 # -----------------------------------------------------------------------------
-class SaleOrder(models.Model):  # Clase que hereda sale.order
-    _inherit = "sale.order"  # Herencia de sale.order
 
-    mechanic_warning_ack = fields.Boolean(  # Flag para no repetir el aviso en el pedido
-        default=False,  # Valor por defecto
-        copy=False,  # No copiar al duplicar
-    )  # Fin mechanic_warning_ack
-
-    @api.onchange(  # Onchange a nivel pedido para avisar una sola vez
-        "order_line.mechanic_id",
-        "order_line.product_id",
-        "order_line.display_mechanic_fields",
-        "order_line.mechanic_is_placeholder",
-    )
-    def _onchange_mechanic_global_warning(self):  # Método onchange global
-        for order in self:  # Itera pedidos
-            if order.mechanic_warning_ack:  # Si ya se mostró, no repetir
-                continue  # Salta a siguiente
-            # Líneas de servicio del pedido
-            service_lines = order.order_line.filtered(lambda l: l.product_id and l.product_id.type == "service")  # Solo servicios
-            if not service_lines:  # Si no hay servicios, no avisar
-                continue  # Salta
-            # ¿Alguna línea tiene mecánico REAL? (no placeholder)
-            any_real_mechanic = any(l.mechanic_id and not l.mechanic_is_placeholder for l in service_lines)  # True si hay alguno real
-            # ¿Quedan pendientes? (sin mecánico o con placeholder)
-            any_pending = any((not l.mechanic_id) or l.mechanic_is_placeholder for l in service_lines)  # True si faltan reales
-            # Avisar solo si NO hay ninguno real y sí hay pendientes
-            if (not any_real_mechanic) and any_pending:  # Condición de aviso único
-                order.mechanic_warning_ack = True  # Marca como avisado
-                return {  # Retorna warning no bloqueante
-                    "warning": {
-                        "title": _("Falta seleccionar el mecánico"),  # Título
-                        "message": _(
-                            "Tienes líneas de SERVICIO sin mecánico real. "
-                            "Asigna al menos UN mecánico. "
-                            "Este aviso se mostrará solo una vez."
-                        ),  # Mensaje
-                    }
-                }  # Fin return
-        return {}  # No hay aviso

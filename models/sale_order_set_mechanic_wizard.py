@@ -14,22 +14,7 @@ from odoo import models, fields, api, _  # importa _ por si lo necesitas en mens
 # Extensión mínima de sale.order SOLO para abrir el wizard
 # (El aviso "una sola vez" y cualquier validación déjalos en sale_extend.py)
 # -------------------------------------------------------------------
-class SaleOrder(models.Model):  # noqa: E265
-    _inherit = 'sale.order'  # noqa: E265
 
-    def action_open_set_mechanic_wizard(self):  # Acción para abrir el wizard  # noqa: E265
-        self.ensure_one()  # Garantiza un solo registro  # noqa: E265
-        return {  # Devuelve acción ventana modal  # noqa: E265
-            'type': 'ir.actions.act_window',  # Tipo de acción  # noqa: E265
-            'name': _('Asignar mecánico a líneas'),  # Título de la ventana  # noqa: E265
-            'res_model': 'sale.order.set.mechanic.wizard',  # Modelo del wizard  # noqa: E265
-            'view_mode': 'form',  # Modo formulario  # noqa: E265
-            'target': 'new',  # Abrir en modal  # noqa: E265
-            'context': {  # Contexto por defecto  # noqa: E265
-                'default_order_id': self.id,  # Pedido actual  # noqa: E265
-                'default_company_id': self.company_id.id,  # Compañía del pedido  # noqa: E265
-            },
-        }  # noqa: E265
 
 
 # -------------------------------------------------------------------
