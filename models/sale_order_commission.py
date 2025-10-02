@@ -8,91 +8,138 @@
 # ║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html   ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
-# -*- coding: utf-8 -*-
-from odoo import api, fields, models, _           # ← agrega "fields"
-from odoo.exceptions import ValidationError, UserError  # ← por si usas validaciones/bloqueos
+from odoo import api, fields, models, _
+from odoo.exceptions import UserError
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 class SaleOrder(models.Model):
     _inherit = 'sale.order'
 
-    seller_name = fields.Char(string='Vendedor', compute='_compute_seller_commission', store=True)
-    commission_percent = fields.Float(string='Porcentaje Comisión (%)', compute='_compute_seller_commission', store=True)
-    commission_amount = fields.Monetary(string='Monto Comisión', compute='_compute_seller_commission', store=True, currency_field='currency_id')
+    # -------------------------------------------------------------------------
+    # Campos de comisión (ejemplo simple)
+    # -------------------------------------------------------------------------
+    seller_name = fields.Char(
+        string='Vendedor',
+        compute='_compute_seller_commission',
+        store=True,
+    )
+    commission_percent = fields.Float(
+        string='Porcentaje Comisión (%)',
+        compute='_compute_seller_commission',
+        store=True,
+        help="Porcentaje de comisión aplicado al pedido (ej. tomado del equipo de ventas).",
+    )
+    commission_amount = fields.Monetary(
+        string='Monto Comisión',
+        compute='_compute_seller_commission',
+        store=True,
+        currency_field='currency_id',
+    )
 
-    @api.depends('user_id', 'amount_untaxed')
+    @api.depends(
+        'user_id',
+        'amount_untaxed',
+        'user_id.sale_team_id',
+        'user_id.sale_team_id.commission_percent',
+    )
     def _compute_seller_commission(self):
+        """Ejemplo: toma nombre del vendedor y porcentaje del equipo de ventas."""
         for order in self:
             user = order.user_id
             order.seller_name = user.name if user else ''
-            # Puedes tomar el porcentaje del usuario o del equipo
-            percent = user.sale_team_id.commission_percent if user and user.sale_team_id else 0.0
-            order.commission_percent = percent
-            order.commission_amount = order.amount_untaxed * (percent / 100.0)
+            percent = 0.0
+            try:
+                percent = user.sale_team_id.commission_percent if user and user.sale_team_id else 0.0
+            except Exception:
+                # Si el campo commission_percent no existe en el equipo, deja 0.0
+                _logger.debug("El equipo de ventas no tiene 'commission_percent'; usando 0.0")
+                percent = 0.0
+            order.commission_percent = percent or 0.0
+            order.commission_amount = (order.amount_untaxed or 0.0) * ((percent or 0.0) / 100.0)
 
-    def action_open_set_mechanic_wizard(self):  # Acción para abrir el wizard  # noqa: E265
-        self.ensure_one()  # Garantiza un solo registro  # noqa: E265
-        return {  # Devuelve acción ventana modal  # noqa: E265
-            'type': 'ir.actions.act_window',  # Tipo de acción  # noqa: E265
-            'name': _('Asignar mecánico a líneas'),  # Título de la ventana  # noqa: E265
-            'res_model': 'sale.order.set.mechanic.wizard',  # Modelo del wizard  # noqa: E265
-            'view_mode': 'form',  # Modo formulario  # noqa: E265
-            'target': 'new',  # Abrir en modal  # noqa: E265
-            'context': {  # Contexto por defecto  # noqa: E265
-                'default_order_id': self.id,  # Pedido actual  # noqa: E265
-                'default_company_id': self.company_id.id,  # Compañía del pedido  # noqa: E265
+    # -------------------------------------------------------------------------
+    # Asistente para asignar mecánico (acción modal)
+    # -------------------------------------------------------------------------
+    def action_open_set_mechanic_wizard(self):
+        """Abre un wizard para asignar mecánico a las líneas del pedido."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _('Asignar mecánico a líneas'),
+            'res_model': 'sale.order.set.mechanic.wizard',
+            'view_mode': 'form',
+            'target': 'new',
+            'context': {
+                'default_order_id': self.id,
+                'default_company_id': self.company_id.id,
             },
-        }  # noqa: E265
+        }
 
-    mechanic_warning_ack = fields.Boolean(  # Flag para no repetir el aviso en el pedido
-        default=False,  # Valor por defecto
-        copy=False,  # No copiar al duplicar
-    )  # Fin mechanic_warning_ack
-
-    @api.onchange(  # Onchange a nivel pedido para avisar una sola vez
-        "order_line.mechanic_id",
-        "order_line.product_id",
-        "order_line.display_mechanic_fields",
-        "order_line.mechanic_is_placeholder",
+    # -------------------------------------------------------------------------
+    # Aviso no bloqueante: sólo se muestra una vez por pedido en modo edición
+    # -------------------------------------------------------------------------
+    mechanic_warning_ack = fields.Boolean(
+        string='Aviso de mecánico mostrado',
+        default=False,
+        copy=False,
     )
-    def _onchange_mechanic_global_warning(self):  # Método onchange global
-        for order in self:  # Itera pedidos
-            if order.mechanic_warning_ack:  # Si ya se mostró, no repetir
-                continue  # Salta a siguiente
-            # Líneas de servicio del pedido
-            service_lines = order.order_line.filtered(lambda l: l.product_id and l.product_id.type == "service")  # Solo servicios
-            if not service_lines:  # Si no hay servicios, no avisar
-                continue  # Salta
-            # ¿Alguna línea tiene mecánico REAL? (no placeholder)
-            any_real_mechanic = any(l.mechanic_id and not l.mechanic_is_placeholder for l in service_lines)  # True si hay alguno real
-            # ¿Quedan pendientes? (sin mecánico o con placeholder)
-            any_pending = any((not l.mechanic_id) or l.mechanic_is_placeholder for l in service_lines)  # True si faltan reales
-            # Avisar solo si NO hay ninguno real y sí hay pendientes
-            if (not any_real_mechanic) and any_pending:  # Condición de aviso único
-                order.mechanic_warning_ack = True  # Marca como avisado
-                return {  # Retorna warning no bloqueante
+
+    @api.onchange('order_line')
+    def _onchange_mechanic_global_warning(self):
+        """Si hay líneas de servicio sin mecánico real, muestra un warning una sola vez."""
+        for order in self:
+            if order.mechanic_warning_ack:
+                continue
+
+            # Usa el mismo criterio que la UI (display_mechanic_fields) si existe;
+            # si no existe, cae al tipo de producto == service.
+            def _is_service_line(l):
+                if hasattr(l, 'display_mechanic_fields'):
+                    return bool(getattr(l, 'display_mechanic_fields', False))
+                return bool(getattr(getattr(l, 'product_id', False), 'type', '') == 'service')
+
+            service_lines = order.order_line.filtered(_is_service_line)
+            if not service_lines:
+                continue
+
+            any_real_mechanic = any(
+                getattr(l, 'mechanic_id', False) and not getattr(l, 'mechanic_is_placeholder', False)
+                for l in service_lines
+            )
+            any_pending = any(
+                (not getattr(l, 'mechanic_id', False)) or getattr(l, 'mechanic_is_placeholder', False)
+                for l in service_lines
+            )
+
+            if (not any_real_mechanic) and any_pending:
+                order.mechanic_warning_ack = True
+                return {
                     "warning": {
-                        "title": _("Falta seleccionar el mecánico"),  # Título
+                        "title": _("Falta seleccionar el mecánico"),
                         "message": _(
                             "Tienes líneas de SERVICIO sin mecánico real. "
                             "Asigna al menos UN mecánico. "
                             "Este aviso se mostrará solo una vez."
-                        ),  # Mensaje
+                        ),
                     }
-                }  # Fin return
-        return {}  # No hay aviso
+                }
+        return {}
 
-    def _get_lines_missing_mechanic(self):
-        """Devuelve las líneas de servicio que requieren mecánico pero no lo tienen
-        o traen un placeholder (misma lógica que la decoración-warning)."""
-        self.ensure_one()
-        return self.order_line.filtered(
-            lambda l: l.display_mechanic_fields and (not l.mechanic_id or l.mechanic_is_placeholder)
-        )
-
+    # -------------------------------------------------------------------------
+    # Bloqueo al confirmar: NO permite confirmar si hay líneas “pintadas”
+    # (mismo criterio que la decoración-warning en la vista)
+    # -------------------------------------------------------------------------
     def action_confirm(self):
         for order in self:
-            lines = order._get_lines_missing_mechanic()
+            # MISMA condición que la decoración-warning, en-línea para evitar errores
+            # si el helper no se cargara por orden/actualización de módulos.
+            lines = order.order_line.filtered(
+                lambda l: getattr(l, 'display_mechanic_fields', False)
+                and (not getattr(l, 'mechanic_id', False) or getattr(l, 'mechanic_is_placeholder', False))
+            )
             if lines:
                 details = "\n".join(
                     f"• {l.product_id.display_name or l.name} (línea {l.sequence or '-'})"
@@ -102,4 +149,29 @@ class SaleOrder(models.Model):
                     "Antes de confirmar, selecciona un Mecánico en todas las líneas de servicio "
                     "resaltadas en naranja.\n\nFaltan en:\n%s"
                 ) % details)
+
         return super().action_confirm()
+
+    # -------------------------------------------------------------------------
+    # (OPCIONAL) Bloqueo al GUARDAR en borrador/enviado:
+    # Si lo quieres activar, descomenta el decorador y el raise.
+    # Nota: puede ser molesto durante la captura; por eso está OFF por defecto.
+    # -------------------------------------------------------------------------
+    # from odoo.exceptions import ValidationError
+    # @api.constrains('order_line', 'state')
+    # def _constrain_mechanic_on_save(self):
+    #     for order in self:
+    #         if order.state in ('draft', 'sent'):
+    #             lines = order.order_line.filtered(
+    #                 lambda l: getattr(l, 'display_mechanic_fields', False)
+    #                 and (not getattr(l, 'mechanic_id', False) or getattr(l, 'mechanic_is_placeholder', False))
+    #             )
+    #             if lines:
+    #                 details = "\n".join(
+    #                     f"• {l.product_id.display_name or l.name} (línea {l.sequence or '-'})"
+    #                     for l in lines
+    #                 )
+    #                 raise ValidationError(_(
+    #                     "No puedes guardar la cotización porque hay líneas de servicio "
+    #                     "sin Mecánico real seleccionado.\n\nCompleta estas líneas:\n%s"
+    #                 ) % details)
