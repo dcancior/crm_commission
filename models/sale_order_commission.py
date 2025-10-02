@@ -54,7 +54,6 @@ class SaleOrder(models.Model):
             try:
                 percent = user.sale_team_id.commission_percent if user and user.sale_team_id else 0.0
             except Exception:
-                # Si el campo commission_percent no existe en el equipo, deja 0.0
                 _logger.debug("El equipo de ventas no tiene 'commission_percent'; usando 0.0")
                 percent = 0.0
             order.commission_percent = percent or 0.0
@@ -79,7 +78,7 @@ class SaleOrder(models.Model):
         }
 
     # -------------------------------------------------------------------------
-    # Aviso no bloqueante: sólo se muestra una vez por pedido en modo edición
+    # Aviso no bloqueante en modo edición (una sola vez por pedido)
     # -------------------------------------------------------------------------
     mechanic_warning_ack = fields.Boolean(
         string='Aviso de mecánico mostrado',
@@ -94,9 +93,8 @@ class SaleOrder(models.Model):
             if order.mechanic_warning_ack:
                 continue
 
-            # Usa el mismo criterio que la UI (display_mechanic_fields) si existe;
-            # si no existe, cae al tipo de producto == service.
             def _is_service_line(l):
+                # Preferimos el flag display_mechanic_fields; si no existe, caemos a tipo 'service'
                 if hasattr(l, 'display_mechanic_fields'):
                     return bool(getattr(l, 'display_mechanic_fields', False))
                 return bool(getattr(getattr(l, 'product_id', False), 'type', '') == 'service')
@@ -129,13 +127,12 @@ class SaleOrder(models.Model):
         return {}
 
     # -------------------------------------------------------------------------
-    # Bloqueo al confirmar: NO permite confirmar si hay líneas “pintadas”
+    # Bloqueo SOLO al confirmar: NO permite confirmar si hay líneas “pintadas”
     # (mismo criterio que la decoración-warning en la vista)
     # -------------------------------------------------------------------------
     def action_confirm(self):
         for order in self:
-            # MISMA condición que la decoración-warning, en-línea para evitar errores
-            # si el helper no se cargara por orden/actualización de módulos.
+            # Condición en-línea para evitar problemas de carga/actualización de módulos
             lines = order.order_line.filtered(
                 lambda l: getattr(l, 'display_mechanic_fields', False)
                 and (not getattr(l, 'mechanic_id', False) or getattr(l, 'mechanic_is_placeholder', False))
@@ -153,25 +150,7 @@ class SaleOrder(models.Model):
         return super().action_confirm()
 
     # -------------------------------------------------------------------------
-    # (OPCIONAL) Bloqueo al GUARDAR en borrador/enviado:
-    # Si lo quieres activar, descomenta el decorador y el raise.
-    # Nota: puede ser molesto durante la captura; por eso está OFF por defecto.
+    # NOTA: No hay constraints activos para bloquear el guardado en borrador/sent.
+    # Si en el futuro quisieras bloquear también el guardado, se puede añadir
+    # una @api.constrains(...) como la que te dejé de ejemplo, pero está omitida.
     # -------------------------------------------------------------------------
-    # from odoo.exceptions import ValidationError
-    # @api.constrains('order_line', 'state')
-    # def _constrain_mechanic_on_save(self):
-    #     for order in self:
-    #         if order.state in ('draft', 'sent'):
-    #             lines = order.order_line.filtered(
-    #                 lambda l: getattr(l, 'display_mechanic_fields', False)
-    #                 and (not getattr(l, 'mechanic_id', False) or getattr(l, 'mechanic_is_placeholder', False))
-    #             )
-    #             if lines:
-    #                 details = "\n".join(
-    #                     f"• {l.product_id.display_name or l.name} (línea {l.sequence or '-'})"
-    #                     for l in lines
-    #                 )
-    #                 raise ValidationError(_(
-    #                     "No puedes guardar la cotización porque hay líneas de servicio "
-    #                     "sin Mecánico real seleccionado.\n\nCompleta estas líneas:\n%s"
-    #                 ) % details)
