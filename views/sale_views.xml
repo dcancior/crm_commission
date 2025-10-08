@@ -84,49 +84,52 @@
     </field>
   </record>
 
+  <!-- Quitar el % del margen en el encabezado (al lado de Subtotal/Impuestos) -->
+  <record id="hide_margin_percent_header" model="ir.ui.view">
+    <field name="name">sale.order.hide.margin.percent.header</field>
+    <field name="model">sale.order</field>
+    <field name="inherit_id" ref="sale_margin.sale_margin_sale_order"/>
+    <field name="arch" type="xml">
+      <!-- Remueve el span que contiene (margin_percent) -->
+      <xpath expr="//span[.//field[@name='margin_percent']]" position="replace"/>
+    </field>
+  </record>
+
+  <!-- Quitar la columna % en el árbol de líneas insertada por sale_margin -->
+  <record id="hide_margin_percent_tree_lines" model="ir.ui.view">
+    <field name="name">sale.order.line.hide.margin.percent.tree</field>
+    <field name="model">sale.order</field>
+    <field name="inherit_id" ref="sale_margin.sale_margin_sale_order_line_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//field[@name='order_line']/tree//field[@name='margin_percent']" position="replace"/>
+    </field>
+  </record>
+  
+
   <!-- A) Formulario de venta con tree inline de order_line -->
-    <record id="view_order_form_edit_manual_margin" model="ir.ui.view">
-      <field name="name">sale.order.form.edit.manual.margin</field>
-      <field name="model">sale.order</field>
-      <field name="inherit_id" ref="sale.view_order_form"/>
-      <field name="arch" type="xml">
-        <!-- Inserta nuestra columna justo DESPUÉS del precio unitario -->
-        <xpath expr="//field[@name='order_line']/tree//field[@name='price_unit']" position="after">
-          <field name="manual_margin_percent" string="Margin %" widget="float" optional="show"/>
-        </xpath>
-      </field>
-    </record>
+  <record id="view_order_form_edit_manual_margin" model="ir.ui.view">
+    <field name="name">sale.order.form.edit.manual.margin</field>
+    <field name="model">sale.order</field>
+    <field name="inherit_id" ref="sale.view_order_form"/>
+    <field name="arch" type="xml">
+      <!-- Insertar nuestra columna justo después de price_unit -->
+      <xpath expr="//field[@name='order_line']/tree//field[@name='price_unit']" position="after">
+        <field name="manual_margin_percent" string="Margin %" widget="float" optional="show"/>
+      </xpath>
+    </field>
+  </record>
 
-    <!-- B) Si tu instancia usa un tree externo para las líneas (muy común) -->
-    <!--    Agregamos la columna también en ese tree -->
-    <record id="view_order_line_tree_edit_manual_margin" model="ir.ui.view">
-      <field name="name">sale.order.line.tree.edit.manual.margin</field>
-      <field name="model">sale.order.line</field>
-      <field name="inherit_id" ref="sale.view_order_line_tree"/>
-      <field name="arch" type="xml">
-        <xpath expr="//tree//field[@name='price_unit']" position="after">
-          <field name="manual_margin_percent" string="Margin %" widget="float" optional="show"/>
-        </xpath>
-      </field>
-    </record>
-
-    <!-- (Opcional) Ocultar la columna margin_percent si aparece por algún inherit de sale_margin.
-         Debes apuntar al XML ID exacto que agrega esa columna en tu DB.
-         Activa Modo Desarrollador → abre la vista del árbol de líneas → “Ver arquitectura”
-         y copia el External ID. Reemplaza abajo 'SALE_MARGIN_VIEW_XMLID' por el real. -->
-    <!--
-    <record id="hide_margin_percent_column" model="ir.ui.view">
-      <field name="name">hide.margin.percent.column</field>
-      <field name="model">sale.order.line</field>
-      <field name="inherit_id" ref="SALE_MARGIN_VIEW_XMLID"/>
-      <field name="arch" type="xml">
-        <xpath expr="//field[@name='margin_percent']" position="attributes">
-          <attribute name="invisible">1</attribute>
-          <attribute name="optional">hide</attribute>
-        </xpath>
-      </field>
-    </record>
-    -->
+  <!-- B) Si tu instancia usa un tree externo para las líneas -->
+  <record id="view_order_line_tree_edit_manual_margin" model="ir.ui.view">
+    <field name="name">sale.order.line.tree.edit.manual.margin</field>
+    <field name="model">sale.order.line</field>
+    <field name="inherit_id" ref="sale.view_order_line_tree"/>
+    <field name="arch" type="xml">
+      <xpath expr="//tree//field[@name='price_unit']" position="after">
+        <field name="manual_margin_percent" string="Margin %" widget="float" optional="show"/>
+      </xpath>
+    </field>
+  </record>
 
     
 </odoo>
