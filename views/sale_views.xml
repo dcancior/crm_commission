@@ -84,28 +84,49 @@
     </field>
   </record>
 
-  <!-- Heredar el formulario de ventas y reemplazar la columna margin_percent en el tree de order_line -->
+  <!-- A) Formulario de venta con tree inline de order_line -->
     <record id="view_order_form_edit_manual_margin" model="ir.ui.view">
       <field name="name">sale.order.form.edit.manual.margin</field>
       <field name="model">sale.order</field>
       <field name="inherit_id" ref="sale.view_order_form"/>
       <field name="arch" type="xml">
-        <!-- En el tree de lines, donde sale_margin pone margin_percent -->
-        <xpath expr="//field[@name='order_line']/tree//field[@name='margin_percent']" position="replace">
-          <field name="manual_margin_percent" string="Margin %" widget="float"/>
+        <!-- Inserta nuestra columna justo DESPUÉS del precio unitario -->
+        <xpath expr="//field[@name='order_line']/tree//field[@name='price_unit']" position="after">
+          <field name="manual_margin_percent" string="Margin %" widget="float" optional="show"/>
         </xpath>
       </field>
     </record>
 
-    <!-- (Opcional) En la vista de líneas independiente, por si tuvieras otra variante -->
-    <record id="view_order_tree_edit_manual_margin" model="ir.ui.view">
+    <!-- B) Si tu instancia usa un tree externo para las líneas (muy común) -->
+    <!--    Agregamos la columna también en ese tree -->
+    <record id="view_order_line_tree_edit_manual_margin" model="ir.ui.view">
       <field name="name">sale.order.line.tree.edit.manual.margin</field>
-      <field name="model">sale.order</field>
-      <field name="inherit_id" ref="sale.view_quotation_tree"/>
+      <field name="model">sale.order.line</field>
+      <field name="inherit_id" ref="sale.view_order_line_tree"/>
       <field name="arch" type="xml">
-        <xpath expr="//field[@name='order_line']/tree//field[@name='margin_percent']" position="replace">
-          <field name="manual_margin_percent" string="Margin %" widget="float"/>
+        <xpath expr="//tree//field[@name='price_unit']" position="after">
+          <field name="manual_margin_percent" string="Margin %" widget="float" optional="show"/>
         </xpath>
       </field>
     </record>
+
+    <!-- (Opcional) Ocultar la columna margin_percent si aparece por algún inherit de sale_margin.
+         Debes apuntar al XML ID exacto que agrega esa columna en tu DB.
+         Activa Modo Desarrollador → abre la vista del árbol de líneas → “Ver arquitectura”
+         y copia el External ID. Reemplaza abajo 'SALE_MARGIN_VIEW_XMLID' por el real. -->
+    <!--
+    <record id="hide_margin_percent_column" model="ir.ui.view">
+      <field name="name">hide.margin.percent.column</field>
+      <field name="model">sale.order.line</field>
+      <field name="inherit_id" ref="SALE_MARGIN_VIEW_XMLID"/>
+      <field name="arch" type="xml">
+        <xpath expr="//field[@name='margin_percent']" position="attributes">
+          <attribute name="invisible">1</attribute>
+          <attribute name="optional">hide</attribute>
+        </xpath>
+      </field>
+    </record>
+    -->
+
+    
 </odoo>
