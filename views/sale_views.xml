@@ -114,7 +114,7 @@
     <field name="arch" type="xml">
       <!-- Insertar nuestra columna justo después de price_unit -->
       <xpath expr="//field[@name='order_line']/tree/field[@name='mechanic_id']" position="before">
-        <field name="manual_margin_percent" string="Margin %" widget="float" optional="show"/>
+        <field name="manual_margin_percent" string="Margen %" widget="float" optional="show"/>
       </xpath>
     </field>
   </record>

@@ -288,7 +288,7 @@ class SaleOrderLine(models.Model):
 
     # Campo editable que el usuario maneja en la vista (sustituye a margin_percent visualmente)
     manual_margin_percent = fields.Float(
-        string="Margin %",
+        string="Margen %",
         help="Margen de utilidad deseado. Se aplica sobre el costo (purchase_price) para calcular el precio de venta."
     )
 
