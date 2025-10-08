@@ -131,5 +131,54 @@
     </field>
   </record>
 -->
+
+  <!-- 1) HEADER: quita COMPLETAMENTE el label y el bloque que contenía margin y margin_percent -->
+  <record id="hide_margin_header_block" model="ir.ui.view">
+    <field name="name">sale.order.hide.margin.header.block</field>
+    <field name="model">sale.order</field>
+    <!-- Heredamos la vista del módulo sale_margin que añadió el bloque -->
+    <field name="inherit_id" ref="sale_margin.sale_margin_sale_order"/>
+    <field name="arch" type="xml">
+      <!-- Quita el label "Margin" -->
+      <xpath expr="//label[@for='margin']" position="replace"/>
+      <!-- Quita el DIV que contenía <field name='margin'/> y el span con margin_percent -->
+      <xpath expr="//div[.//field[@name='margin']]" position="replace"/>
+    </field>
+  </record>
+
+  <!-- 2) INLINE TREE (dentro del form de pedido): quita columnas margin y margin_percent si están -->
+  <record id="hide_margin_cols_inline_tree" model="ir.ui.view">
+    <field name="name">sale.order.hide.margin.cols.inline.tree</field>
+    <field name="model">sale.order</field>
+    <field name="inherit_id" ref="sale.view_order_form"/>
+    <field name="arch" type="xml">
+      <!-- Remueve columnas del árbol embebido -->
+      <xpath expr="//field[@name='order_line']/tree//field[@name='margin_percent']" position="replace"/>
+      <xpath expr="//field[@name='order_line']/tree//field[@name='margin']" position="replace"/>
+    </field>
+  </record>
+
+  <!-- 3) TREE externo de líneas (el que añade sale_margin): quita margin y margin_percent -->
+  <record id="hide_margin_cols_external_tree" model="ir.ui.view">
+    <field name="name">sale.order.hide.margin.cols.external.tree</field>
+    <field name="model">sale.order</field>
+    <!-- Heredamos justo donde sale_margin los insertó -->
+    <field name="inherit_id" ref="sale_margin.sale_margin_sale_order_line_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//field[@name='order_line']/tree//field[@name='margin_percent']" position="replace"/>
+      <xpath expr="//field[@name='order_line']/tree//field[@name='margin']" position="replace"/>
+    </field>
+  </record>
+
+  <!-- 4) (Por si acaso) FORM de la línea: si algún heredado mostró margin o margin_percent, quítalos -->
+  <record id="hide_margin_fields_in_line_form" model="ir.ui.view">
+    <field name="name">sale.order.hide.margin.fields.in.line.form</field>
+    <field name="model">sale.order</field>
+    <field name="inherit_id" ref="sale.view_order_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//field[@name='order_line']/form//field[@name='margin_percent']" position="replace"/>
+      <xpath expr="//field[@name='order_line']/form//field[@name='margin']" position="replace"/>
+    </field>
+  </record>
     
 </odoo>
