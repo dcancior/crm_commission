@@ -95,7 +95,7 @@
     </field>
   </record>
 
-  <!-- Quitar la columna % en el árbol de líneas insertada por sale_margin -->
+  <!-- Quitar la columna % en el árbol de líneas insertada por sale_margin 
   <record id="hide_margin_percent_tree_lines" model="ir.ui.view">
     <field name="name">sale.order.line.hide.margin.percent.tree</field>
     <field name="model">sale.order</field>
@@ -104,7 +104,7 @@
       <xpath expr="//field[@name='order_line']/tree//field[@name='margin_percent']" position="replace"/>
     </field>
   </record>
-  
+-->
 
   <!-- A) Formulario de venta con tree inline de order_line -->
   <record id="view_order_form_edit_manual_margin" model="ir.ui.view">
@@ -113,13 +113,13 @@
     <field name="inherit_id" ref="sale.view_order_form"/>
     <field name="arch" type="xml">
       <!-- Insertar nuestra columna justo después de price_unit -->
-      <xpath expr="//field[@name='order_line']/tree//field[@name='price_unit']" position="after">
+      <xpath expr="//field[@name='order_line']/tree/field[@name='mechanic_id']" position="before">
         <field name="manual_margin_percent" string="Margin %" widget="float" optional="show"/>
       </xpath>
     </field>
   </record>
 
-  <!-- B) Si tu instancia usa un tree externo para las líneas -->
+  <!-- B) Si tu instancia usa un tree externo para las líneas 
   <record id="view_order_line_tree_edit_manual_margin" model="ir.ui.view">
     <field name="name">sale.order.line.tree.edit.manual.margin</field>
     <field name="model">sale.order.line</field>
@@ -130,6 +130,6 @@
       </xpath>
     </field>
   </record>
-
+-->
     
 </odoo>
