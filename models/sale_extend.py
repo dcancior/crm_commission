@@ -284,3 +284,69 @@ class SaleOrderLine(models.Model):
         if self.mechanic_id and not self.mechanic_is_placeholder:
             vals["mechanic_id"] = self.mechanic_id.id
         return vals
+
+
+    # Campo editable que el usuario maneja en la vista (sustituye a margin_percent visualmente)
+    manual_margin_percent = fields.Float(
+        string="Margin %",
+        help="Margen de utilidad deseado. Se aplica sobre el costo (purchase_price) para calcular el precio de venta."
+    )
+
+    @api.onchange('manual_margin_percent', 'purchase_price')
+    def _onchange_manual_margin_percent_apply_price(self):
+        """ Cuando el usuario cambia el margen o el costo, recalculamos el precio unitario. """
+        for line in self:
+            # Toma costo: purchase_price (si no, standard_price como respaldo)
+            cost = line.purchase_price
+            if not cost and line.product_id:
+                cost = line.product_id.standard_price
+            if cost is None:
+                continue
+
+            margin = (line.manual_margin_percent or 0.0) / 100.0
+            currency = (line.order_id and line.order_id.pricelist_id.currency_id) or line.currency_id
+            if currency:
+                line.price_unit = currency.round(cost * (1.0 + margin))
+            else:
+                line.price_unit = cost * (1.0 + margin)
+
+    @api.onchange('price_unit')
+    def _onchange_price_unit_recompute_margin(self):
+        """ Si el usuario modifica el precio, recalculamos el % de margen para que la columna sea coherente. """
+        for line in self:
+            cost = line.purchase_price or (line.product_id and line.product_id.standard_price) or 0.0
+            if cost:
+                line.manual_margin_percent = (line.price_unit / cost - 1.0) * 100.0
+            else:
+                # Sin costo no podemos calcular margen; deja en 0 para evitar NaN.
+                line.manual_margin_percent = 0.0
+
+    def _apply_manual_margin(self):
+        """ Utilidad interna para create/write: aplicar manual_margin_percent -> price_unit """
+        for line in self:
+            cost = line.purchase_price or (line.product_id and line.product_id.standard_price) or 0.0
+            margin = (line.manual_margin_percent or 0.0) / 100.0
+            currency = (line.order_id and line.order_id.pricelist_id.currency_id) or line.currency_id
+            price = cost * (1.0 + margin)
+            line.price_unit = currency.round(price) if currency else price
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        records = super().create(vals_list)
+        # Si viene el margen pero no viene el price_unit explícito, aplícalo.
+        for rec, vals in zip(records, vals_list):
+            if 'manual_margin_percent' in vals and 'price_unit' not in vals:
+                rec._apply_manual_margin()
+        return records
+
+    def write(self, vals):
+        res = super().write(vals)
+        # Si se cambió el margen (o el costo) y NO se fijó explícitamente price_unit, vuelve a aplicar el margen.
+        if 'manual_margin_percent' in vals or 'purchase_price' in vals:
+            lines = self
+            # Evitar pisar un price_unit que el usuario haya puesto explícitamente en este write
+            if 'price_unit' in vals:
+                lines = self.env['sale.order.line']  # vacío
+            for line in lines:
+                line._apply_manual_margin()
+        return res

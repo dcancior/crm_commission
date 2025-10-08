@@ -83,4 +83,29 @@
 
     </field>
   </record>
+
+  <!-- Heredar el formulario de ventas y reemplazar la columna margin_percent en el tree de order_line -->
+    <record id="view_order_form_edit_manual_margin" model="ir.ui.view">
+      <field name="name">sale.order.form.edit.manual.margin</field>
+      <field name="model">sale.order</field>
+      <field name="inherit_id" ref="sale.view_order_form"/>
+      <field name="arch" type="xml">
+        <!-- En el tree de lines, donde sale_margin pone margin_percent -->
+        <xpath expr="//field[@name='order_line']/tree//field[@name='margin_percent']" position="replace">
+          <field name="manual_margin_percent" string="Margin %" widget="float"/>
+        </xpath>
+      </field>
+    </record>
+
+    <!-- (Opcional) En la vista de líneas independiente, por si tuvieras otra variante -->
+    <record id="view_order_tree_edit_manual_margin" model="ir.ui.view">
+      <field name="name">sale.order.line.tree.edit.manual.margin</field>
+      <field name="model">sale.order</field>
+      <field name="inherit_id" ref="sale.view_quotation_tree"/>
+      <field name="arch" type="xml">
+        <xpath expr="//field[@name='order_line']/tree//field[@name='margin_percent']" position="replace">
+          <field name="manual_margin_percent" string="Margin %" widget="float"/>
+        </xpath>
+      </field>
+    </record>
 </odoo>
