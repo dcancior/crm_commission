@@ -21,7 +21,7 @@ MONTHS = [
 
 class MechanicCommissionWizard(models.TransientModel):
     _name = "mechanic.commission.wizard"
-    _description = "Wizard: Comisiones de mecánicos por mes (facturas pagadas)"
+    _description = "Wizard: Comisiones de mecánicos por mes (facturas activas)"
 
     employee_id = fields.Many2one(
         "hr.employee",
@@ -193,8 +193,10 @@ class MechanicCommissionWizard(models.TransientModel):
                 ('employee_id', '=', w.employee_id.id),
                 ('invoice_date', '>=', date_start),
                 ('invoice_date', '<=', date_end),
+                ('invoice_id.state', '=', 'posted'),  # >>> CAMBIO: solo activas
             ]
             entries = Entry.search(dom)
+
             if w.report_paid_filter == 'paid':
                 entries = entries.filtered(lambda e: e.is_paid)
             elif w.report_paid_filter == 'unpaid':
@@ -283,11 +285,10 @@ class MechanicCommissionWizard(models.TransientModel):
             date_start = f"{year}-{str(month).zfill(2)}-01"
             date_end = f"{year}-{str(month).zfill(2)}-{last_day}"
 
-            # FACTURAS DEL CLIENTE pagadas
+            # FACTURAS DEL CLIENTE ACTIVAS (posteadas), sin importar si están pagadas o no  # >>> CAMBIO
             moves = w.env['account.move'].search([
                 ('move_type', '=', 'out_invoice'),
-                ('state', '=', 'posted'),
-                ('payment_state', '=', 'paid'),
+                ('state', '=', 'posted'),  # activas; canceladas no pasan este filtro
                 ('invoice_date', '>=', date_start),
                 ('invoice_date', '<=', date_end),
             ])
@@ -303,8 +304,19 @@ class MechanicCommissionWizard(models.TransientModel):
             entries_to_keep = Entry.browse()
 
             for line in inv_lines:
-                cph = (getattr(line.product_id.product_tmpl_id, 'service_cost_per_hour', 0.0) or 0.0)
-                hrs_req = (getattr(line.product_id.product_tmpl_id, 'service_hours_required', 0.0) or 0.0)
+                tmpl = line.product_id.product_tmpl_id
+
+                # Compatibilidad doble: primero intenta mechanic_*, si no existe usa service_*  # >>> CAMBIO
+                cph = getattr(tmpl, 'mechanic_cost_per_hour', None)
+                if cph in (None, False):
+                    cph = getattr(tmpl, 'service_cost_per_hour', 0.0)
+                cph = cph or 0.0
+
+                hrs_req = getattr(tmpl, 'mechanic_hours_required', None)
+                if hrs_req in (None, False):
+                    hrs_req = getattr(tmpl, 'service_hours_required', 0.0)
+                hrs_req = hrs_req or 0.0
+
                 qty = line.quantity or 0.0
                 hrs = hrs_req * qty
                 payout = cph * hrs
@@ -339,25 +351,32 @@ class MechanicCommissionWizard(models.TransientModel):
 
                 entries_to_keep |= entry
 
-            # Construir comandos (aplicando filtro si corresponde)
+            # Limpieza: elimina entradas del periodo que ya no aplican (p.ej., factura cancelada)  # >>> CAMBIO RECOMENDADO
+            obsolete = Entry.search([
+                ('employee_id', '=', w.employee_id.id),
+                ('month', '=', str(month).zfill(2)),
+                ('year', '=', str(year)),
+                ('id', 'not in', entries_to_keep.ids),
+            ])
+            if obsolete:
+                obsolete.unlink()
+
             # Construir comandos (aplicando filtro si corresponde)
             lines_cmds = [
                 (0, 0, {
-                    'commission_entry_id': e.id,  # <-- solo esto
+                    'commission_entry_id': e.id,
                 })
                 for e in entries_to_keep.sorted(lambda r: (r.invoice_date or fields.Date.today(), r.id))
             ]
 
             if w.report_paid_filter == 'paid':
                 lines_cmds = [cmd for cmd in lines_cmds if cmd and cmd[2] and
-                            w.env['mechanic.commission.entry'].browse(cmd[2]['commission_entry_id']).is_paid]
+                              w.env['mechanic.commission.entry'].browse(cmd[2]['commission_entry_id']).is_paid]
             elif w.report_paid_filter == 'unpaid':
                 lines_cmds = [cmd for cmd in lines_cmds if cmd and cmd[2] and
-                            not w.env['mechanic.commission.entry'].browse(cmd[2]['commission_entry_id']).is_paid]
+                              not w.env['mechanic.commission.entry'].browse(cmd[2]['commission_entry_id']).is_paid]
 
             w.line_ids = [(5, 0, 0)] + lines_cmds
-
-        # No llamamos _compute_totals aquí; el cliente lo pedirá al reabrir el form
 
     @api.onchange('report_paid_filter')
     def _onchange_report_paid_filter(self):

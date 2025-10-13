@@ -25,7 +25,7 @@
 
                     <!-- Detalle -->
                     <notebook>
-                        <page string="Detalle de líneas facturadas (pagadas)">
+                        <page string="Detalle de líneas facturadas (activas)">
                             <field name="line_ids" nolabel="1"
                                 context="{'no_open': 1}"
                                 options="{'no_create': True}">
