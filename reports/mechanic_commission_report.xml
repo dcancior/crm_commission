@@ -21,7 +21,7 @@
       <field name="report_name">crm_commission.mechanic_commission_report_template</field>
       <field name="report_file">crm_commission.mechanic_commission_report_template</field>
       <field name="print_report_name" eval="False"/>
-      <!-- Si quieres restringir por grupo, descomenta:
+      <!-- Para restringir por grupo, si lo deseas:
       <field name="groups_id" eval="[(4, ref('crm_commission.group_mechanic_commission_view'))]"/>
       -->
     </record>
@@ -34,17 +34,27 @@
 
             <!-- Encabezado -->
             <h2 class="text-center">Comisiones de Mecánico</h2>
+
+            <!-- Variable de moneda disponible en todo el template -->
+            <t t-set="currency_id" t-value="object and (object.currency_id or object.env.company.currency_id) or None"/>
+
             <div class="row mt16 mb8">
               <div class="col-6">
                 <p>
                   <b>Mecánico:</b>
-                  <t t-esc="employee_name or (object.employee_id.name if object and hasattr(object,'employee_id') and object.employee_id else '')"/>
+                  <t t-esc="employee_name or (object and object.employee_id and object.employee_id.name) or ''"/>
                 </p>
               </div>
               <div class="col-6 text-right">
                 <p>
                   <b>Periodo:</b>
-                  <t t-esc="month_name or str(month or '')"/> <t t-esc="year or ''"/>
+                  <!-- Usar period_label (enviado por el wizard). Si no viene, mostrar date_from → date_to -->
+                  <t t-if="period_label">
+                    <t t-esc="period_label"/>
+                  </t>
+                  <t t-else="">
+                    <t t-esc="(date_from or '')"/> &rarr; <t t-esc="(date_to or '')"/>
+                  </t>
                 </p>
               </div>
             </div>
@@ -85,7 +95,6 @@
                     <td class="text-right"><t t-esc="'%.2f' % qty_val"/></td>
 
                     <!-- Costo/Hora -->
-                    
                     <t t-set="cph_raw" t-value="l.get('cost_per_hour') or 0.0"/>
                     <t t-set="cph_val" t-value="float(cph_raw) if not isinstance(cph_raw, str) else float((cph_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
                     <td class="text-right"><t t-esc="'%.2f' % cph_val"/></td>
@@ -98,7 +107,6 @@
                     <!-- Pago Mecánico -->
                     <t t-set="payout_raw" t-value="l.get('payout') or 0.0"/>
                     <t t-set="payout_val" t-value="float(payout_raw) if not isinstance(payout_raw, str) else float((payout_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
-                    
                     <td class="text-right">
                       <t t-if="currency_id">
                         <t t-esc="format_amount(payout_val, currency_id)"/>
@@ -107,6 +115,7 @@
                         <t t-esc="'%.2f' % payout_val"/>
                       </t>
                     </td>
+
                     <td class="text-center"><t t-esc="l.get('paid_date') or ''"/></td>
                   </tr>
                 </t>
@@ -114,7 +123,7 @@
                 <!-- Sin líneas -->
                 <t t-if="not (lines and len(lines))">
                   <tr>
-                    <td colspan="7" class="text-center text-muted">Sin registros</td>
+                    <td colspan="8" class="text-center text-muted">Sin registros</td>
                   </tr>
                 </t>
               </tbody>
@@ -135,7 +144,11 @@
                   </tr>
                   <tr>
                     <td><b>Horas totales</b></td>
-                    <td class="text-right"><t t-esc="'%.2f' % (float(total_hours or 0.0) if not isinstance(total_hours, str) else float((total_hours or '0').replace('$','').replace(',','').replace(' ','')))"/></td>
+                    <td class="text-right">
+                      <t t-set="th_raw" t-value="total_hours or 0.0"/>
+                      <t t-set="th_val" t-value="float(th_raw) if not isinstance(th_raw, str) else float((th_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
+                      <t t-esc="'%.2f' % th_val"/>
+                    </td>
                   </tr>
                   <tr>
                     <td><b>Importe facturado (cliente)</b></td>

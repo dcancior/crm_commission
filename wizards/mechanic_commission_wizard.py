@@ -9,40 +9,38 @@
 # ╚══════════════════════════════════════════════════════════════════╝
 
 from odoo import models, fields, api
+from odoo.exceptions import ValidationError
 from datetime import datetime
 import calendar
 import re  # para _get_report_base_filename
 
-MONTHS = [
-    ('01', 'Enero'), ('02', 'Febrero'), ('03', 'Marzo'), ('04', 'Abril'),
-    ('05', 'Mayo'), ('06', 'Junio'), ('07', 'Julio'), ('08', 'Agosto'),
-    ('09', 'Septiembre'), ('10', 'Octubre'), ('11', 'Noviembre'), ('12', 'Diciembre')
-]
 
 class MechanicCommissionWizard(models.TransientModel):
     _name = "mechanic.commission.wizard"
-    _description = "Wizard: Comisiones de mecánicos por mes (facturas activas)"
+    _description = "Wizard: Comisiones de mecánicos por rango de fechas (facturas activas)"
 
+    # === Filtros ===
     employee_id = fields.Many2one(
         "hr.employee",
         string="Mecánico",
         required=True,
     )
-    month = fields.Selection(
-        MONTHS,
-        string="Mes",
-        required=True,
-        default=lambda self: datetime.now().strftime("%m"),
-    )
-    month_name = fields.Char(string="Mes (nombre)", compute="_compute_month_name", store=False)
 
-    year = fields.Selection(
-        [(str(y), str(y)) for y in range(datetime.now().year, datetime.now().year - 10, -1)],
-        string="Año",
-        required=True,
-        default=lambda self: str(datetime.now().year),
-    )
+    # >>> RANGO DE FECHAS (reemplaza month/year)
+    def _default_date_from(self):
+        today = fields.Date.context_today(self)
+        # today es datetime.date; llevamos al primer día del mes actual
+        return today.replace(day=1)
 
+    def _default_date_to(self):
+        today = fields.Date.context_today(self)
+        last_day = calendar.monthrange(today.year, today.month)[1]
+        return today.replace(day=last_day)
+
+    date_from = fields.Date(string="Desde", required=True, default=_default_date_from)
+    date_to = fields.Date(string="Hasta", required=True, default=_default_date_to)
+
+    # === KPIs ===
     services_count = fields.Integer(
         string="Servicios (líneas)",
         compute="_compute_totals",
@@ -92,6 +90,13 @@ class MechanicCommissionWizard(models.TransientModel):
         string="Filtrar para PDF",
         default='all',
     )
+
+    # --- Validaciones de rango ---
+    @api.constrains('date_from', 'date_to')
+    def _check_dates(self):
+        for w in self:
+            if w.date_from and w.date_to and w.date_from > w.date_to:
+                raise ValidationError("La fecha 'Desde' no puede ser posterior a la fecha 'Hasta'.")
 
     # --- PERSISTENCIA de lo editado en líneas (forma de pago, pagado, metadata) ---
     def _inverse_line_ids(self):
@@ -168,32 +173,29 @@ class MechanicCommissionWizard(models.TransientModel):
             else:
                 w.allowed_user_ids = self.env['res.users'].browse([])
 
-    # >>>>>> Calcula KPIs leyendo mechanic.commission.entry (robusto) y respeta el filtro <<<<<<
+    # >>>>>> Calcula KPIs leyendo mechanic.commission.entry y respeta el filtro <<<<<<
     @api.depends(
-        'employee_id', 'month', 'year', 'report_paid_filter',
+        'employee_id', 'date_from', 'date_to', 'report_paid_filter',
         'line_ids', 'line_ids.is_paid', 'line_ids.pago_comision'
     )
     def _compute_totals(self):
         Entry = self.env['mechanic.commission.entry']
         for w in self:
-            if not (w.employee_id and w.month and w.year):
+            if not (w.employee_id and w.date_from and w.date_to):
                 w.services_count = 0
                 w.total_hours = 0.0
                 w.payout_total = 0.0
                 w.amount_invoiced = 0.0
                 continue
 
-            year = int(w.year)
-            month = int(w.month)
-            last_day = calendar.monthrange(year, month)[1]
-            date_start = f"{year}-{str(month).zfill(2)}-01"
-            date_end = f"{year}-{str(month).zfill(2)}-{last_day}"
+            date_start = fields.Date.to_string(w.date_from)
+            date_end = fields.Date.to_string(w.date_to)
 
             dom = [
                 ('employee_id', '=', w.employee_id.id),
                 ('invoice_date', '>=', date_start),
                 ('invoice_date', '<=', date_end),
-                ('invoice_id.state', '=', 'posted'),  # >>> CAMBIO: solo activas
+                ('invoice_id.state', '=', 'posted'),  # solo activas
             ]
             entries = Entry.search(dom)
 
@@ -248,13 +250,22 @@ class MechanicCommissionWizard(models.TransientModel):
             "paid_date": fields.Datetime.to_string(l.paid_date) if l.paid_date else "",
         } for l in line_records]
 
-        month_name = dict(self.fields_get(allfields=["month"])["month"]["selection"]).get(self.month, "") or ""
+        # Etiqueta de periodo para el reporte
+        date_from_txt = fields.Date.to_string(self.date_from) if self.date_from else ""
+        date_to_txt = fields.Date.to_string(self.date_to) if self.date_to else ""
+        period_label = f"{date_from_txt} → {date_to_txt}".strip()
 
         data = {
             "employee_name": self.employee_id.name or "",
-            "month": self.month or "",
-            "month_name": month_name,
-            "year": self.year or "",
+            # Compatibilidad previa: dejamos claves antiguas vacías por si el QWeb aún las referencia
+            "month": "",
+            "month_name": "",
+            "year": "",
+            # Nuevas claves de periodo
+            "date_from": date_from_txt,
+            "date_to": date_to_txt,
+            "period_label": period_label,
+            # KPIs
             "services_count": int(services_count_pdf or 0),
             "total_hours": _num(total_hours_pdf, 2),
             "amount_invoiced": _money(amount_invoiced_pdf),
@@ -263,29 +274,20 @@ class MechanicCommissionWizard(models.TransientModel):
         }
         return self.env.ref('crm_commission.action_mechanic_commission_report').report_action(self, data=data)
 
-    @api.depends("month")
-    def _compute_month_name(self):
-        sel = dict(MONTHS)
-        for w in self:
-            w.month_name = sel.get(w.month or "", "")
-
     # ÚNICO lugar que construye line_ids (blindado y por registro)
-    @api.onchange('employee_id', 'month', 'year')
+    @api.onchange('employee_id', 'date_from', 'date_to')
     def _onchange_build_lines(self):
         for w in self:
             lines_cmds = []
 
-            if not (w.employee_id and w.month and w.year):
+            if not (w.employee_id and w.date_from and w.date_to):
                 w.line_ids = [(5, 0, 0)]
                 continue
 
-            year = int(w.year)
-            month = int(w.month)
-            last_day = calendar.monthrange(year, month)[1]
-            date_start = f"{year}-{str(month).zfill(2)}-01"
-            date_end = f"{year}-{str(month).zfill(2)}-{last_day}"
+            date_start = fields.Date.to_string(w.date_from)
+            date_end = fields.Date.to_string(w.date_to)
 
-            # FACTURAS DEL CLIENTE ACTIVAS (posteadas), sin importar si están pagadas o no  # >>> CAMBIO
+            # FACTURAS DEL CLIENTE ACTIVAS (posteadas), dentro del rango
             moves = w.env['account.move'].search([
                 ('move_type', '=', 'out_invoice'),
                 ('state', '=', 'posted'),  # activas; canceladas no pasan este filtro
@@ -306,7 +308,7 @@ class MechanicCommissionWizard(models.TransientModel):
             for line in inv_lines:
                 tmpl = line.product_id.product_tmpl_id
 
-                # Compatibilidad doble: primero intenta mechanic_*, si no existe usa service_*  # >>> CAMBIO
+                # Compatibilidad doble: primero intenta mechanic_*, si no existe usa service_*
                 cph = getattr(tmpl, 'mechanic_cost_per_hour', None)
                 if cph in (None, False):
                     cph = getattr(tmpl, 'service_cost_per_hour', 0.0)
@@ -321,13 +323,17 @@ class MechanicCommissionWizard(models.TransientModel):
                 hrs = hrs_req * qty
                 payout = cph * hrs
 
+                invoice_dt = line.move_id.invoice_date or fields.Date.context_today(w)
+                month_text = str(invoice_dt.month).zfill(2)
+                year_text = str(invoice_dt.year)
+
                 vals_base = {
                     'company_id': w.env.company.id,
                     'employee_id': w.employee_id.id,
                     'invoice_id': line.move_id.id,
                     'invoice_line_id': line.id,
                     'invoice_name': f'{line.move_id.name or line.move_id.payment_reference or ""} - {line.move_id.partner_id.display_name}',
-                    'invoice_date': line.move_id.invoice_date,
+                    'invoice_date': invoice_dt,
                     'product_id': line.product_id.id,
                     'product_name': line.product_id.display_name,
                     'quantity': qty,
@@ -336,8 +342,9 @@ class MechanicCommissionWizard(models.TransientModel):
                     'payout': payout,
                     'cost_per_hour': cph,
                     'currency_id': line.currency_id.id or w.env.company.currency_id.id,
-                    'month': str(month).zfill(2),
-                    'year': str(year),
+                    # Compatibilidad con otros reportes ya existentes:
+                    'month': month_text,
+                    'year': year_text,
                 }
 
                 entry = Entry.search([
@@ -351,11 +358,11 @@ class MechanicCommissionWizard(models.TransientModel):
 
                 entries_to_keep |= entry
 
-            # Limpieza: elimina entradas del periodo que ya no aplican (p.ej., factura cancelada)  # >>> CAMBIO RECOMENDADO
+            # Limpieza: elimina entradas del rango que ya no aplican (p.ej., factura cancelada)
             obsolete = Entry.search([
                 ('employee_id', '=', w.employee_id.id),
-                ('month', '=', str(month).zfill(2)),
-                ('year', '=', str(year)),
+                ('invoice_date', '>=', date_start),
+                ('invoice_date', '<=', date_end),
                 ('id', 'not in', entries_to_keep.ids),
             ])
             if obsolete:
@@ -414,7 +421,10 @@ class MechanicCommissionWizard(models.TransientModel):
         mech_safe = re.sub(r'[\\/*?:"<>|]', '-', mech)
         dt_local = fields.Datetime.context_timestamp(self, fields.Datetime.now())
         stamp = dt_local.strftime('%Y-%m-%d %H-%M')
-        return f"Reporte de comisiones ({mech_safe}) {stamp}"
+        # Añadimos el rango en el nombre para ubicar rápido el archivo
+        date_from_txt = fields.Date.to_string(self.date_from) if self.date_from else ""
+        date_to_txt = fields.Date.to_string(self.date_to) if self.date_to else ""
+        return f"Reporte de comisiones ({mech_safe}) {date_from_txt} a {date_to_txt} - {stamp}"
 
 
 class MechanicCommissionWizardLine(models.TransientModel):
@@ -424,7 +434,7 @@ class MechanicCommissionWizardLine(models.TransientModel):
     wizard_id = fields.Many2one('mechanic.commission.wizard', required=True, ondelete='cascade')
     commission_entry_id = fields.Many2one('mechanic.commission.entry', required=True, ondelete='cascade')
 
-    ## Copias para visualización -> AHORA RELATED
+    ## Copias para visualización -> RELATED
     invoice_name = fields.Char(related='commission_entry_id.invoice_name', readonly=True)
     invoice_date = fields.Date(related='commission_entry_id.invoice_date', readonly=True)
     product_name = fields.Char(related='commission_entry_id.product_name', readonly=True)
@@ -433,12 +443,11 @@ class MechanicCommissionWizardLine(models.TransientModel):
     subtotal_customer = fields.Monetary(related='commission_entry_id.subtotal_customer',
                                         currency_field='currency_id', readonly=True)
     payout = fields.Monetary(related='commission_entry_id.payout',
-                            currency_field='currency_id', readonly=True)
+                             currency_field='currency_id', readonly=True)
 
     # Usa la moneda de la entrada (más correcto que la del wizard)
     currency_id = fields.Many2one(related='commission_entry_id.currency_id', readonly=True)
 
-    # Ya la tienes related; la dejamos igual
     cost_per_hour = fields.Monetary(
         string='Costo por hora',
         readonly=True,
