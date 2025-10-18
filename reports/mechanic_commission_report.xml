@@ -1,184 +1,126 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!--
-╔════════════════════════════════════════════════════════════════════╗
-║  DCR INFORMATIC SERVICES SAS DE CV                                 ║
-║  Web: https://www.dcrsoluciones.com                                ║
-║  Contacto: info@dcrsoluciones.com                                  ║
-║                                                                    ║
-║  Este módulo está bajo licencia (LGPLv3).                          ║
-║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html     ║
-╚════════════════════════════════════════════════════════════════════╝
--->
-
 <odoo>
-  <data>
+    <record id="view_mechanic_commission_wizard_form" model="ir.ui.view">
+        <field name="name">mechanic.commission.wizard.form</field>
+        <field name="model">mechanic.commission.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Reporte de comisiones de mecánicos (por rango)">
+                <sheet>
+                    <!-- Filtros -->
+                    <group col="4">
+                        <field name="employee_id"
+                               options="{'no_create_edit': True}"
+                               domain="[('active','=',True), ('job_id.name','ilike','Mecán')]"/>
+                        <!-- RANGO DE FECHAS (reemplaza month/year) -->
+                        <field name="date_from" required="1"/>
+                        <field name="date_to" required="1"/>
+                        <field name="report_paid_filter"/>
+                    </group>
 
-    <!-- ACCIÓN DEL REPORTE -->
-    <record id="action_mechanic_commission_report" model="ir.actions.report">
-      <field name="name">Reporte de comisiones de mecánico</field>
-      <field name="model">mechanic.commission.wizard</field>
-      <field name="report_type">qweb-pdf</field>
-      <field name="report_name">crm_commission.mechanic_commission_report_template</field>
-      <field name="report_file">crm_commission.mechanic_commission_report_template</field>
-      <field name="print_report_name" eval="False"/>
-      <!-- Para restringir por grupo, si lo deseas:
-      <field name="groups_id" eval="[(4, ref('crm_commission.group_mechanic_commission_view'))]"/>
-      -->
+                    <!-- KPIs -->
+                    <group col="4">
+                        <field name="services_count" readonly="1"/>
+                        <field name="total_hours" readonly="1"/>
+                        <field name="amount_invoiced" readonly="1"/>
+                        <field name="payout_total" readonly="1"/>
+                    </group>
+
+                    <!-- Detalle -->
+                    <notebook>
+                        <page string="Detalle de líneas facturadas (activas)">
+                            <field name="line_ids" nolabel="1"
+                                   context="{'no_open': 1}"
+                                   options="{'no_create': True}">
+                                <tree editable="bottom" create="0" edit="0" delete="0">
+                                    <!-- columnas -->
+                                    <field name="invoice_name" readonly="1"/>
+                                    <field name="product_name" readonly="1"/>
+                                    <field name="hours" readonly="1"/>
+                                    <field name="payout" readonly="1"/>
+                                    <!-- Estado de pago (editable) -->
+                                    <field name="is_paid"/>
+                                    <!-- Forma de pago (editable) -->
+                                    <field name="pago_comision"/>
+                                    <field name="quantity" readonly="1"/>
+                                    <field name="cost_per_hour" readonly="1"/>
+                                    <field name="paid_date" readonly="1"/>
+                                    <field name="paid_by" readonly="1"/>
+                                </tree>
+
+                                <!-- Subform cuando (por cualquier razón) se intente abrir la línea -->
+                                <form string="Detalle de comisión">
+                                    <group>
+                                        <field name="wizard_id" invisible="1"/>
+                                        <field name="commission_entry_id" invisible="1"/>
+
+                                        <field name="invoice_name" readonly="1"/>
+                                        <field name="invoice_date" readonly="1"/>
+                                        <field name="product_name" readonly="1"/>
+                                        <field name="quantity" readonly="1"/>
+                                        <field name="hours" readonly="1"/>
+                                        <field name="subtotal_customer" readonly="1"/>
+                                        <field name="payout" readonly="1"/>
+                                        <field name="cost_per_hour" readonly="1"/>
+
+                                        <field name="is_paid" readonly="1"/>
+                                        <field name="pago_comision"/>
+
+                                        <field name="paid_date" readonly="1"/>
+                                        <field name="paid_by" readonly="1"/>
+                                    </group>
+                                </form>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+
+                <footer>
+                    <button name="action_save_lines" type="object" string="Guardar cambios" class="oe_highlight"/>
+                    <button name="action_mark_all_paid" type="object" string="Marcar todas como pagadas" class="oe_highlight"/>
+                    <button string="Cerrar" special="cancel"/>
+                    <button name="action_print_pdf" type="object" string="Descargar PDF"/>
+                </footer>
+            </form>
+        </field>
     </record>
 
-    <!-- TEMPLATE QWEB -->
-    <template id="mechanic_commission_report_template" name="Mechanic Commission Report">
-      <t t-call="web.html_container">
-        <t t-call="web.external_layout">
-          <div class="page">
+    <act_window id="action_mechanic_commission_wizard"
+                name="Reporte de Comisiones (Mecánicos)"
+                res_model="mechanic.commission.wizard"
+                view_mode="form"
+                target="new"/>
 
-            <!-- Encabezado -->
-            <h2 class="text-center">Comisiones de Mecánico</h2>
+    <menuitem id="menu_mechanic_commission_root"
+              name="Comisiones Mecánicos"
+              sequence="100"
+              groups="crm_commission.group_mechanic_commission_view"
+              web_icon="crm_commission,static/description/icon_mechanic.svg"/>
 
-            <!-- Variable de moneda disponible en todo el template -->
-            <t t-set="currency_id" t-value="object and (object.currency_id or object.env.company.currency_id) or None"/>
+    <menuitem id="menu_mechanic_commission_report"
+              name="Reporte por rango"
+              parent="menu_mechanic_commission_root"
+              action="action_mechanic_commission_wizard"
+              sequence="10"
+              groups="crm_commission.group_mechanic_commission_view"/>
 
-            <div class="row mt16 mb8">
-              <div class="col-6">
-                <p>
-                  <b>Mecánico:</b>
-                  <t t-esc="employee_name or (object and object.employee_id and object.employee_id.name) or ''"/>
-                </p>
-              </div>
-              <div class="col-6 text-right">
-                <p>
-                  <b>Periodo:</b>
-                  <!-- Usar period_label (enviado por el wizard). Si no viene, mostrar date_from → date_to -->
-                  <t t-if="period_label">
-                    <t t-esc="period_label"/>
-                  </t>
-                  <t t-else="">
-                    <t t-esc="(date_from or '')"/> → <t t-esc="(date_to or '')"/>
-                  </t>
-                </p>
-              </div>
-            </div>
-
-            <!-- Tabla de líneas -->
-            <table class="table table-sm table-striped o_main_table">
-              <thead>
-                <tr>
-                  <th class="text-center">Estado</th>
-                  <th>Factura</th>
-                  <th>Servicio</th>
-                  <th class="text-right">Cantidad</th>
-                  <th class="text-right">Costo/Hora</th>
-                  <th class="text-right">Horas</th>
-                  <th class="text-right">Pago Mecánico</th>
-                  <th class="text-center">Fecha pago</th>
-                </tr>
-              </thead>
-              <tbody>
-                <t t-foreach="lines or []" t-as="l">
-                  <tr>
-                    <!-- Estado -->
-                    <td class="text-center">
-                      <t t-if="l.get('is_paid')">
-                        <span>Pagada</span>
-                      </t>
-                      <t t-else="">
-                        <span>No pagada</span>
-                      </t>
-                    </td>
-
-                    <td><t t-esc="l.get('invoice_name') or ''"/></td>
-                    <td><t t-esc="l.get('product_name') or ''"/></td>
-
-                    <!-- Cantidad -->
-                    <t t-set="qty_raw" t-value="l.get('quantity') or 0.0"/>
-                    <t t-set="qty_val" t-value="float(qty_raw) if not isinstance(qty_raw, str) else float((qty_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
-                    <td class="text-right"><t t-esc="'%.2f' % qty_val"/></td>
-
-                    <!-- Costo/Hora -->
-                    <t t-set="cph_raw" t-value="l.get('cost_per_hour') or 0.0"/>
-                    <t t-set="cph_val" t-value="float(cph_raw) if not isinstance(cph_raw, str) else float((cph_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
-                    <td class="text-right"><t t-esc="'%.2f' % cph_val"/></td>
-
-                    <!-- Horas -->
-                    <t t-set="hrs_raw" t-value="l.get('hours') or 0.0"/>
-                    <t t-set="hrs_val" t-value="float(hrs_raw) if not isinstance(hrs_raw, str) else float((hrs_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
-                    <td class="text-right"><t t-esc="'%.2f' % hrs_val"/></td>
-
-                    <!-- Pago Mecánico -->
-                    <t t-set="payout_raw" t-value="l.get('payout') or 0.0"/>
-                    <t t-set="payout_val" t-value="float(payout_raw) if not isinstance(payout_raw, str) else float((payout_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
-                    <td class="text-right">
-                      <t t-if="currency_id">
-                        <t t-esc="format_amount(payout_val, currency_id)"/>
-                      </t>
-                      <t t-else="">
-                        <t t-esc="'%.2f' % payout_val"/>
-                      </t>
-                    </td>
-
-                    <td class="text-center"><t t-esc="l.get('paid_date') or ''"/></td>
-                  </tr>
-                </t>
-
-                <!-- Sin líneas -->
-                <t t-if="not (lines and len(lines))">
-                  <tr>
-                    <td colspan="8" class="text-center text-muted">Sin registros</td>
-                  </tr>
-                </t>
-              </tbody>
-            </table>
-
-            <!-- Totales (sanear por si llegan como texto con $) -->
-            <t t-set="ai_raw" t-value="amount_invoiced or 0.0"/>
-            <t t-set="ai_val" t-value="float(ai_raw) if not isinstance(ai_raw, str) else float((ai_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
-            <t t-set="pt_raw" t-value="payout_total or 0.0"/>
-            <t t-set="pt_val" t-value="float(pt_raw) if not isinstance(pt_raw, str) else float((pt_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
-
-            <div class="mt16">
-              <table class="table table-sm" style="width:60%; margin-left:auto;">
-                <tbody>
-                  <tr>
-                    <td><b>Servicios</b></td>
-                    <td class="text-right"><t t-esc="services_count or 0"/></td>
-                  </tr>
-                  <tr>
-                    <td><b>Horas totales</b></td>
-                    <td class="text-right">
-                      <t t-set="th_raw" t-value="total_hours or 0.0"/>
-                      <t t-set="th_val" t-value="float(th_raw) if not isinstance(th_raw, str) else float((th_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
-                      <t t-esc="'%.2f' % th_val"/>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td><b>Importe facturado (cliente)</b></td>
-                    <td class="text-right">
-                      <t t-if="currency_id">
-                        <t t-esc="format_amount(ai_val, currency_id)"/>
-                      </t>
-                      <t t-else="">
-                        <t t-esc="'%.2f' % ai_val"/>
-                      </t>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td><b>Total a pagar al mecánico</b></td>
-                    <td class="text-right">
-                      <t t-if="currency_id">
-                        <t t-esc="format_amount(pt_val, currency_id)"/>
-                      </t>
-                      <t t-else="">
-                        <t t-esc="'%.2f' % pt_val"/>
-                      </t>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-          </div>
-        </t>
-      </t>
-    </template>
-  </data>
+    <!-- Wizard de pago masivo (sin cambios) -->
+    <record id="view_mechanic_commission_mass_pay_wizard_form" model="ir.ui.view">
+        <field name="name">mechanic.commission.mass.pay.wizard.form</field>
+        <field name="model">mechanic.commission.mass.pay.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Marcar como pagadas">
+                <group>
+                    <field name="pago_comision" required="1"/>
+                    <field name="paid_date"/>
+                    <field name="pay_note"/>
+                </group>
+                <group>
+                    <field name="entry_ids" widget="many2many_tags" options="{'no_open': True, 'no_create': True}"/>
+                </group>
+                <footer>
+                    <button name="action_confirm" type="object" string="Aplicar" class="oe_highlight"/>
+                    <button string="Cancelar" special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
 </odoo>
