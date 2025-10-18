@@ -53,7 +53,7 @@
                     <t t-esc="period_label"/>
                   </t>
                   <t t-else="">
-                    <t t-esc="(date_from or '')"/> &rarr; <t t-esc="(date_to or '')"/>
+                    <t t-esc="(date_from or '')"/> → <t t-esc="(date_to or '')"/>
                   </t>
                 </p>
               </div>
