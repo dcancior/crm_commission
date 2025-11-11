@@ -94,7 +94,8 @@
             </thead>
 
             <tbody>
-              <t t-if="invoice_lines && len(invoice_lines)">
+              <!-- IMPORTANTE: usar 'and' (Python) en lugar de '&&' -->
+              <t t-if="invoice_lines and len(invoice_lines)">
                 <t t-foreach="invoice_lines" t-as="l">
                   <tr>
                     <td class="col-paid"><t t-esc="l.get('commission_paid')"/></td>
