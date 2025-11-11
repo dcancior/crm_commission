@@ -66,46 +66,44 @@
           <h3 class="mt16">Detalle de Facturas</h3>
 
           <table class="table table-sm o_main_table commission-table">
-            <!-- Control fino de anchos de columna -->
+            <!-- Control fino de anchos de columna (9 columnas) -->
             <colgroup>
-              <!-- Ajusta si cambias el orden de columnas -->
-              <col style="width: 8%;" />   <!-- Comisión pagada -->
-              <col style="width: 14%;" />  <!-- # Factura -->
-              <col style="width: 22%;" />  <!-- Cliente (más angosta) -->
-              <col style="width: 10%;" />  <!-- Método -->
-              <col style="width: 14%;" />  <!-- Fecha/Hora pago -->
-              <col style="width: 16%;" />  <!-- Total sin IVA (más ancho) -->
-              <col style="width: 16%;" />  <!-- Comisión (más ancho) -->
+              <col style="width: 7%;" />   <!-- Comisión pagada -->
+              <col style="width: 12%;" />  <!-- # Factura -->
+              <col style="width: 10%;" />  <!-- Fecha Factura -->
+              <col style="width: 10%;" />  <!-- Fecha pago factura (cliente) -->
+              <col style="width: 18%;" />  <!-- Cliente -->
+              <col style="width: 10%;" />  <!-- Método (comisión) -->
+              <col style="width: 10%;" />  <!-- Fecha pago comisión -->
+              <col style="width: 11%;" />  <!-- Total sin IVA -->
+              <col style="width: 12%;" />  <!-- Comisión -->
             </colgroup>
 
             <thead>
               <tr>
                 <th>Comisión pagada</th>
                 <th># Factura</th>
-                <!-- <th>Fecha</th> -->
+                <th>Fecha Factura</th>
+                <th>Fecha pago factura</th> <!-- cliente -->
                 <th>Cliente</th>
-                <!-- <th class="text-right">% Com.</th> -->
-                <th>Método</th>
-                <th>Fecha/Hora pago</th>
-                <!-- <th>Registró</th> -->
+                <th>Método</th> <!-- método de pago de la comisión -->
+                <th>Fecha pago comisión</th>
                 <th class="text-right">Total sin IVA</th>
                 <th class="text-right">Comisión</th>
               </tr>
             </thead>
 
             <tbody>
-              <t t-if="invoice_lines and len(invoice_lines)">
+              <t t-if="invoice_lines && len(invoice_lines)">
                 <t t-foreach="invoice_lines" t-as="l">
                   <tr>
                     <td class="col-paid"><t t-esc="l.get('commission_paid')"/></td>
                     <td><t t-esc="l.get('number')"/></td>
-                    <!-- <td><t t-esc="l.get('date')"/></td> -->
+                    <td><t t-esc="l.get('date')"/></td> <!-- fecha de la factura -->
+                    <td><t t-esc="l.get('invoice_payment_date')"/></td> <!-- fecha de pago de la factura (cliente) -->
                     <td class="col-partner"><t t-esc="l.get('partner')"/></td>
-                    <!-- <td class="text-right"><t t-esc="l.get('commission_percent_str') or l.get('commission_percent')"/></td> -->
                     <td><t t-esc="l.get('pay_method')"/></td>
-                    <!-- <td><t t-esc="l.get('pay_datetime')"/></td> -->
-                    <td><t t-esc="(l.get('pay_datetime') or '').split(' ')[0]"/></td> <!-- Solo muestra la fecha, no la hora -->
-                    <!-- <td><t t-esc="l.get('pay_user')"/></td> -->
+                    <td><t t-esc="(l.get('pay_datetime') or '').split(' ')[0]"/></td> <!-- solo la fecha de la comisión -->
                     <td class="text-right col-amount">
                       <t t-esc="l.get('amount_untaxed_str') or l.get('amount_untaxed')"/>
                     </td>
@@ -117,8 +115,8 @@
               </t>
               <t t-else="">
                 <tr>
-                  <!-- 7 columnas visibles -->
-                  <td colspan="7" class="text-center text-muted">
+                  <!-- 9 columnas visibles -->
+                  <td colspan="9" class="text-center text-muted">
                     No hay facturas en el periodo/filtro seleccionado.
                   </td>
                 </tr>
@@ -127,8 +125,8 @@
 
             <tfoot>
               <tr>
-                <!-- Hay 7 columnas. Antes de los totales monetarios hay 5 -->
-                <th colspan="5" class="text-right">Totales</th>
+                <!-- 9 columnas; antes de los 2 totales monetarios hay 7 -->
+                <th colspan="7" class="text-right">Totales</th>
                 <th class="text-right col-amount">
                   <t t-esc="amount_total_str or amount_total"/>
                 </th>

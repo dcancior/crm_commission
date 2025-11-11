@@ -11,11 +11,14 @@
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError
 import base64
+import json  # ← NUEVO
+from datetime import datetime  # ← NUEVO
 
 PAYMENT_METHODS = [
     ('efectivo', 'Efectivo'),
     ('transferencia', 'Transferencia'),
 ]
+
 
 def _default_date_start(self):
     today = fields.Date.context_today(self)
@@ -23,6 +26,56 @@ def _default_date_start(self):
 
 def _default_date_end(self):
     return fields.Date.context_today(self)
+
+
+# ===================== Helper: fecha de pago del cliente =====================
+def get_invoice_payment_date(move):
+    """
+    Devuelve la fecha (date) en la que la factura quedó pagada por el cliente.
+    Estrategia:
+      1) Intenta leer del invoice_payments_widget (JSON).
+      2) Si no hay datos, recorre las conciliaciones parciales de las líneas
+         por cobrar/pagar y toma la fecha del asiento 'del otro lado'.
+    Retorna:
+      - date (objeto) si encuentra fechas
+      - False en caso contrario
+    """
+    # 1) Leer del widget de pagos (si existe y tiene contenido)
+    try:
+        widget = move.invoice_payments_widget
+        if widget:
+            info = json.loads(widget)
+            dates = []
+            for it in (info.get('content') or []):
+                ds = it.get('date')
+                if ds:
+                    # Normalmente viene como 'YYYY-MM-DD'
+                    try:
+                        dates.append(datetime.strptime(ds, "%Y-%m-%d").date())
+                    except Exception:
+                        # Si por alguna razón cambia el formato, ignoramos ese item
+                        pass
+            if dates:
+                return max(dates)
+    except Exception:
+        # Continuamos con el fallback
+        pass
+
+    # 2) Fallback: usar conciliaciones de líneas por cobrar/pagar
+    dates = []
+    receivable_lines = move.line_ids.filtered(
+        lambda l: getattr(l.account_id, 'internal_type', '') in ('receivable', 'payable')
+                  or getattr(l.account_id, 'account_type', '') in ('asset_receivable', 'liability_payable')
+    )
+    for line in receivable_lines:
+        # matched_debit_ids / matched_credit_ids están en account.move.line (partial reconcile)
+        partials = line.matched_debit_ids | line.matched_credit_ids
+        for pr in partials:
+            other_ml = pr.credit_move_id if pr.debit_move_id == line else pr.debit_move_id
+            if other_ml and other_ml.move_id and other_ml.move_id.date:
+                dates.append(other_ml.move_id.date)
+    return max(dates) if dates else False
+# ============================================================================
 
 
 class CommissionReportWizard(models.TransientModel):
@@ -231,6 +284,12 @@ class CommissionReportWizard(models.TransientModel):
         for m, entry in pairs:
             amount_total += (m.amount_untaxed or 0.0)
             commission_total += (m.commission_amount or 0.0)
+
+            # Fecha de pago del cliente (NUEVO)
+            inv_paid_date = get_invoice_payment_date(m)
+            inv_paid_date_str = inv_paid_date.strftime('%d/%m/%Y') if inv_paid_date else ''
+
+            # Fecha/hora del registro de pago de comisión (ya existente)
             pay_dt = ''
             if entry and entry.payment_datetime:
                 pay_dt = fields.Datetime.context_timestamp(self, entry.payment_datetime).strftime('%d/%m/%Y %H:%M:%S')
@@ -245,10 +304,15 @@ class CommissionReportWizard(models.TransientModel):
                 'commission_percent_str': f"{(m.commission_percent or 0.0):.2f}",
                 'commission_amount': m.commission_amount,
                 'commission_amount_str': money_str(m.commission_amount),
+
+                # Comisión (existente)
                 'pay_method': dict(PAYMENT_METHODS).get(entry.payment_method, '') if entry else '',
                 'pay_datetime': pay_dt,
                 'pay_user': entry.payment_user_id.name if entry and entry.payment_user_id else '',
                 'commission_paid': 'Sí' if entry and entry.payment_method else 'No',
+
+                # NUEVO: fecha de pago por el cliente
+                'invoice_payment_date': inv_paid_date_str,
             })
 
         ds = self.date_start.strftime('%d/%m/%Y') if self.date_start else ''
@@ -361,6 +425,13 @@ class CommissionReportWizardLine(models.TransientModel):
     currency_id = fields.Many2one(related='move_id.currency_id', store=False)
     payment_state = fields.Selection(related='move_id.payment_state', string='Estado Pago', store=False)
 
+    # NUEVO: fecha en que el cliente pagó la factura (la más reciente si hubo pagos parciales)
+    invoice_payment_date = fields.Date(
+        string='Fecha de pago (cliente)',
+        compute='_compute_invoice_payment_date',
+        store=False
+    )
+
     # Datos de pago (RELATED al entry)
     payment_method = fields.Selection(
         PAYMENT_METHODS, string='Forma de pago comisión',
@@ -375,6 +446,10 @@ class CommissionReportWizardLine(models.TransientModel):
             if line.payment_entry_id and line.payment_method:
                 line.payment_entry_id.payment_datetime = fields.Datetime.now()
                 line.payment_entry_id.payment_user_id = self.env.user
+
+    def _compute_invoice_payment_date(self):
+        for r in self:
+            r.invoice_payment_date = get_invoice_payment_date(r.move_id) if r.move_id else False
 
     @api.model_create_multi
     def create(self, vals_list):
