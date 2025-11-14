@@ -26,4 +26,23 @@
             </xpath>
         </field>
     </record>
+
+    
+
+    <record id="view_order_form_hide_name_column" model="ir.ui.view">
+        <field name="name">sale.order.form.hide.name.column</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+
+            <!-- Hacer que la columna "name" esté oculta por defecto,
+                 pero se pueda activar desde el selector de columnas -->
+            <xpath expr="//field[@name='order_line']/tree//field[@name='name']"
+                   position="attributes">
+                <attribute name="optional">hide</attribute>
+            </xpath>
+
+        </field>
+    </record>
+
 </odoo>
