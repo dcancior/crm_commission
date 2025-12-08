@@ -242,6 +242,8 @@ class MechanicCommissionWizard(models.TransientModel):
             "invoice_name": l.invoice_name or "",
             "invoice_date": l.invoice_date or "",
             "product_name": l.product_name or "",
+            "nombre_auto": l.nombre_auto.name if l.nombre_auto else "",
+            "color_auto": l.color_auto or "",
             "quantity": _num(l.quantity, 2),
             "cost_per_hour": _money(l.cost_per_hour),
             "hours": _num(l.hours, 2),

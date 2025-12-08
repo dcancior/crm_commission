@@ -63,6 +63,8 @@
                   <th class="text-center">Estado</th>
                   <th>Factura</th>
                   <th>Servicio</th>
+                  <th>Modelo</th>
+                  <th>Color</th>
                   <th class="text-right">Cantidad</th>
                   <th class="text-right">Costo/Hora</th>
                   <th class="text-right">Horas</th>
@@ -85,6 +87,8 @@
 
                     <td><t t-esc="l.get('invoice_name') or ''"/></td>
                     <td><t t-esc="l.get('product_name') or ''"/></td>
+                    <td><t t-esc="l.get('nombre_auto') or ''"/></td>
+                    <td><t t-esc="l.get('color_auto') or ''"/></td>
 
                     <!-- Cantidad -->
                     <t t-set="qty_raw" t-value="l.get('quantity') or 0.0"/>
@@ -120,7 +124,7 @@
                 <!-- Sin líneas -->
                 <t t-if="not (lines and len(lines))">
                   <tr>
-                    <td colspan="8" class="text-center text-muted">Sin registros</td>
+                    <td colspan="10" class="text-center text-muted">Sin registros</td>
                   </tr>
                 </t>
               </tbody>
