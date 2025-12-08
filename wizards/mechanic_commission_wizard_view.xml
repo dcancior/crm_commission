@@ -41,7 +41,7 @@
                                     <field name="color_auto" readonly="1" optional="show"/>
                                     <field name="quantity" readonly="1"/>
                                     <field name="hours" readonly="1"/>
-                                    <field name="cost_per_hour" readonly="1"/>
+                                    <field name="cost_per_hour" readonly="1" invisible="1"/>
                                     <field name="subtotal_customer" readonly="1" invisible="1"/>
                                     <field name="porcentaje_comision" readonly="1" invisible="1"/>
                                     <field name="payout" readonly="1"/>
@@ -49,9 +49,8 @@
                                     <field name="is_paid"/>
                                     <!-- Forma de pago (editable, visible solo si is_paid) -->
                                     <field name="pago_comision"/>
-                                    <field name="cost_per_hour" readonly="1"/>
-                                    <field name="paid_date" readonly="1"/>
-                                    <field name="paid_by" readonly="1"/>
+                                    <field name="paid_date" readonly="1" optional="hide"/>
+                                    <field name="paid_by" readonly="1" optional="hide"/>
                                 </tree>
 
                                 <!-- Subform cuando (por cualquier razón) se intente abrir la línea -->
