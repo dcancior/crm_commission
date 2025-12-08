@@ -472,8 +472,7 @@ class MechanicCommissionWizardLine(models.TransientModel):
     )
 
     # Campos del vehículo (relacionados)
-    marca_auto = fields.Many2one(
-        'car.brand',
+    marca_auto = fields.Char(
         string='Marca',
         related='commission_entry_id.marca_auto',
         readonly=True

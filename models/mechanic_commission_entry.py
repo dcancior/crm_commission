@@ -73,10 +73,9 @@ class MechanicCommissionEntry(models.Model):
         store=True,
         readonly=True,
     )
-    marca_auto = fields.Many2one(
-        'car.brand',
+    marca_auto = fields.Char(
         string='Marca',
-        related='car_id.nombre_auto.brand',
+        related='car_id.nombre_auto.brand.name',
         store=True,
         readonly=True,
     )
