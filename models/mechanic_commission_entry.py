@@ -33,6 +33,13 @@ class MechanicCommissionEntry(models.Model):
     hours = fields.Float(string='Horas', digits='Product Unit of Measure')
     # NUEVO: costo por hora (persistente)
     cost_per_hour = fields.Monetary(string='Costo por hora', currency_field='currency_id')
+    
+    # Porcentaje de comisión aplicado
+    porcentaje_comision = fields.Float(
+        string='% Comisión',
+        digits=(5, 2),
+        help='Porcentaje de comisión aplicado del producto'
+    )
 
     subtotal_customer = fields.Monetary(string='Subtotal al cliente', currency_field='currency_id')
     payout = fields.Monetary(string='Comisión del Mecánico', currency_field='currency_id')

@@ -471,6 +471,13 @@ class MechanicCommissionWizardLine(models.TransientModel):
         currency_field='currency_id',
         related='commission_entry_id.cost_per_hour'
     )
+    
+    porcentaje_comision = fields.Float(
+        string='% Comisión',
+        related='commission_entry_id.porcentaje_comision',
+        readonly=True,
+        digits=(5, 2)
+    )
 
     # Estado de pago (editable)
     is_paid = fields.Boolean(string='Pagado', related='commission_entry_id.is_paid', readonly=False)
