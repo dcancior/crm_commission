@@ -308,24 +308,34 @@ class MechanicCommissionWizard(models.TransientModel):
             for line in inv_lines:
                 tmpl = line.product_id.product_tmpl_id
 
-                # Compatibilidad doble: primero intenta mechanic_*, si no existe usa service_*
-                cph = getattr(tmpl, 'mechanic_cost_per_hour', None)
-                if cph in (None, False):
-                    cph = getattr(tmpl, 'service_cost_per_hour', 0.0)
-                cph = cph or 0.0
+                # Obtener porcentaje de comisión del producto
+                porcentaje = getattr(tmpl, 'porcentaje_comision_mecanico', 0.0) or 0.0
+                
+                # Calcular comisión basada en porcentaje
+                subtotal = line.price_subtotal or 0.0
+                commission = (subtotal * porcentaje) / 100.0
 
-                hrs_req = getattr(tmpl, 'mechanic_hours_required', None)
-                if hrs_req in (None, False):
-                    hrs_req = getattr(tmpl, 'service_hours_required', 0.0)
-                hrs_req = hrs_req or 0.0
-
-                qty = line.quantity or 0.0
-                hrs = hrs_req * qty
-                payout = cph * hrs
+                # Obtener orden de venta desde la línea de factura
+                sale_order = line.sale_line_ids.mapped('order_id')[:1] if line.sale_line_ids else False
+                
+                # Capturar información del vehículo desde sale.order.selected_car_id
+                car_id = False
+                marca_auto = False
+                nombre_auto = False
+                color_auto = False
+                
+                if sale_order and sale_order.selected_car_id:
+                    car = sale_order.selected_car_id
+                    car_id = car.id
+                    marca_auto = car.marca_auto if hasattr(car, 'marca_auto') else False
+                    nombre_auto = car.nombre_auto.id if hasattr(car, 'nombre_auto') and car.nombre_auto else False
+                    color_auto = car.color_auto if hasattr(car, 'color_auto') else False
 
                 invoice_dt = line.move_id.invoice_date or fields.Date.context_today(w)
                 month_text = str(invoice_dt.month).zfill(2)
                 year_text = str(invoice_dt.year)
+                
+                qty = line.quantity or 0.0
 
                 vals_base = {
                     'company_id': w.env.company.id,
@@ -337,14 +347,21 @@ class MechanicCommissionWizard(models.TransientModel):
                     'product_id': line.product_id.id,
                     'product_name': line.product_id.display_name,
                     'quantity': qty,
-                    'hours': hrs,
-                    'subtotal_customer': line.price_subtotal,
-                    'payout': payout,
-                    'cost_per_hour': cph,
+                    'porcentaje_comision': porcentaje,
+                    'subtotal_customer': subtotal,
+                    'payout': commission,
                     'currency_id': line.currency_id.id or w.env.company.currency_id.id,
+                    # Información del vehículo
+                    'car_id': car_id,
+                    'marca_auto': marca_auto,
+                    'nombre_auto': nombre_auto,
+                    'color_auto': color_auto,
                     # Compatibilidad con otros reportes ya existentes:
                     'month': month_text,
                     'year': year_text,
+                    # Campos legacy (mantenidos para compatibilidad)
+                    'hours': 0.0,
+                    'cost_per_hour': 0.0,
                 }
 
                 entry = Entry.search([
