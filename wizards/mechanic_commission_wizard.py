@@ -471,6 +471,25 @@ class MechanicCommissionWizardLine(models.TransientModel):
         store=False,
     )
 
+    # Campos del vehículo (relacionados)
+    marca_auto = fields.Many2one(
+        'car.brand',
+        string='Marca',
+        related='commission_entry_id.marca_auto',
+        readonly=True
+    )
+    nombre_auto = fields.Many2one(
+        'car.model',
+        string='Modelo',
+        related='commission_entry_id.nombre_auto',
+        readonly=True
+    )
+    color_auto = fields.Char(
+        string='Color',
+        related='commission_entry_id.color_auto',
+        readonly=True
+    )
+
     def write(self, vals):
         res = super().write(vals)
         for line in self:

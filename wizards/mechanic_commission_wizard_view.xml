@@ -33,8 +33,12 @@
                                 <tree editable="bottom" create="0" edit="0" delete="0">
                                     <!-- columnas -->
                                     <field name="invoice_name" readonly="1"/>
+                                    <field name="invoice_date" readonly="1"/>
                                     <field name="product_name" readonly="1"/>
-                                    <field name="hours" readonly="1"/>
+                                    <!-- Columnas del vehículo -->
+                                    <field name="marca_auto" readonly="1" optional="show"/>
+                                    <field name="nombre_auto" readonly="1" optional="show"/>
+                                    <field name="color_auto" readonly="1" optional="show"/>
                                     <field name="payout" readonly="1"/>
                                     <!-- Estado de pago (editable) -->
                                     <field name="is_paid"/>
@@ -57,6 +61,13 @@
                                         <field name="invoice_name" readonly="1"/>
                                         <field name="invoice_date" readonly="1"/>
                                         <field name="product_name" readonly="1"/>
+                                        
+                                        <!-- Información del Vehículo -->
+                                        <group string="Información del Vehículo" col="2">
+                                            <field name="marca_auto" readonly="1"/>
+                                            <field name="nombre_auto" readonly="1"/>
+                                            <field name="color_auto" readonly="1"/>
+                                        </group>
                                         <field name="quantity" readonly="1"/>
                                         <field name="hours" readonly="1"/>
                                         <field name="subtotal_customer" readonly="1"/>

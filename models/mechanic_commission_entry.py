@@ -54,6 +54,33 @@ class MechanicCommissionEntry(models.Model):
         string='Pago comisión'
     )
 
+    # Campos relacionados al vehículo
+    car_id = fields.Many2one(
+        'car',
+        string='Vehículo',
+        help='Vehículo asociado a la orden de venta',
+    )
+    nombre_auto = fields.Many2one(
+        'car.model',
+        string='Modelo del auto',
+        related='car_id.nombre_auto',
+        store=True,
+        readonly=True,
+    )
+    color_auto = fields.Char(
+        string='Color',
+        related='car_id.color_auto',
+        store=True,
+        readonly=True,
+    )
+    marca_auto = fields.Many2one(
+        'car.brand',
+        string='Marca',
+        related='car_id.nombre_auto.brand',
+        store=True,
+        readonly=True,
+    )
+
     _sql_constraints = [
         # Evita duplicados por misma línea de factura para el mismo mecánico
         ('uniq_employee_invoice_line',
