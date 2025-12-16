@@ -140,3 +140,39 @@ class SaleOrder(models.Model):
                 ) % details)
 
         return super().action_confirm()
+
+
+
+    @api.onchange('order_line')
+    def _onchange_order_line_propagate_mechanic(self):
+        """
+        Propaga el mecánico seleccionado en una línea de servicio
+        a las demás líneas de servicio del pedido.
+        """
+        for order in self:
+            # Buscar un mecánico "fuente"
+            source_line = next(
+                (
+                    line for line in order.order_line
+                    if line.mechanic_id
+                    and line.display_mechanic_fields
+                    and not line.mechanic_exempt
+                    and not line.mechanic_is_placeholder
+                ),
+                None
+            )
+
+            if not source_line:
+                return
+
+            mechanic = source_line.mechanic_id
+
+            for line in order.order_line:
+                if not line.display_mechanic_fields:
+                    continue
+                if line.mechanic_exempt:
+                    continue
+                if line.mechanic_id and not line.mechanic_is_placeholder:
+                    continue
+
+                line.mechanic_id = mechanic
