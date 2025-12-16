@@ -284,3 +284,46 @@ class SaleOrderLine(models.Model):
         if self.mechanic_id and not self.mechanic_is_placeholder:
             vals["mechanic_id"] = self.mechanic_id.id
         return vals
+
+
+    # Agregamos el onchange para propagar el mecánico a otras líneas
+    @api.onchange('mechanic_id')
+    def _onchange_propagate_mechanic_to_service_lines(self):
+        """
+        Cuando se selecciona un mecánico en una línea de servicio,
+        propaga ese mismo mecánico a las demás líneas de servicio
+        del mismo pedido que:
+        - No estén exentas (PAQ*)
+        - No tengan mecánico asignado o tengan placeholder
+        """
+        for line in self:
+            # Validaciones base
+            if not line.mechanic_id:
+                return
+
+            if not line.order_id:
+                return
+
+            # Solo aplica a servicios no exentos
+            if not line.display_mechanic_fields or line.mechanic_exempt:
+                return
+
+            for other_line in line.order_id.order_line:
+                # Saltar la línea actual
+                if other_line == line:
+                    continue
+
+                # Solo servicios
+                if not other_line.display_mechanic_fields:
+                    continue
+
+                # Respetar exenciones PAQ*
+                if other_line.mechanic_exempt:
+                    continue
+
+                # Si ya tiene mecánico real, no tocar
+                if other_line.mechanic_id and not other_line.mechanic_is_placeholder:
+                    continue
+
+                # Asignar mecánico
+                other_line.mechanic_id = line.mechanic_id
