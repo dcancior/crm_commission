@@ -289,28 +289,29 @@ class MechanicCommissionWizard(models.TransientModel):
             date_start = fields.Date.to_string(w.date_from)
             date_end = fields.Date.to_string(w.date_to)
 
-            # FACTURAS DEL CLIENTE ACTIVAS (posteadas), dentro del rango
-            moves = w.env['account.move'].search([
-                ('move_type', '=', 'out_invoice'),
-                ('state', '=', 'posted'),  # activas; canceladas no pasan este filtro
-                ('invoice_date', '>=', date_start),
-                ('invoice_date', '<=', date_end),
+
+            # PEDIDOS DE VENTA CONFIRMADOS (state = 'sale'), dentro del rango
+            orders = w.env['sale.order'].search([
+                ('state', '=', 'sale'),  # solo pedidos confirmados/publicados
+                ('date_order', '>=', date_start),
+                ('date_order', '<=', date_end),
             ])
 
             # LÍNEAS DE SERVICIO DEL mecánico seleccionado
-            inv_lines = moves.mapped('invoice_line_ids').filtered(
-                lambda l: l.product_id.type == 'service'
+            order_lines = orders.mapped('order_line').filtered(
+                lambda l: l.product_id and l.product_id.type == 'service'
                           and getattr(l, 'mechanic_id', False)
                           and l.mechanic_id.id == w.employee_id.id
+                          and l.order_id.state == 'sale'  # Asegura que la orden sigue confirmada
             )
+
 
             Entry = w.env['mechanic.commission.entry']
             entries_to_keep = Entry.browse()
 
-            for line in inv_lines:
+            for line in order_lines:
                 tmpl = line.product_id.product_tmpl_id
 
-                # Compatibilidad doble: primero intenta mechanic_*, si no existe usa service_*
                 cph = getattr(tmpl, 'mechanic_cost_per_hour', None)
                 if cph in (None, False):
                     cph = getattr(tmpl, 'service_cost_per_hour', 0.0)
@@ -321,40 +322,37 @@ class MechanicCommissionWizard(models.TransientModel):
                     hrs_req = getattr(tmpl, 'service_hours_required', 0.0)
                 hrs_req = hrs_req or 0.0
 
-                qty = line.quantity or 0.0
+                qty = line.product_uom_qty or 0.0
                 hrs = hrs_req * qty
                 payout = cph * hrs
 
-                # Obtener porcentaje de comisión (si existe) solo para registro
                 porcentaje = getattr(tmpl, 'porcentaje_comision_mecanico', 0.0) or 0.0
 
-                # Obtener orden de venta desde la línea de factura
-                sale_order = line.sale_line_ids.mapped('order_id')[:1] if line.sale_line_ids else False
-                
-                # Capturar información del vehículo desde sale.order.selected_car_id
+                # Información del vehículo desde el pedido
                 car_id = False
                 marca_auto = False
                 nombre_auto = False
                 color_auto = False
-                
-                if sale_order and sale_order.selected_car_id:
-                    car = sale_order.selected_car_id
+                if line.order_id and hasattr(line.order_id, 'selected_car_id') and line.order_id.selected_car_id:
+                    car = line.order_id.selected_car_id
                     car_id = car.id
-                    marca_auto = car.marca_auto if hasattr(car, 'marca_auto') else False
-                    nombre_auto = car.nombre_auto.id if hasattr(car, 'nombre_auto') and car.nombre_auto else False
-                    color_auto = car.color_auto if hasattr(car, 'color_auto') else False
+                    marca_auto = getattr(car, 'marca_auto', False)
+                    nombre_auto = getattr(car, 'nombre_auto', False)
+                    color_auto = getattr(car, 'color_auto', False)
 
-                invoice_dt = line.move_id.invoice_date or fields.Date.context_today(w)
-                month_text = str(invoice_dt.month).zfill(2)
-                year_text = str(invoice_dt.year)
+                order_dt = line.order_id.date_order or fields.Date.context_today(w)
+                month_text = str(order_dt.month).zfill(2)
+                year_text = str(order_dt.year)
 
                 vals_base = {
                     'company_id': w.env.company.id,
                     'employee_id': w.employee_id.id,
-                    'invoice_id': line.move_id.id,
-                    'invoice_line_id': line.id,
-                    'invoice_name': f'{line.move_id.name or line.move_id.payment_reference or ""} - {line.move_id.partner_id.display_name}',
-                    'invoice_date': invoice_dt,
+                    'invoice_id': False,  # No hay factura aún
+                    'invoice_line_id': False,  # No hay línea de factura
+                    'order_id': line.order_id.id,
+                    'order_line_id': line.id,
+                    'invoice_name': f'{line.order_id.name or ""} - {line.order_id.partner_id.display_name}',
+                    'invoice_date': order_dt,
                     'product_id': line.product_id.id,
                     'product_name': line.product_id.display_name,
                     'quantity': qty,
@@ -364,19 +362,17 @@ class MechanicCommissionWizard(models.TransientModel):
                     'cost_per_hour': cph,
                     'porcentaje_comision': porcentaje,
                     'currency_id': line.currency_id.id or w.env.company.currency_id.id,
-                    # Información del vehículo
                     'car_id': car_id,
                     'marca_auto': marca_auto,
                     'nombre_auto': nombre_auto,
                     'color_auto': color_auto,
-                    # Compatibilidad con otros reportes ya existentes:
                     'month': month_text,
                     'year': year_text,
                 }
 
                 entry = Entry.search([
                     ('employee_id', '=', w.employee_id.id),
-                    ('invoice_line_id', '=', line.id)
+                    ('order_line_id', '=', line.id)
                 ], limit=1)
                 if entry:
                     entry.write(vals_base)
@@ -385,6 +381,17 @@ class MechanicCommissionWizard(models.TransientModel):
 
                 entries_to_keep |= entry
 
+            # Elimina entradas de comisión que provengan de líneas de factura (legacy)
+            # Solo deben existir entradas ligadas a order_line_id, no a invoice_line_id
+            obsolete_invoice_entries = Entry.search([
+                ('employee_id', '=', w.employee_id.id),
+                ('invoice_line_id', '!=', False),
+                ('order_line_id', '=', False),
+                ('invoice_date', '>=', date_start),
+                ('invoice_date', '<=', date_end),
+            ])
+            if obsolete_invoice_entries:
+                obsolete_invoice_entries.unlink()
             # Limpieza: elimina entradas del rango que ya no aplican (p.ej., factura cancelada)
             obsolete = Entry.search([
                 ('employee_id', '=', w.employee_id.id),
