@@ -43,10 +43,11 @@
 
       <!-- 3) Columna "Mecánico" antes del subtotal -->
       <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="before">
-        <field name="mechanic_id"
-               string="Mecánico"
-               optional="show"
-               domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
+         <field name="mechanic_id"
+           string="Mecánico"
+           optional="show"
+           domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"
+           attrs="{'readonly':[('display_mechanic_fields','=',False)]}"/>
       </xpath>
 
       <!-- 4) Costo mecánico después del subtotal -->
