@@ -366,7 +366,7 @@ class MechanicCommissionWizard(models.TransientModel):
                     'currency_id': line.currency_id.id or w.env.company.currency_id.id,
                     'car_id': car_id,
                     'marca_auto': marca_auto,
-                    'nombre_auto': nombre_auto,
+                    'nombre_auto': nombre_auto.id if nombre_auto else False,
                     'color_auto': color_auto,
                     'month': month_text,
                     'year': year_text,
