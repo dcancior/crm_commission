@@ -462,10 +462,11 @@ class MechanicCommissionWizard(models.TransientModel):
 
 
 class MechanicCommissionWizardLine(models.TransientModel):
-        order_id = fields.Many2one('sale.order', string='Cotización/Orden', related='commission_entry_id.order_id', readonly=True)
-        order_line_id = fields.Many2one('sale.order.line', string='Línea de cotización/orden', related='commission_entry_id.order_line_id', readonly=True)
     _name = 'mechanic.commission.wizard.line'
     _description = 'Línea wizard comisión mecánicos'
+
+    order_id = fields.Many2one('sale.order', string='Cotización/Orden', related='commission_entry_id.order_id', readonly=True)
+    order_line_id = fields.Many2one('sale.order.line', string='Línea de cotización/orden', related='commission_entry_id.order_line_id', readonly=True)
 
     wizard_id = fields.Many2one('mechanic.commission.wizard', required=True, ondelete='cascade')
     commission_entry_id = fields.Many2one('mechanic.commission.entry', required=True, ondelete='cascade')
