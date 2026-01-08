@@ -12,6 +12,8 @@ from odoo import models, fields, api, _
 from odoo.exceptions import ValidationError
 
 class MechanicCommissionEntry(models.Model):
+        order_id = fields.Many2one('sale.order', string='Cotización/Orden', ondelete='set null', index=True)
+        order_line_id = fields.Many2one('sale.order.line', string='Línea de cotización/orden', ondelete='set null', index=True)
     _name = 'mechanic.commission.entry'
     _description = 'Entrada de comisión por servicio mecánico'
     _order = 'invoice_date desc, id desc'
