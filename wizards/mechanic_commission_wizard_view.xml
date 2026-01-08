@@ -31,6 +31,9 @@
                                 context="{'no_open': 1}"
                                 options="{'no_create': True}">
                                 <tree editable="bottom" create="0" edit="0" delete="0">
+                                       <!-- Ocultar filas con payout igual a 0 -->
+                                       <field name="payout" invisible="1"/>
+                                       <field name="is_paid"/>
                                     <!-- columnas -->
                                     <field name="order_id" string="Cotización/Orden" readonly="1"/>
                                     <field name="order_line_id" string="Línea de cotización/orden" readonly="1"/>

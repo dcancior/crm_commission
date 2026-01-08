@@ -225,6 +225,8 @@ class MechanicCommissionWizard(models.TransientModel):
 
         # Aplica filtro para el PDF sobre las líneas del wizard
         line_records = self.line_ids
+        # Excluir líneas con payout <= 0 también en el PDF
+        line_records = line_records.filtered(lambda r: r.payout and r.payout > 0)
         if self.report_paid_filter == 'paid':
             line_records = line_records.filtered(lambda r: bool(r.is_paid))
         elif self.report_paid_filter == 'unpaid':
@@ -404,11 +406,11 @@ class MechanicCommissionWizard(models.TransientModel):
 
             # Construir comandos (aplicando filtro si corresponde)
             lines_cmds = [
-                (0, 0, {
-                    'commission_entry_id': e.id,
-                })
-                for e in entries_to_keep.sorted(lambda r: (r.invoice_date or fields.Date.today(), r.id))
-            ]
+                    (0, 0, {
+                        'commission_entry_id': e.id,
+                    })
+                    for e in entries_to_keep.sorted(lambda r: (r.invoice_date or fields.Date.today(), r.id)) if e.payout and e.payout > 0
+                ]
 
             if w.report_paid_filter == 'paid':
                 lines_cmds = [cmd for cmd in lines_cmds if cmd and cmd[2] and
