@@ -191,11 +191,13 @@ class MechanicCommissionWizard(models.TransientModel):
             date_start = fields.Date.to_string(w.date_from)
             date_end = fields.Date.to_string(w.date_to)
 
+            # Busca entries vinculadas a order_line (no a invoice_line) del rango seleccionado
+            # Las entries pueden no tener factura aún (invoice_id=False es válido)
             dom = [
                 ('employee_id', '=', w.employee_id.id),
                 ('invoice_date', '>=', date_start),
                 ('invoice_date', '<=', date_end),
-                ('invoice_id.state', '=', 'posted'),  # solo activas
+                ('order_line_id', '!=', False),  # Solo entries de orden de venta
             ]
             entries = Entry.search(dom)
 
