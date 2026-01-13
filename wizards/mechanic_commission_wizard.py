@@ -300,13 +300,21 @@ class MechanicCommissionWizard(models.TransientModel):
             ])
 
             # LÍNEAS DE SERVICIO DEL mecánico seleccionado
+            # Nota: exclude_from_totals es un campo del módulo externo 'repairshop_automobile'
+            # Usamos try-except para evitar errores si el campo no existe en el modelo
             order_lines = orders.mapped('order_line').filtered(
                 lambda l: l.product_id and l.product_id.type == 'service'
                           and getattr(l, 'mechanic_id', False)
                           and l.mechanic_id.id == w.employee_id.id
                           and l.order_id.state == 'sale'  # Asegura que la orden sigue confirmada
-                          and not getattr(l, 'exclude_from_totals', False)  # Excluye líneas marcadas como excluidas
             )
+            
+            # Excluir líneas marcadas con exclude_from_totals=True (si existe el campo)
+            try:
+                order_lines = order_lines.filtered(lambda l: not l.exclude_from_totals)
+            except AttributeError:
+                # El campo no existe en esta instalación
+                pass
 
 
             Entry = w.env['mechanic.commission.entry']
