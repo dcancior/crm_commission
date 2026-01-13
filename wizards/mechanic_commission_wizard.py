@@ -305,6 +305,7 @@ class MechanicCommissionWizard(models.TransientModel):
                           and getattr(l, 'mechanic_id', False)
                           and l.mechanic_id.id == w.employee_id.id
                           and l.order_id.state == 'sale'  # Asegura que la orden sigue confirmada
+                          and not getattr(l, 'exclude_from_totals', False)  # Excluye líneas marcadas como excluidas
             )
 
 
