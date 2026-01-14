@@ -201,6 +201,9 @@ class MechanicCommissionWizard(models.TransientModel):
             ]
             entries = Entry.search(dom)
 
+            # Solo contar entries con payout > 0 (igual que las mostradas en la tabla)
+            entries = entries.filtered(lambda e: e.payout and e.payout > 0)
+
             if w.report_paid_filter == 'paid':
                 entries = entries.filtered(lambda e: e.is_paid)
             elif w.report_paid_filter == 'unpaid':
