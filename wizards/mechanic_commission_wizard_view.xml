@@ -7,9 +7,8 @@
                 <sheet>
                     <!-- Filtros -->
                     <group col="4">
-                        <field name="employee_id"
-                               options="{'no_create_edit': True}"
-                               domain="[('active','=',True), ('job_id.name','ilike','Mecán')]"/>
+                        <field name="employee_selection"
+                               options="{'no_create_edit': True}"/>
                         <!-- DESPUÉS -->
                         <field name="date_from" required="1"/>
                         <field name="date_to" required="1"/>
@@ -35,6 +34,7 @@
                                        <field name="payout" invisible="1"/>
                                        <field name="is_paid"/>
                                     <!-- columnas -->
+                                    <field name="employee_name" string="Mecánico" readonly="1" optional="show"/>
                                     <field name="order_id" string="Cotización/Orden" readonly="1"/>
                                     <field name="order_line_id" string="Línea de cotización/orden" readonly="1" invisible="1"/>
                                     <field name="product_name" readonly="1"/>

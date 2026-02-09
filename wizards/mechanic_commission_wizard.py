@@ -20,10 +20,17 @@ class MechanicCommissionWizard(models.TransientModel):
     _description = "Wizard: Comisiones de mecánicos por rango de fechas (facturas activas)"
 
     # === Filtros ===
+    employee_selection = fields.Selection(
+        string="Mecánico",
+        selection="_get_employee_selection",
+        required=True,
+        default='all',
+    )
     employee_id = fields.Many2one(
         "hr.employee",
-        string="Mecánico",
-        required=True,
+        string="Mecánico Interno",
+        compute="_compute_employee_from_selection",
+        store=True,
     )
 
     # >>> RANGO DE FECHAS (reemplaza month/year)
@@ -144,6 +151,33 @@ class MechanicCommissionWizard(models.TransientModel):
             }
         }
 
+    def _get_employee_selection(self):
+        """Devuelve lista de opciones: [('all', 'Todos')] + [(emp.id, emp.name), ...]"""
+        Employee = self.env['hr.employee']
+        # Buscar empleados con job que contenga 'Mecán'
+        mechanics = Employee.search([
+            ('active', '=', True),
+            ('job_id.name', 'ilike', 'Mecán')
+        ])
+        options = [('all', 'Todos')]
+        for emp in mechanics:
+            options.append((str(emp.id), emp.name))
+        return options
+    
+    @api.depends('employee_selection')
+    def _compute_employee_from_selection(self):
+        """Convierte la selección en employee_id real para lógica interna"""
+        Employee = self.env['hr.employee']
+        for w in self:
+            if w.employee_selection == 'all':
+                w.employee_id = False  # Significa "todos"
+            else:
+                try:
+                    emp_id = int(w.employee_selection)
+                    w.employee_id = Employee.browse(emp_id)
+                except (ValueError, TypeError):
+                    w.employee_id = False
+
     @api.depends()
     def _compute_allowed_employee_ids(self):
         Team = self.env['crm.team']
@@ -175,13 +209,13 @@ class MechanicCommissionWizard(models.TransientModel):
 
     # >>>>>> Calcula KPIs leyendo mechanic.commission.entry y respeta el filtro <<<<<<
     @api.depends(
-        'employee_id', 'date_from', 'date_to', 'report_paid_filter',
+        'employee_selection', 'date_from', 'date_to', 'report_paid_filter',
         'line_ids', 'line_ids.is_paid', 'line_ids.pago_comision'
     )
     def _compute_totals(self):
         Entry = self.env['mechanic.commission.entry']
         for w in self:
-            if not (w.employee_id and w.date_from and w.date_to):
+            if not (w.date_from and w.date_to):
                 w.services_count = 0
                 w.total_hours = 0.0
                 w.payout_total = 0.0
@@ -194,11 +228,24 @@ class MechanicCommissionWizard(models.TransientModel):
             # Busca entries vinculadas a order_line (no a invoice_line) del rango seleccionado
             # Las entries pueden no tener factura aún (invoice_id=False es válido)
             dom = [
-                ('employee_id', '=', w.employee_id.id),
                 ('invoice_date', '>=', date_start),
                 ('invoice_date', '<=', date_end),
                 ('order_line_id', '!=', False),  # Solo entries de orden de venta
             ]
+            
+            # Filtrar por empleado si no es "Todos"
+            if w.employee_selection != 'all' and w.employee_id:
+                dom.append(('employee_id', '=', w.employee_id.id))
+            elif w.employee_selection == 'all':
+                # Filtrar solo empleados mecánicos
+                Employee = w.env['hr.employee']
+                mechanics = Employee.search([
+                    ('active', '=', True),
+                    ('job_id.name', 'ilike', 'Mecán')
+                ])
+                if mechanics:
+                    dom.append(('employee_id', 'in', mechanics.ids))
+            
             entries = Entry.search(dom)
 
             # Solo contar entries con payout > 0 (igual que las mostradas en la tabla)
@@ -265,7 +312,7 @@ class MechanicCommissionWizard(models.TransientModel):
         period_label = f"{date_from_txt} → {date_to_txt}".strip()
 
         data = {
-            "employee_name": self.employee_id.name or "",
+            "employee_name": "Todos los mecánicos" if self.employee_selection == 'all' else (self.employee_id.name or ""),
             # Compatibilidad previa: dejamos claves antiguas vacías por si el QWeb aún las referencia
             "month": "",
             "month_name": "",
@@ -284,12 +331,12 @@ class MechanicCommissionWizard(models.TransientModel):
         return self.env.ref('crm_commission.action_mechanic_commission_report').report_action(self, data=data)
 
     # ÚNICO lugar que construye line_ids (blindado y por registro)
-    @api.onchange('employee_id', 'date_from', 'date_to')
+    @api.onchange('employee_selection', 'date_from', 'date_to')
     def _onchange_build_lines(self):
         for w in self:
             lines_cmds = []
 
-            if not (w.employee_id and w.date_from and w.date_to):
+            if not (w.date_from and w.date_to and w.employee_selection):
                 w.line_ids = [(5, 0, 0)]
                 continue
 
@@ -304,13 +351,30 @@ class MechanicCommissionWizard(models.TransientModel):
                 ('date_order', '<=', date_end),
             ])
 
-            # LÍNEAS DE SERVICIO DEL mecánico seleccionado
+            # LÍNEAS DE SERVICIO DE LOS mecánicos seleccionados
             # Nota: exclude_from_totals es un campo del módulo externo 'repairshop_automobile'
             # Usamos try-except para evitar errores si el campo no existe en el modelo
+            
+            # Determinar qué mecánicos incluir
+            if w.employee_selection == 'all':
+                # Obtener todos los empleados con trabajo de mecánico
+                Employee = w.env['hr.employee']
+                target_mechanics = Employee.search([
+                    ('active', '=', True),
+                    ('job_id.name', 'ilike', 'Mecán')
+                ])
+            else:
+                # Solo el mecánico seleccionado
+                target_mechanics = w.employee_id
+            
+            if not target_mechanics:
+                w.line_ids = [(5, 0, 0)]
+                continue
+                
             order_lines = orders.mapped('order_line').filtered(
                 lambda l: l.product_id and l.product_id.type == 'service'
                           and getattr(l, 'mechanic_id', False)
-                          and l.mechanic_id.id == w.employee_id.id
+                          and l.mechanic_id in target_mechanics
                           and l.order_id.state == 'sale'  # Asegura que la orden sigue confirmada
             )
             
@@ -362,7 +426,7 @@ class MechanicCommissionWizard(models.TransientModel):
 
                 vals_base = {
                     'company_id': w.env.company.id,
-                    'employee_id': w.employee_id.id,
+                    'employee_id': line.mechanic_id.id,  # El mecánico real de la línea
                     'invoice_id': False,  # No hay factura aún
                     'invoice_line_id': False,  # No hay línea de factura
                     'order_id': line.order_id.id,
@@ -387,7 +451,7 @@ class MechanicCommissionWizard(models.TransientModel):
                 }
 
                 entry = Entry.search([
-                    ('employee_id', '=', w.employee_id.id),
+                    ('employee_id', '=', line.mechanic_id.id),  # Buscar por el mecánico real
                     ('order_line_id', '=', line.id)
                 ], limit=1)
                 if entry:
@@ -399,22 +463,37 @@ class MechanicCommissionWizard(models.TransientModel):
 
             # Elimina entradas de comisión que provengan de líneas de factura (legacy)
             # Solo deben existir entradas ligadas a order_line_id, no a invoice_line_id
-            obsolete_invoice_entries = Entry.search([
-                ('employee_id', '=', w.employee_id.id),
+            cleanup_domain = [
                 ('invoice_line_id', '!=', False),
                 ('order_line_id', '=', False),
                 ('invoice_date', '>=', date_start),
                 ('invoice_date', '<=', date_end),
-            ])
+            ]
+            if w.employee_selection != 'all' and w.employee_id:
+                cleanup_domain.append(('employee_id', '=', w.employee_id.id))
+            else:
+                # Para "todos", limpiar solo mecánicos válidos
+                if target_mechanics:
+                    cleanup_domain.append(('employee_id', 'in', target_mechanics.ids))
+                    
+            obsolete_invoice_entries = Entry.search(cleanup_domain)
             if obsolete_invoice_entries:
                 obsolete_invoice_entries.unlink()
+                
             # Limpieza: elimina entradas del rango que ya no aplican (p.ej., factura cancelada)
-            obsolete = Entry.search([
-                ('employee_id', '=', w.employee_id.id),
+            cleanup_domain2 = [
                 ('invoice_date', '>=', date_start),
                 ('invoice_date', '<=', date_end),
                 ('id', 'not in', entries_to_keep.ids),
-            ])
+            ]
+            if w.employee_selection != 'all' and w.employee_id:
+                cleanup_domain2.append(('employee_id', '=', w.employee_id.id))
+            else:
+                # Para "todos", limpiar solo mecánicos válidos  
+                if target_mechanics:
+                    cleanup_domain2.append(('employee_id', 'in', target_mechanics.ids))
+                    
+            obsolete = Entry.search(cleanup_domain2)
             if obsolete:
                 obsolete.unlink()
 
@@ -467,8 +546,11 @@ class MechanicCommissionWizard(models.TransientModel):
     def _get_report_base_filename(self):
         """Nombre del archivo: Reporte de comisiones (Mecánico) AAAA-MM-DD HH-MM"""
         self.ensure_one()
-        mech = (self.employee_id.name or "Sin mecanico").strip()
-        mech_safe = re.sub(r'[\\/*?:"<>|]', '-', mech)
+        if self.employee_selection == 'all':
+            mech_safe = "Todos los mecánicos"
+        else:
+            mech = (self.employee_id.name or "Sin mecanico").strip()
+            mech_safe = re.sub(r'[\\/*?:"<>|]', '-', mech)
         dt_local = fields.Datetime.context_timestamp(self, fields.Datetime.now())
         stamp = dt_local.strftime('%Y-%m-%d %H-%M')
         # Añadimos el rango en el nombre para ubicar rápido el archivo
@@ -488,6 +570,7 @@ class MechanicCommissionWizardLine(models.TransientModel):
     commission_entry_id = fields.Many2one('mechanic.commission.entry', ondelete='cascade')
 
     ## Copias para visualización -> RELATED
+    employee_name = fields.Char(related='commission_entry_id.employee_id.name', readonly=True, string='Mecánico')
     invoice_name = fields.Char(related='commission_entry_id.invoice_name', readonly=True)
     invoice_date = fields.Date(related='commission_entry_id.invoice_date', readonly=True)
     product_name = fields.Char(related='commission_entry_id.product_name', readonly=True)
