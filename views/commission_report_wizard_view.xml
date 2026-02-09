@@ -58,7 +58,7 @@
 
           <!-- Filtros -->
           <group string="Filtros">
-            <field name="user_id" required="1" options="{'no_create_edit': True}" domain="[('sale_team_id.name', 'ilike', 'Sales')]"/>
+            <field name="user_id" required="1" options="{'no_create_edit': True}" domain="[('sale_team_id.name', 'ilike', 'Ventas')]"/>
             <field name="date_start" required="1"/>
             <field name="date_end" required="1"/>
             <field name="filter_payment"/>
