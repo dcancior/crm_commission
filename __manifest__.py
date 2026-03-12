@@ -1,12 +1,8 @@
 # -*- coding: utf-8 -*-
-# ╔══════════════════════════════════════════════════════════════════╗
-# ║  DCR INFORMATIC SERVICES SAS DE CV                               ║
-# ║  Web: https://www.dcrsoluciones.com                              ║
-# ║  Contacto: info@dcrsoluciones.com                                ║
-# ║                                                                  ║
-# ║  Este módulo está bajo licencia (LGPLv3).                        ║
-# ║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html   ║
-# ╚══════════════════════════════════════════════════════════════════╝
+# DCR INFORMATIC SERVICES SAS DE CV
+# https://www.dcrsoluciones.comi
+# facebook.com/dcrinformaticservices
+# pylint: skip-file
 {
     'name': 'CRM Commission',
     'version': '16.0.1.0.1',
