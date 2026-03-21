@@ -1,19 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-╔════════════════════════════════════════════════════════════════════╗
-║  DCR INFORMATIC SERVICES SAS DE CV                                 ║
-║  Web: https://www.dcrsoluciones.com                                ║
-║  Contacto: info@dcrsoluciones.com                                  ║
-║                                                                    ║
-║  Este módulo está bajo licencia (LGPLv3).                          ║
-║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html     ║
-╚════════════════════════════════════════════════════════════════════╝
--->
-
 <odoo>
   <data>
 
-    <!-- ACCIÓN DEL REPORTE -->
     <record id="action_mechanic_commission_report" model="ir.actions.report">
       <field name="name">Reporte de comisiones de mecánico</field>
       <field name="model">mechanic.commission.wizard</field>
@@ -21,21 +9,30 @@
       <field name="report_name">crm_commission.mechanic_commission_report_template</field>
       <field name="report_file">crm_commission.mechanic_commission_report_template</field>
       <field name="print_report_name" eval="False"/>
-      <!-- Si deseas restringir por grupo:
-      <field name="groups_id" eval="[(4, ref('crm_commission.group_mechanic_commission_view'))]"/>
-      -->
     </record>
 
-    <!-- TEMPLATE QWEB -->
     <template id="mechanic_commission_report_template" name="Mechanic Commission Report">
       <t t-call="web.html_container">
         <t t-call="web.external_layout">
-          <div class="page">
+          
+          <div class="footer">
+            <div class="row" style="border-top: 1px solid #ccc; font-size: 10px; padding-top: 5px; color: #666;">
+              <div class="col-6">
+                <span>Mecánico: </span>
+                <strong>
+                  <t t-esc="employee_name or (object and object.employee_id and object.employee_id.name) or ''"/>
+                </strong>
+              </div>
+              <div class="col-6 text-right">
+                <span>Página: </span>
+                <span class="page"/> / <span class="topage"/>
+              </div>
+            </div>
+          </div>
 
-            <!-- Encabezado -->
+          <div class="page">
             <h2 class="text-center">Comisiones de Mecánico</h2>
 
-            <!-- Variable de moneda disponible en todo el template -->
             <t t-set="currency_id" t-value="object and (object.currency_id or object.env.company.currency_id) or None"/>
 
             <div class="row mt16 mb8">
@@ -56,7 +53,6 @@
               </div>
             </div>
 
-            <!-- Tabla de líneas -->
             <table class="table table-sm table-striped o_main_table">
               <thead>
                 <tr>
@@ -75,7 +71,6 @@
               <tbody>
                 <t t-foreach="lines or []" t-as="l">
                   <tr>
-                    <!-- Estado -->
                     <td class="text-center">
                       <t t-if="l.get('is_paid')">
                         <span>Pagada</span>
@@ -90,22 +85,18 @@
                     <td><t t-esc="l.get('nombre_auto') or ''"/></td>
                     <td><t t-esc="l.get('color_auto') or ''"/></td>
 
-                    <!-- Cantidad -->
                     <t t-set="qty_raw" t-value="l.get('quantity') or 0.0"/>
                     <t t-set="qty_val" t-value="float(qty_raw) if not isinstance(qty_raw, str) else float((qty_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
                     <td class="text-right"><t t-esc="'%.2f' % qty_val"/></td>
 
-                    <!-- Costo/Hora -->
                     <t t-set="cph_raw" t-value="l.get('cost_per_hour') or 0.0"/>
                     <t t-set="cph_val" t-value="float(cph_raw) if not isinstance(cph_raw, str) else float((cph_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
                     <td class="text-right"><t t-esc="'%.2f' % cph_val"/></td>
 
-                    <!-- Horas -->
                     <t t-set="hrs_raw" t-value="l.get('hours') or 0.0"/>
                     <t t-set="hrs_val" t-value="float(hrs_raw) if not isinstance(hrs_raw, str) else float((hrs_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
                     <td class="text-right"><t t-esc="'%.2f' % hrs_val"/></td>
 
-                    <!-- Pago Mecánico -->
                     <t t-set="payout_raw" t-value="l.get('payout') or 0.0"/>
                     <t t-set="payout_val" t-value="float(payout_raw) if not isinstance(payout_raw, str) else float((payout_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
                     <td class="text-right">
@@ -121,7 +112,6 @@
                   </tr>
                 </t>
 
-                <!-- Sin líneas -->
                 <t t-if="not (lines and len(lines))">
                   <tr>
                     <td colspan="10" class="text-center text-muted">Sin registros</td>
@@ -130,7 +120,6 @@
               </tbody>
             </table>
 
-            <!-- Totales (sanear por si llegan como texto con $) -->
             <t t-set="ai_raw" t-value="amount_invoiced or 0.0"/>
             <t t-set="ai_val" t-value="float(ai_raw) if not isinstance(ai_raw, str) else float((ai_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
             <t t-set="pt_raw" t-value="payout_total or 0.0"/>
@@ -176,10 +165,6 @@
                 </tbody>
               </table>
             </div>
-
-          </div>
-        </t>
-      </t>
-    </template>
+          </div> </t> </t> </template>
   </data>
 </odoo>
