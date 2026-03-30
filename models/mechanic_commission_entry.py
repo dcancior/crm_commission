@@ -73,22 +73,21 @@ class MechanicCommissionEntry(models.Model):
         string='Vehículo',
         help='Vehículo asociado a la orden de venta',
     )
-    marca_auto = fields.Selection(
+    marca_auto = fields.Char(
         string='Marca',
-        related='car_id.marca_auto',
+        related='car_id.marca_auto_id.name',  # referencia correcta al Many2one de marca
         store=True,
         readonly=True,
     )
-    nombre_auto = fields.Many2one(
-        'car.model',
+    nombre_auto = fields.Char(
         string='Modelo del auto',
-        related='car_id.nombre_auto',
+        related='car_id.nombre_auto.name',  # referencia correcta al Many2one de modelo
         store=True,
         readonly=True,
     )
     color_auto = fields.Char(
         string='Color',
-        related='car_id.color_auto',
+        related='car_id.color_auto',  # campo Char directo
         store=True,
         readonly=True,
     )

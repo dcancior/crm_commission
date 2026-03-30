@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
+# pylint: skip-file
 # ╔══════════════════════════════════════════════════════════════════╗
 # ║  DCR INFORMATIC SERVICES SAS DE CV                               ║
 # ║  Web: https://www.dcrsoluciones.com                              ║
 # ║  Contacto: info@dcrsoluciones.com                                ║
+# ║  facebook.com/dcrinformaticservices                              ║
 # ║                                                                  ║
-# ║  Este módulo está bajo licencia (LGPLv3).                        ║
+# ║  Este módulo está bajo licencia (LGPLv3)                         ║
 # ║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html   ║
 # ╚══════════════════════════════════════════════════════════════════╝
 {
