@@ -155,6 +155,6 @@
   <act_window id="action_commission_report_wizard" name="Reporte de Comisión de Ventas" res_model="commission.report.wizard" view_mode="form" target="new"/>
 
   <!-- Menú -->
-  <menuitem id="menu_commission_report_root" name="Comisiones de Ventas" sequence="100" groups="crm_commission.group_commission_view" web_icon="crm_commission,static/description/icon_commission.svg"/>
+  <menuitem id="menu_commission_report_root" name="Vendedores" sequence="100" groups="crm_commission.group_commission_view" web_icon="crm_commission,static/description/icon_commission.svg"/>
   <menuitem id="menu_commission_report_wizard" name="Reporte de Comisión de Ventas" parent="menu_commission_report_root" action="action_commission_report_wizard" sequence="10" groups="crm_commission.group_commission_view"/>
 </odoo>
