@@ -108,15 +108,13 @@
     <field name="model">sale.order</field>
     <field name="inherit_id" ref="sale.view_sales_order_filter"/>
     <field name="arch" type="xml">
-
-        <xpath expr="//filter[@name='my_sale_orders']" position="after">
-
-            <filter name="missing_mechanic"
-                    string="Sin mecánico"
-                    domain="[('has_missing_mechanic', '=', True), ('state', '=', 'sale')]"/>
-
-        </xpath>
-
+      <xpath expr="//search" position="inside">
+        <group expand="0" string="Operación"> 
+          <filter name="missing_mechanic"
+              string="⚠ Sin mecánico"
+              domain="[('has_missing_mechanic', '=', True), ('state', '=', 'sale')]"/>
+          </group>
+      </xpath>
     </field>
   </record>
 </odoo>
