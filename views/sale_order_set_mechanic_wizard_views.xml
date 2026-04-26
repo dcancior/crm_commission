@@ -17,22 +17,28 @@
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
-            <!-- BOTÓN ANTES DE CONFIRMAR -->
-            <button name="action_open_set_mechanic_wizard"
-                    type="object"
-                    class="btn btn-link btn-sm"
-                    icon="fa-wrench"
-                    string=" Asignar mecánico"
-                    title="Asignar mecánico a líneas de servicio"
-                    attrs="{'invisible': [('state','not in',('draft','sent'))]}"/>
+            <xpath expr="//sheet//notebook" position="before">
+                <div class="d-flex justify-content-end mb-2">
 
-            <!-- BOTÓN DESPUÉS DE CONFIRMAR -->
-            <button name="action_assign_mechanic_after_confirm"
-                    type="object"
-                    string=" Asignar mecánico"
-                    class="btn btn-link btn-sm"
-                    icon="fa-exchange"
-                    attrs="{'invisible': [('state', '!=', 'sale')]}"/>
+                    <!-- BOTÓN ANTES DE CONFIRMAR -->
+                    <button name="action_open_set_mechanic_wizard"
+                            type="object"
+                            class="btn btn-link btn-sm"
+                            icon="fa-wrench"
+                            string=" Asignar mecánico"
+                            title="Asignar mecánico a líneas de servicio"
+                            attrs="{'invisible': [('state','not in',('draft','sent'))]}"/>
+
+                    <!-- BOTÓN DESPUÉS DE CONFIRMAR -->
+                    <button name="action_assign_mechanic_after_confirm"
+                            type="object"
+                            string=" Asignar mecánico"
+                            class="btn btn-link btn-sm"
+                            icon="fa-exchange"
+                            attrs="{'invisible': [('state', '!=', 'sale')]}"/>
+
+                </div>
+            </xpath>
         </field>
     </record>
 
