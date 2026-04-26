@@ -66,8 +66,10 @@ class SaleOrderSetMechanicWizard(models.TransientModel):  # noqa: E265
         order = self.order_id
         lines = self._get_target_lines()
 
-        # Asignar mecánico
-        lines.write({'mechanic_id': self.mechanic_id.id})
+        # 🔓 Asignar mecánico con bypass del bloqueo de facturas
+        lines.with_context(skip_invoice_lock=True).write({
+            'mechanic_id': self.mechanic_id.id
+        })
 
         # 🔥 MENSAJE EN CHATTER
         if lines:
