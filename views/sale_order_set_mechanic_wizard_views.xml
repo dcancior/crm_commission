@@ -11,32 +11,28 @@
 -->
 
 <odoo>
-
     <!-- Vista que ahora SOLO agrega el botón estilo link arriba del notebook -->
     <record id="view_order_form_add_assign_mechanic_btn" model="ir.ui.view">
         <field name="name">sale.order.form.assign.mechanic.button</field>
         <field name="model">sale.order</field>
         <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
-            <!-- Botón tipo link (misma acción), alineado a la derecha sobre el notebook -->
-            <xpath expr="//sheet//notebook" position="before">
-                <div class="d-flex justify-content-end mb-2">
-                    <button name="action_open_set_mechanic_wizard"
-                            type="object"
-                            class="btn btn-link btn-sm"
-                            icon="fa-wrench"
-                            string=" Asignar mecánico"
-                            title="Asignar mecánico a líneas de servicio"
-                            attrs="{'invisible': [('state','not in',('draft','sent'))]}"/>
+            <!-- BOTÓN ANTES DE CONFIRMAR -->
+            <button name="action_open_set_mechanic_wizard"
+                    type="object"
+                    class="btn btn-link btn-sm"
+                    icon="fa-wrench"
+                    string=" Asignar mecánico"
+                    title="Asignar mecánico a líneas de servicio"
+                    attrs="{'invisible': [('state','not in',('draft','sent'))]}"/>
 
-                    <button name="action_assign_mechanic_after_confirm"
-                        type="object"
-                        string="Asignar mecánico"
-                        class="btn btn-link btn-sm"
-                        icon="fa-exchange"
-                        attrs="{'invisible': [('state', '!=', 'sale')]}"/>
-                </div>
-            </xpath>
+            <!-- BOTÓN DESPUÉS DE CONFIRMAR -->
+            <button name="action_assign_mechanic_after_confirm"
+                    type="object"
+                    string=" Asignar mecánico"
+                    class="btn btn-link btn-sm"
+                    icon="fa-exchange"
+                    attrs="{'invisible': [('state', '!=', 'sale')]}"/>
         </field>
     </record>
 
@@ -69,5 +65,4 @@
             </form>
         </field>
     </record>
-
 </odoo>
