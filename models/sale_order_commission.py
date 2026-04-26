@@ -26,9 +26,13 @@ class SaleOrder(models.Model):
 
     # Campo para detectar si falta mecánico en líneas de servicio (para aviso o bloqueo)
     has_missing_mechanic = fields.Boolean(
-        string="Falta mecánico",
-        compute="_compute_missing_mechanic",
+        compute="_compute_has_missing_mechanic",
         store=True
+    )
+
+    allow_without_mechanic = fields.Boolean(
+        string="Permitir sin mecánico",
+        help="Permite confirmar la orden sin asignar mecánico. Se deberá asignar después."
     )
     # -------------------------------------------------------------------------
     # Campos de comisión (ejemplo simple)
@@ -140,29 +144,18 @@ class SaleOrder(models.Model):
     def action_confirm(self):
         for order in self:
 
-            # ✅ NUEVO: si el switch está activo, NO validar mecánico
-            if order.allow_no_mechanic:
-                continue
+            # Si NO permite sin mecánico → validar
+            if not order.allow_without_mechanic:
 
-            lines = order.order_line.filtered(
-                lambda l:
-                    # Debe aplicar la lógica de mecánico
-                    getattr(l, 'display_mechanic_fields', False)
-                    # NO si es PAQ
-                    and not self._is_paq_line(l)
-                    # ❗ SOLO validar si NO tiene mecánico (ya no bloqueamos placeholder aquí)
-                    and not getattr(l, 'mechanic_id', False)
-            )
-
-            if lines:
-                details = "\n".join(
-                    f"• {l.product_id.display_name or l.name} (línea {l.sequence or '-'})"
-                    for l in lines
+                lines_without_mechanic = order.order_line.filtered(
+                    lambda l: l.product_id.type == 'service' and not l.mechanic_id
                 )
-                raise UserError(_(
-                    "Antes de confirmar, selecciona un Mecánico en todas las líneas de servicio "
-                    "resaltadas en naranja.\n\nFaltan en:\n%s"
-                ) % details)
+
+                if lines_without_mechanic:
+                    raise ValidationError(
+                        "No puedes confirmar sin asignar mecánico a las líneas de servicio.\n\n"
+                        "Activa 'Permitir sin mecánico' si deseas continuar."
+                    )
 
         return super().action_confirm()
 
@@ -225,3 +218,12 @@ class SaleOrder(models.Model):
                 for l in order.order_line
             )
             order.has_missing_mechanic = bool(order.allow_no_mechanic and missing)
+
+
+    @api.depends('order_line.mechanic_id')
+    def _compute_has_missing_mechanic(self):
+        for order in self:
+            order.has_missing_mechanic = any(
+                l.product_id.type == 'service' and not l.mechanic_id
+                for l in order.order_line
+            )

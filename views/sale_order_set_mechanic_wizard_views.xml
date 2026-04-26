@@ -20,6 +20,10 @@
             <xpath expr="//sheet//notebook" position="before">
                 <div class="d-flex justify-content-end mb-2">
 
+                    <group>
+                        <field name="allow_without_mechanic"/>
+                    </group>
+
                     <!-- BOTÓN ANTES DE CONFIRMAR -->
                     <button name="action_open_set_mechanic_wizard"
                             type="object"
@@ -27,14 +31,6 @@
                             icon="fa-wrench"
                             string=" Asignar mecánico"
                             title="Asignar mecánico a líneas de servicio"
-                            attrs="{'invisible': [('state','not in',('draft','sent'))]}"/>
-
-                    <!-- BOTÓN DESPUÉS DE CONFIRMAR -->
-                    <button name="action_assign_mechanic_after_confirm"
-                            type="object"
-                            string=" Asignar mecánico"
-                            class="btn btn-link btn-sm"
-                            icon="fa-exchange"
                             attrs="{'invisible': [('state', '=', 'cancel')]}"/>
 
                 </div>
