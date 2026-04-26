@@ -101,4 +101,22 @@
 
     </field>
   </record>
+
+  <!-- Filtro para órdenes con mecánico faltante -->
+  <record id="view_sale_order_filter_mechanic" model="ir.ui.view">
+    <field name="name">sale.order.search.mechanic</field>
+    <field name="model">sale.order</field>
+    <field name="inherit_id" ref="sale.view_sales_order_filter"/>
+    <field name="arch" type="xml">
+
+        <xpath expr="//filter[@name='my_sale_orders']" position="after">
+
+            <filter name="missing_mechanic"
+                    string="Sin mecánico"
+                    domain="[('has_missing_mechanic', '=', True), ('state', '=', 'sale')]"/>
+
+        </xpath>
+
+    </field>
+  </record>
 </odoo>
