@@ -26,6 +26,7 @@ class SaleOrder(models.Model):
 
     # Campo para detectar si falta mecánico en líneas de servicio (para aviso o bloqueo)
     has_missing_mechanic = fields.Boolean(
+        string="Faltan mecánicos",
         compute="_compute_has_missing_mechanic",
         store=True
     )
@@ -223,10 +224,17 @@ class SaleOrder(models.Model):
     @api.depends('order_line.mechanic_id', 'order_line.product_id', 'state')
     def _compute_has_missing_mechanic(self):
         for order in self:
-            order.has_missing_mechanic = (
-                order.state == 'sale' and
-                any(
-                    line.product_id.type == 'service' and not line.mechanic_id
-                    for line in order.order_line
-                )
-            )
+            missing = False
+
+            if order.state == 'sale':  # solo órdenes confirmadas
+                for line in order.order_line:
+                    if (
+                        line.product_id
+                        and line.product_id.type == 'service'
+                        and not line.mechanic_id
+                        and not line.display_type
+                    ):
+                        missing = True
+                        break
+
+            order.has_missing_mechanic = missing
