@@ -220,10 +220,13 @@ class SaleOrder(models.Model):
             order.has_missing_mechanic = bool(order.allow_no_mechanic and missing)
 
 
-    @api.depends('order_line.mechanic_id')
+    @api.depends('order_line.mechanic_id', 'order_line.product_id', 'state')
     def _compute_has_missing_mechanic(self):
         for order in self:
-            order.has_missing_mechanic = any(
-                l.product_id.type == 'service' and not l.mechanic_id
-                for l in order.order_line
+            order.has_missing_mechanic = (
+                order.state == 'sale' and
+                any(
+                    line.product_id.type == 'service' and not line.mechanic_id
+                    for line in order.order_line
+                )
             )

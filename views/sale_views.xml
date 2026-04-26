@@ -92,7 +92,7 @@
 
               ⚠ Esta orden fue confirmada sin mecánico. Debes asignarlo.
 
-              <button name="action_assign_mechanic_after_confirm"
+              <button name="action_open_set_mechanic_wizard"
                       type="object"
                       string="Asignar ahora"
                       class="btn btn-danger btn-sm ms-2"/>
