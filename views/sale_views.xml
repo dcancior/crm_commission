@@ -82,6 +82,21 @@
         </group>
       </xpath>
 
+      <!-- Banner visial sólo para grupo de comisiones-->
+      <xpath expr="//sheet" position="inside">
+          <div class="alert alert-danger"
+              attrs="{'invisible': [('has_missing_mechanic', '=', False)]}"
+              groups="crm_commission.group_mechanic_commission_view">
+
+              ⚠ Esta orden fue confirmada sin mecánico. Debes asignarlo.
+
+              <button name="action_assign_mechanic_after_confirm"
+                      type="object"
+                      string="Asignar ahora"
+                      class="btn btn-danger btn-sm ms-2"/>
+          </div>
+      </xpath>
+
     </field>
   </record>
 </odoo>

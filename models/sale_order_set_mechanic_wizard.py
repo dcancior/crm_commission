@@ -15,8 +15,6 @@ from odoo import models, fields, api, _  # importa _ por si lo necesitas en mens
 # (El aviso "una sola vez" y cualquier validación déjalos en sale_extend.py)
 # -------------------------------------------------------------------
 
-
-
 # -------------------------------------------------------------------
 # WIZARD: Asignar mecánico masivo a líneas de servicio del pedido
 # -------------------------------------------------------------------

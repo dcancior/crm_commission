@@ -450,10 +450,14 @@ class MechanicCommissionWizard(models.TransientModel):
                     'year': year_text,
                 }
 
+                # 🔥 Buscar solo por línea, no por empleado
                 entry = Entry.search([
-                    ('employee_id', '=', line.mechanic_id.id),  # Buscar por el mecánico real
                     ('order_line_id', '=', line.id)
                 ], limit=1)
+                # Si aún no hay mecánico, NO crear entry
+                if not line.mechanic_id:
+                    continue
+                vals_base['employee_id'] = line.mechanic_id.id
                 if entry:
                     entry.write(vals_base)
                 else:
@@ -481,21 +485,22 @@ class MechanicCommissionWizard(models.TransientModel):
                 obsolete_invoice_entries.unlink()
                 
             # Limpieza: elimina entradas del rango que ya no aplican (p.ej., factura cancelada)
-            cleanup_domain2 = [
-                ('invoice_date', '>=', date_start),
-                ('invoice_date', '<=', date_end),
-                ('id', 'not in', entries_to_keep.ids),
-            ]
-            if w.employee_selection != 'all' and w.employee_id:
-                cleanup_domain2.append(('employee_id', '=', w.employee_id.id))
-            else:
-                # Para "todos", limpiar solo mecánicos válidos  
-                if target_mechanics:
-                    cleanup_domain2.append(('employee_id', 'in', target_mechanics.ids))
-                    
-            obsolete = Entry.search(cleanup_domain2)
-            if obsolete:
-                obsolete.unlink()
+            if entries_to_keep:
+                cleanup_domain2 = [
+                    ('invoice_date', '>=', date_start),
+                    ('invoice_date', '<=', date_end),
+                    ('id', 'not in', entries_to_keep.ids),
+                ]
+                if w.employee_selection != 'all' and w.employee_id:
+                    cleanup_domain2.append(('employee_id', '=', w.employee_id.id))
+                else:
+                    # Para "todos", limpiar solo mecánicos válidos  
+                    if target_mechanics:
+                        cleanup_domain2.append(('employee_id', 'in', target_mechanics.ids))
+                        
+                obsolete = Entry.search(cleanup_domain2)
+                if obsolete:
+                    obsolete.unlink()
 
             # Construir comandos (aplicando filtro si corresponde)
             lines_cmds = [

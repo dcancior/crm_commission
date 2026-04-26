@@ -18,6 +18,18 @@ _logger = logging.getLogger(__name__)
 class SaleOrder(models.Model):
     _inherit = 'sale.order'
 
+    # Campo para permitir confirmar sin mecánico (opcional, según tu lógica de negocio)
+    allow_no_mechanic = fields.Boolean(
+        string="Permitir sin mecánico",
+        help="Permite confirmar la orden sin asignar mecánico aún. El mecánico se podrá asignar después."
+    )
+
+    # Campo para detectar si falta mecánico en líneas de servicio (para aviso o bloqueo)
+    has_missing_mechanic = fields.Boolean(
+        string="Falta mecánico",
+        compute="_compute_missing_mechanic",
+        store=True
+    )
     # -------------------------------------------------------------------------
     # Campos de comisión (ejemplo simple)
     # -------------------------------------------------------------------------
@@ -77,6 +89,10 @@ class SaleOrder(models.Model):
             },
         }
 
+    def action_assign_mechanic_after_confirm(self):
+        self.ensure_one()
+        return self.action_open_set_mechanic_wizard()
+
     # -------------------------------------------------------------------------
     # Helper: detectar si una línea está exenta por regla "PAQ*"
     # -------------------------------------------------------------------------
@@ -117,18 +133,21 @@ class SaleOrder(models.Model):
     # -------------------------------------------------------------------------
     def action_confirm(self):
         for order in self:
+
+            # ✅ NUEVO: si el switch está activo, NO validar mecánico
+            if order.allow_no_mechanic:
+                continue
+
             lines = order.order_line.filtered(
                 lambda l:
-                    # Debe aplicar la lógica de mecánico (tu flag de servicio)
+                    # Debe aplicar la lógica de mecánico
                     getattr(l, 'display_mechanic_fields', False)
-                    # Pero NO si es un producto "PAQ*"
+                    # NO si es PAQ
                     and not self._is_paq_line(l)
-                    # Y además falta el mecánico real (o es placeholder)
-                    and (
-                        not getattr(l, 'mechanic_id', False)
-                        or getattr(l, 'mechanic_is_placeholder', False)
-                    )
+                    # ❗ SOLO validar si NO tiene mecánico (ya no bloqueamos placeholder aquí)
+                    and not getattr(l, 'mechanic_id', False)
             )
+
             if lines:
                 details = "\n".join(
                     f"• {l.product_id.display_name or l.name} (línea {l.sequence or '-'})"
@@ -176,3 +195,27 @@ class SaleOrder(models.Model):
                     continue
 
                 line.mechanic_id = mechanic
+
+    def _recompute_mechanic_commissions(self):
+        """
+        Fuerza la regeneración de comisiones para este pedido.
+        """
+        self.ensure_one()
+
+        wizard = self.env['mechanic.commission.wizard'].create({
+            'employee_selection': 'all',
+            'date_from': self.date_order.date(),
+            'date_to': self.date_order.date(),
+        })
+
+        wizard._onchange_build_lines()
+
+    @api.depends('order_line.mechanic_id', 'order_line.display_mechanic_fields', 'allow_no_mechanic')
+    def _compute_missing_mechanic(self):
+        for order in self:
+            missing = any(
+                getattr(l, 'display_mechanic_fields', False)
+                and not getattr(l, 'mechanic_id', False)
+                for l in order.order_line
+            )
+            order.has_missing_mechanic = bool(order.allow_no_mechanic and missing)

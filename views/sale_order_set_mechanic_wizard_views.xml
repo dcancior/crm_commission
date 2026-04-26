@@ -28,6 +28,13 @@
                             string=" Asignar mecánico"
                             title="Asignar mecánico a líneas de servicio"
                             attrs="{'invisible': [('state','not in',('draft','sent'))]}"/>
+
+                    <button name="action_assign_mechanic_after_confirm"
+                        type="object"
+                        string="Asignar mecánico"
+                        class="btn btn-link btn-sm"
+                        icon="fa-exchange"
+                        attrs="{'invisible': [('state', '!=', 'sale')]}"/>
                 </div>
             </xpath>
         </field>
