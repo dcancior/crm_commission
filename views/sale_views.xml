@@ -83,7 +83,7 @@
       </xpath>
 
       <!-- Banner visial sólo para grupo de comisiones-->
-      <xpath expr="//sheet" position="inside">
+      <xpath expr="//sheet" position="before">
           <!-- Campo técnico (obligatorio para attrs) -->
           <field name="has_missing_mechanic" invisible="1"/>
           <div class="alert alert-danger"
