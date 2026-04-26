@@ -84,6 +84,8 @@
 
       <!-- Banner visial sólo para grupo de comisiones-->
       <xpath expr="//sheet" position="inside">
+          <!-- Campo técnico (obligatorio para attrs) -->
+          <field name="has_missing_mechanic" invisible="1"/>
           <div class="alert alert-danger"
               attrs="{'invisible': [('has_missing_mechanic', '=', False)]}"
               groups="crm_commission.group_mechanic_commission_view">
