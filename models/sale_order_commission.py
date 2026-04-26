@@ -91,6 +91,12 @@ class SaleOrder(models.Model):
 
     def action_assign_mechanic_after_confirm(self):
         self.ensure_one()
+
+        # Registrar en chatter
+        self.message_post(
+            body=f"Se abrió el asistente para asignar mecánico por {self.env.user.name}"
+        )
+
         return self.action_open_set_mechanic_wizard()
 
     # -------------------------------------------------------------------------

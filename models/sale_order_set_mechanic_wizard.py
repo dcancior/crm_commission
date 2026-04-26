@@ -60,8 +60,20 @@ class SaleOrderSetMechanicWizard(models.TransientModel):  # noqa: E265
         for w in self:  # Itera wizards  # noqa: E265
             w.affected_count = len(w._get_target_lines()) if w.order_id else 0  # Conteo  # noqa: E265
 
-    def action_apply(self):  # Aplica el mecánico a las líneas objetivo  # noqa: E265
-        self.ensure_one()  # Un solo wizard  # noqa: E265
-        lines = self._get_target_lines()  # Obtiene líneas  # noqa: E265
-        lines.write({'mechanic_id': self.mechanic_id.id})  # Escribe mecánico  # noqa: E265
-        return {'type': 'ir.actions.act_window_close'}  # Cierra modal  # noqa: E265
+    def action_apply(self):
+        self.ensure_one()
+
+        order = self.order_id
+        lines = self._get_target_lines()
+
+        # Asignar mecánico
+        lines.write({'mechanic_id': self.mechanic_id.id})
+
+        # 🔥 MENSAJE EN CHATTER
+        if lines:
+            order.message_post(
+                body=f"🔧 Mecánico asignado: {self.mechanic_id.name} "
+                    f"a {len(lines)} línea(s) por {self.env.user.name}"
+            )
+
+        return {'type': 'ir.actions.act_window_close'}

@@ -35,7 +35,7 @@
                             string=" Asignar mecánico"
                             class="btn btn-link btn-sm"
                             icon="fa-exchange"
-                            attrs="{'invisible': [('state', '!=', 'sale')]}"/>
+                            attrs="{'invisible': [('state', '=', 'cancel')]}"/>
 
                 </div>
             </xpath>
