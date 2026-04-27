@@ -66,16 +66,32 @@ class SaleOrderSetMechanicWizard(models.TransientModel):  # noqa: E265
         order = self.order_id
         lines = self._get_target_lines()
 
-        # 🔓 Asignar mecánico con bypass del bloqueo de facturas
-        lines.with_context(skip_invoice_lock=True).write({
-            'mechanic_id': self.mechanic_id.id
-        })
+        # 🔧 Asignar mecánico
+        lines.write({'mechanic_id': self.mechanic_id.id})
 
-        # 🔥 MENSAJE EN CHATTER
+        # 📝 Mensaje en chatter
         if lines:
             order.message_post(
                 body=f"🔧 Mecánico asignado: {self.mechanic_id.name} "
                     f"a {len(lines)} línea(s) por {self.env.user.name}"
             )
+
+        # 🔍 Revisar si aún faltan mecánicos
+        missing = order.order_line.filtered(
+            lambda l: l.product_id.type == 'service' and not l.mechanic_id
+        )
+
+        # 🔥 Buscar actividades
+        activity_type = self.env.ref('mail.mail_activity_data_todo')
+        activities = self.env['mail.activity'].search([
+            ('res_model', '=', 'sale.order'),
+            ('res_id', '=', order.id),
+            ('activity_type_id', '=', activity_type.id),
+            ('state', '=', 'planned')
+        ])
+
+        # ✅ SOLO cerrar si ya no hay pendientes
+        if activities and not missing:
+            activities.action_done()
 
         return {'type': 'ir.actions.act_window_close'}

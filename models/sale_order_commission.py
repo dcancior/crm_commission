@@ -10,6 +10,7 @@
 
 from odoo import api, fields, models, _
 from odoo.exceptions import UserError, ValidationError
+from datetime import timedelta
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -143,11 +144,15 @@ class SaleOrder(models.Model):
     # - EXCEPTO si el producto comienza con 'PAQ'
     # -------------------------------------------------------------------------
     def action_confirm(self):
+        res = super().action_confirm()
+
+        group = self.env.ref('crm_commission.group_mechanic_commission_view', raise_if_not_found=False)
+        activity_type = self.env.ref('mail.mail_activity_data_todo')
+
         for order in self:
 
-            # Si NO permite sin mecánico → validar
+            # 🔒 Validación
             if not order.allow_without_mechanic:
-
                 lines_without_mechanic = order.order_line.filtered(
                     lambda l: l.product_id.type == 'service' and not l.mechanic_id
                 )
@@ -158,8 +163,43 @@ class SaleOrder(models.Model):
                         "Activa 'Permitir sin mecánico' si deseas continuar."
                     )
 
-        return super().action_confirm()
+            # 🔍 Detectar si faltan mecánicos
+            missing = order.order_line.filtered(
+                lambda l: l.product_id.type == 'service' and not l.mechanic_id
+            )
 
+            if missing and group:
+
+                # 📅 Próximo sábado
+                today = fields.Date.today()
+                days_ahead = (5 - today.weekday()) % 7
+                if days_ahead == 0:
+                    days_ahead = 7
+                next_saturday = today + timedelta(days=days_ahead)
+
+                for user in group.users:
+
+                    # 🚫 Evitar duplicados
+                    existing = self.env['mail.activity'].search([
+                        ('res_model', '=', 'sale.order'),
+                        ('res_id', '=', order.id),
+                        ('user_id', '=', user.id),
+                        ('activity_type_id', '=', activity_type.id),
+                    ], limit=1)
+
+                    if not existing:
+                        order.activity_schedule(
+                            activity_type_id=activity_type.id,
+                            user_id=user.id,
+                            note=(
+                                f"⚠ Orden {order.name} confirmada sin mecánico.\n"
+                                f"Cliente: {order.partner_id.name}\n\n"
+                                "Asignar mecánico antes del sábado."
+                            ),
+                            date_deadline=next_saturday
+                        )
+
+        return res
 
 
     @api.onchange('order_line')
@@ -238,3 +278,39 @@ class SaleOrder(models.Model):
                         break
 
             order.has_missing_mechanic = missing
+
+
+    def _create_missing_mechanic_activity(self):
+        Activity = self.env['mail.activity']
+        group = self.env.ref('crm_commission.group_mechanic_commission_view', raise_if_not_found=False)
+
+        if not group:
+            return
+
+        users = group.users.filtered(lambda u: u.active)
+
+        for order in self:
+            if not order.has_missing_mechanic:
+                continue
+
+            # evitar duplicados
+            existing = Activity.search([
+                ('res_model', '=', 'sale.order'),
+                ('res_id', '=', order.id),
+                ('summary', '=', 'Asignar mecánico'),
+                ('user_id', 'in', users.ids),
+            ], limit=1)
+
+            if existing:
+                continue
+
+            for user in users:
+                Activity.create({
+                    'res_model_id': self.env['ir.model']._get_id('sale.order'),
+                    'res_id': order.id,
+                    'user_id': user.id,
+                    'activity_type_id': self.env.ref('mail.mail_activity_data_todo').id,
+                    'summary': 'Asignar mecánico',
+                    'note': 'Esta orden fue confirmada sin mecánico. Asignarlo lo antes posible.',
+                    'date_deadline': fields.Date.today() + timedelta(days=1),
+                })
