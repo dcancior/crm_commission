@@ -146,7 +146,7 @@ class SaleOrder(models.Model):
     def action_confirm(self):
         res = super().action_confirm()
 
-        group = self.env.ref('crm_commission.group_mechanic_commission_view', raise_if_not_found=False)
+        group = self.env.ref('crm_commission.group_mechanic_assignment_followup', raise_if_not_found=False)
         activity_type = self.env.ref('mail.mail_activity_data_todo')
 
         for order in self:
@@ -176,16 +176,16 @@ class SaleOrder(models.Model):
                 if days_ahead == 0:
                     days_ahead = 7
                 next_saturday = today + timedelta(days=days_ahead)
-
-                for user in group.users:
+                users = group.users.filtered(lambda u: u.active and not u.share)
+                for user in users:
 
                     # 🚫 Evitar duplicados
                     existing = self.env['mail.activity'].search([
-                        ('res_model', '=', 'sale.order'),
-                        ('res_id', '=', order.id),
-                        ('user_id', '=', user.id),
-                        ('activity_type_id', '=', activity_type.id),
-                    ], limit=1)
+                    ('res_model', '=', 'sale.order'),
+                    ('res_id', '=', order.id),
+                    ('user_id', '=', user.id),
+                    ('activity_type_id', '=', activity_type.id),
+                ], limit=1)
 
                     if not existing:
                         order.activity_schedule(
