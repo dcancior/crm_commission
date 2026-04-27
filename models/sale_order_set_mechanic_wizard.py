@@ -66,32 +66,54 @@ class SaleOrderSetMechanicWizard(models.TransientModel):  # noqa: E265
         order = self.order_id
         lines = self._get_target_lines()
 
-        # 🔧 Asignar mecánico
-        lines.write({'mechanic_id': self.mechanic_id.id})
-
-        # 📝 Mensaje en chatter
+        # 🔧 Asignar mecánico a las líneas seleccionadas
         if lines:
+            lines.write({'mechanic_id': self.mechanic_id.id})
+            
+            # 📝 Mensaje en chatter
             order.message_post(
                 body=f"🔧 Mecánico asignado: {self.mechanic_id.name} "
-                    f"a {len(lines)} línea(s) por {self.env.user.name}"
+                     f"a {len(lines)} línea(s) por {self.env.user.name}"
             )
 
-        # 🔍 Revisar si aún faltan mecánicos
+        # 🔍 Revisar si después de esta asignación aún faltan mecánicos en otras líneas
         missing = order.order_line.filtered(
             lambda l: l.product_id.type == 'service' and not l.mechanic_id
         )
 
-        # 🔥 Buscar actividades
-        activity_type = self.env.ref('mail.mail_activity_data_todo')
-        activities = self.env['mail.activity'].search([
-            ('res_model', '=', 'sale.order'),
-            ('res_id', '=', order.id),
-            ('activity_type_id', '=', activity_type.id),
-            ('state', '=', 'planned')
-        ])
+        # --- LÓGICA DE INVENTARIO PENDIENTE ---
+        # Si ya no faltan mecánicos, procesamos los pickings que se quedaron pausados
+        if not missing:
+            pickings_to_validate = order.picking_ids.filtered(
+                lambda p: p.state not in ('done', 'cancel')
+            )
+            
+            for picking in pickings_to_validate:
+                # Intentamos reservar stock si no estaba reservado
+                if picking.state in ('confirmed', 'waiting'):
+                    picking.action_assign()
 
-        # ✅ SOLO cerrar si ya no hay pendientes
-        if activities and not missing:
-            activities.action_done()
+                # Si está listo (assigned), validamos automáticamente
+                if picking.state == 'assigned':
+                    for move in picking.move_ids_without_package:
+                        if move.product_id.type == 'product':
+                            move.quantity_done = move.product_uom_qty
+                    
+                    picking.button_validate()
+                    _logger.info("Inventario validado tras asignación de mecánico: %s", picking.name)
+
+        # 🔥 Gestión de Actividades (Limpieza)
+        activity_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
+        if activity_type:
+            activities = self.env['mail.activity'].search([
+                ('res_model', '=', 'sale.order'),
+                ('res_id', '=', order.id),
+                ('activity_type_id', '=', activity_type.id),
+                ('state', '=', 'planned')
+            ])
+
+            # ✅ SOLO cerrar actividades si ya no hay pendientes de mecánico
+            if activities and not missing:
+                activities.action_done()
 
         return {'type': 'ir.actions.act_window_close'}
