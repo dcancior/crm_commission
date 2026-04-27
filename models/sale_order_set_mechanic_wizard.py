@@ -8,8 +8,8 @@
 # ║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html   ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
-from odoo import models, logging, fields, api, _  # importa _ por si lo necesitas en mensajes  # noqa: E265
-
+from odoo import models, fields, api, _  # importa _ por si lo necesitas en mensajes  # noqa: E265
+import logging
 
 _logger = logging.getLogger(__name__)
 # -------------------------------------------------------------------
