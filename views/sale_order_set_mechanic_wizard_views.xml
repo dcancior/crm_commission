@@ -22,7 +22,7 @@
                 <div class="d-flex align-items-center justify-content-end gap-2 mb-2">
 
                     <!-- Switch -->
-                    <field name="allow_without_mechanic" class="oe_inline"/>
+                    <field name="allow_without_mechanic" widget="boolean_toggle"/>
 
                     <!-- Botón -->
                     <button name="action_open_set_mechanic_wizard"
