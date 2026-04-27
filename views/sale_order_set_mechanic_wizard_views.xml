@@ -22,7 +22,10 @@
                 <div class="d-flex align-items-center justify-content-end gap-2 mb-2">
 
                     <!-- Switch -->
-                    <field name="allow_without_mechanic" widget="boolean_toggle"/>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="text-muted small">Orden sin mecánico</span>
+                        <field name="allow_without_mechanic" widget="boolean_toggle"/>
+                    </div>
 
                     <!-- Botón -->
                     <button name="action_open_set_mechanic_wizard"
