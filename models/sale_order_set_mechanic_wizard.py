@@ -10,6 +10,7 @@
 
 from odoo import models, fields, api, _  # importa _ por si lo necesitas en mensajes  # noqa: E265
 
+_logger = logging.getLogger(__name__)
 # -------------------------------------------------------------------
 # Extensión mínima de sale.order SOLO para abrir el wizard
 # (El aviso "una sola vez" y cualquier validación déjalos en sale_extend.py)
