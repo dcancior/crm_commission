@@ -18,22 +18,22 @@
         <field name="inherit_id" ref="sale.view_order_form"/>
         <field name="arch" type="xml">
             <xpath expr="//sheet//notebook" position="before">
-                <div class="d-flex justify-content-end mb-2">
 
-                    <group>
-                        <field name="allow_without_mechanic"/>
-                    </group>
+                <div class="d-flex align-items-center justify-content-end gap-2 mb-2">
 
-                    <!-- BOTÓN ANTES DE CONFIRMAR -->
+                    <!-- Switch -->
+                    <field name="allow_without_mechanic" class="oe_inline"/>
+
+                    <!-- Botón -->
                     <button name="action_open_set_mechanic_wizard"
                             type="object"
                             class="btn btn-link btn-sm"
                             icon="fa-wrench"
-                            string=" Asignar mecánico"
-                            title="Asignar mecánico a líneas de servicio"
+                            string="Asignar mecánico"
                             attrs="{'invisible': [('state', '=', 'cancel')]}"/>
 
                 </div>
+
             </xpath>
         </field>
     </record>
