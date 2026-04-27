@@ -68,7 +68,7 @@ class SaleOrderSetMechanicWizard(models.TransientModel):  # noqa: E265
         order = self.order_id
         lines = self._get_target_lines()
 
-        # 🔧 Asignar mecánico a las líneas seleccionadas
+        # 🔧 1. Asignar mecánico a las líneas seleccionadas
         if lines:
             lines.write({'mechanic_id': self.mechanic_id.id})
             
@@ -78,33 +78,43 @@ class SaleOrderSetMechanicWizard(models.TransientModel):  # noqa: E265
                      f"a {len(lines)} línea(s) por {self.env.user.name}"
             )
 
-        # 🔍 Revisar si después de esta asignación aún faltan mecánicos en otras líneas
+        # 🔍 2. Revisar si después de esta asignación aún faltan mecánicos
+        # Solo procesamos inventario si TODAS las líneas de servicio tienen mecánico
         missing = order.order_line.filtered(
             lambda l: l.product_id.type == 'service' and not l.mechanic_id
         )
 
         # --- LÓGICA DE INVENTARIO PENDIENTE ---
-        # Si ya no faltan mecánicos, procesamos los pickings que se quedaron pausados
         if not missing:
+            # Filtramos albaranes que no estén listos ni cancelados
             pickings_to_validate = order.picking_ids.filtered(
                 lambda p: p.state not in ('done', 'cancel')
             )
             
             for picking in pickings_to_validate:
-                # Intentamos reservar stock si no estaba reservado
+                # A. Intentamos reservar stock si está en 'confirmado' o 'esperando'
                 if picking.state in ('confirmed', 'waiting'):
                     picking.action_assign()
 
-                # Si está listo (assigned), validamos automáticamente
+                # B. Si el estado es 'assigned' (Listo), procedemos a validar
                 if picking.state == 'assigned':
-                    for move in picking.move_ids_without_package:
+                    # Llenamos la cantidad realizada con la cantidad demandada
+                    for move in picking.move_ids:
                         if move.product_id.type == 'product':
                             move.quantity_done = move.product_uom_qty
                     
-                    picking.button_validate()
-                    _logger.info("Inventario validado tras asignación de mecánico: %s", picking.name)
+                    # C. Validación forzada (bypass de wizards de Odoo)
+                    # Usamos context para evitar que Odoo abra ventanas de "Backorder" o "Immediate Transfer"
+                    try:
+                        picking.with_context(
+                            skip_backorder=True, 
+                            picking_label_ids=picking.ids
+                        ).button_validate()
+                        _logger.info("Inventario validado automáticamente para %s tras asignar mecánico", order.name)
+                    except Exception as e:
+                        _logger.error("No se pudo validar el picking %s: %s", picking.name, str(e))
 
-        # 🔥 Gestión de Actividades (Limpieza)
+        # 🔥 3. Gestión de Actividades (Limpieza)
         activity_type = self.env.ref('mail.mail_activity_data_todo', raise_if_not_found=False)
         if activity_type:
             activities = self.env['mail.activity'].search([
