@@ -39,7 +39,7 @@
         <field name="mechanic_id"
                string="Mecánico"
                optional="show"
-               domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
+               domain="[('active','=',True), ('department_id.name', '=', 'Mecánicos')]"/>
       </xpath>
 
       <!-- Campo costo mecánico después del subtotal (visible solo si display_mechanic_fields) -->
@@ -62,7 +62,7 @@
       <xpath expr="//field[@name='order_line']/form//group[1]" position="after">
         <group string="Mecánico">
           <field name="mechanic_id"
-                 domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
+                 domain="[('active','=',True), ('job_id.name', '=', 'Mecánicos')]"/>
           <field name="mechanic_hours_required" readonly="1"
                  attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
           <field name="mechanic_cost_per_hour" readonly="1"
