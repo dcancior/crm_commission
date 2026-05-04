@@ -157,7 +157,7 @@ class MechanicCommissionWizard(models.TransientModel):
         # Buscar empleados con job que contenga 'Mecán'
         mechanics = Employee.search([
             ('active', '=', True),
-            ('job_id.name', 'ilike', 'Mecán')
+            ('department_id.name', 'ilike', 'Mecánicos')
         ])
         options = [('all', 'Todos')]
         for emp in mechanics:
@@ -241,7 +241,7 @@ class MechanicCommissionWizard(models.TransientModel):
                 Employee = w.env['hr.employee']
                 mechanics = Employee.search([
                     ('active', '=', True),
-                    ('job_id.name', 'ilike', 'Mecán')
+                    ('department_id.name', 'ilike', 'Mecánicos')
                 ])
                 if mechanics:
                     dom.append(('employee_id', 'in', mechanics.ids))
@@ -361,7 +361,7 @@ class MechanicCommissionWizard(models.TransientModel):
                 Employee = w.env['hr.employee']
                 target_mechanics = Employee.search([
                     ('active', '=', True),
-                    ('job_id.name', 'ilike', 'Mecán')
+                    ('department_id.name', 'ilike', 'Mecánicos')
                 ])
             else:
                 # Solo el mecánico seleccionado

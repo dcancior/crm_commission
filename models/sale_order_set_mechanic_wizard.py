@@ -27,13 +27,23 @@ class SaleOrderSetMechanicWizard(models.TransientModel):  # noqa: E265
     order_id = fields.Many2one('sale.order', required=True, ondelete='cascade')  # Pedido objetivo  # noqa: E265
     company_id = fields.Many2one('res.company', readonly=True)  # Compañía (para dominio de empleado)  # noqa: E265
 
-    mechanic_id = fields.Many2one(  # Mecánico que se aplicará a las líneas  # noqa: E265
+    mechanic_id = fields.Many2one(
         'hr.employee',
         string='Mecánico',
         required=True,
-        domain="[('active','=',True), ('job_id.name', 'ilike', 'mecán'), '|', ('company_id','=',False), ('company_id','=', company_id)]",  # noqa: E265
-        help="Empleado que se asignará como mecánico a las líneas de servicio.",  # noqa: E265
-    )  # noqa: E265
+        domain="""
+            [
+                ('active','=',True),
+                '|',
+                    ('job_id.name', 'ilike', 'mecán'),
+                    ('department_id.name', 'ilike', 'Mecánicos'),
+                '|',
+                    ('company_id','=',False),
+                    ('company_id','=', company_id)
+            ]
+        """,
+        help="Empleado que se asignará como mecánico a las líneas de servicio.",
+    )
 
     only_empty = fields.Boolean(  # Solo líneas sin mecánico  # noqa: E265
         string='Solo líneas sin mecánico',
