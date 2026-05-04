@@ -54,7 +54,7 @@
                         <field name="mechanic_id"
                             domain="[
                                 ('active','=',True),
-                                ('department_id.name', 'ilike', 'mecan'),
+                                ('department_id.name', 'ilike', 'Mecánicos'),
                                 ('company_id','=', company_id)
                             ]"/>
                         <field name="only_empty"/>

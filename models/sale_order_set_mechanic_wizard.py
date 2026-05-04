@@ -37,8 +37,6 @@ class SaleOrderSetMechanicWizard(models.TransientModel):  # noqa: E265
                 '|',
                     ('job_id.name', 'ilike', 'mecán'),
                     ('department_id.name', 'ilike', 'Mecánicos'),
-                '|',
-                    ('company_id','=',False),
                     ('company_id','=', company_id)
             ]
         """,
