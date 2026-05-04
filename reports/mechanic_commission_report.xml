@@ -15,6 +15,11 @@
       <t t-call="web.html_container">
         <t t-call="web.external_layout">
           
+          <!-- Determinamos la empresa activa -->
+          <t t-set="current_company" t-value="object.env.company if object else env.company"/>
+          <t t-set="currency_id" t-value="object and (object.currency_id or current_company.currency_id) or None"/>
+
+          <!-- Footer Personalizado -->
           <div class="footer">
             <div class="row" style="border-top: 1px solid #ccc; font-size: 10px; padding-top: 5px; color: #666;">
               <div class="col-6">
@@ -22,6 +27,7 @@
                 <strong>
                   <t t-esc="employee_name or (object and object.employee_id and object.employee_id.name) or ''"/>
                 </strong>
+                <span class="ml-2"> | Empresa: <t t-esc="current_company.name"/></span>
               </div>
               <div class="col-6 text-right">
                 <span>Página: </span>
@@ -31,75 +37,72 @@
           </div>
 
           <div class="page">
-            <h2 class="text-center">Comisiones de Mecánico</h2>
+            <!-- Título y Empresa -->
+            <div class="text-center mb-4">
+                <h2 style="color: #2c3e50; font-weight: bold;">Comisiones de Mecánico</h2>
+                <h4 class="text-muted"><t t-esc="current_company.name"/></h4>
+            </div>
 
-            <t t-set="currency_id" t-value="object and (object.currency_id or object.env.company.currency_id) or None"/>
-
-            <div class="row mt16 mb8">
+            <!-- Caja de Información General (Estilo Tarjeta) -->
+            <div class="row p-3 mb-4" style="background-color: #f8f9fa; border-radius: 5px; border: 1px solid #e9ecef;">
               <div class="col-6">
-                <p>
-                  <b>Mecánico:</b>
+                <p class="mb-0" style="font-size: 16px;">
+                  <strong>Mecánico:</strong><br/>
                   <t t-esc="employee_name or (object and object.employee_id and object.employee_id.name) or ''"/>
                 </p>
               </div>
               <div class="col-6 text-right">
-                <p>
-                  <b>Fecha inicial:</b>
-                  <t t-esc="date_from or ''"/>
-                  <br/>
-                  <b>Fecha final:</b>
-                  <t t-esc="date_to or ''"/>
+                <p class="mb-0">
+                  <strong>Fecha inicial:</strong> <t t-esc="date_from or ''"/><br/>
+                  <strong>Fecha final:</strong> <t t-esc="date_to or ''"/>
                 </p>
               </div>
             </div>
 
-            <table class="table table-sm table-striped o_main_table">
-              <thead>
+            <!-- Tabla de Registros -->
+            <table class="table table-sm table-striped table-bordered o_main_table">
+              <thead class="table-light">
                 <tr>
-                  <th class="text-center">Estado</th>
-                  <th>Factura</th>
-                  <th>Servicio</th>
-                  <th>Modelo</th>
-                  <th>Color</th>
-                  <th class="text-right">Cantidad</th>
-                  <th class="text-right">Costo/Hora</th>
-                  <th class="text-right">Horas</th>
-                  <th class="text-right">Pago Mecánico</th>
-                  <th class="text-center">Fecha pago</th>
+                  <th class="text-center align-middle">Estado</th>
+                  <th class="align-middle">Factura</th>
+                  <th class="align-middle">Servicio</th>
+                  <th class="align-middle">Modelo</th>
+                  <th class="align-middle">Color</th>
+                  <th class="text-right align-middle">Cant.</th>
+                  <th class="text-right align-middle">Costo/Hr</th>
+                  <th class="text-right align-middle">Horas</th>
+                  <th class="text-right align-middle" style="min-width: 100px;">Pago Mecánico</th>
+                  <th class="text-center align-middle">Fecha pago</th>
                 </tr>
               </thead>
               <tbody>
                 <t t-foreach="lines or []" t-as="l">
                   <tr>
-                    <td class="text-center">
-                      <t t-if="l.get('is_paid')">
-                        <span>Pagada</span>
-                      </t>
-                      <t t-else="">
-                        <span>No pagada</span>
-                      </t>
+                    <td class="text-center align-middle">
+                      <span t-attf-class="badge #{'bg-success' if l.get('is_paid') else 'bg-warning text-dark'}">
+                        <t t-esc="'Pagada' if l.get('is_paid') else 'No pagada'"/>
+                      </span>
                     </td>
-
-                    <td><t t-esc="l.get('invoice_name') or ''"/></td>
-                    <td><t t-esc="l.get('product_name') or ''"/></td>
-                    <td><t t-esc="l.get('nombre_auto') or ''"/></td>
-                    <td><t t-esc="l.get('color_auto') or ''"/></td>
+                    <td class="align-middle"><t t-esc="l.get('invoice_name') or ''"/></td>
+                    <td class="align-middle"><t t-esc="l.get('product_name') or ''"/></td>
+                    <td class="align-middle"><t t-esc="l.get('nombre_auto') or ''"/></td>
+                    <td class="align-middle"><t t-esc="l.get('color_auto') or ''"/></td>
 
                     <t t-set="qty_raw" t-value="l.get('quantity') or 0.0"/>
                     <t t-set="qty_val" t-value="float(qty_raw) if not isinstance(qty_raw, str) else float((qty_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
-                    <td class="text-right"><t t-esc="'%.2f' % qty_val"/></td>
+                    <td class="text-right align-middle"><t t-esc="'%.2f' % qty_val"/></td>
 
                     <t t-set="cph_raw" t-value="l.get('cost_per_hour') or 0.0"/>
                     <t t-set="cph_val" t-value="float(cph_raw) if not isinstance(cph_raw, str) else float((cph_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
-                    <td class="text-right"><t t-esc="'%.2f' % cph_val"/></td>
+                    <td class="text-right align-middle"><t t-esc="'%.2f' % cph_val"/></td>
 
                     <t t-set="hrs_raw" t-value="l.get('hours') or 0.0"/>
                     <t t-set="hrs_val" t-value="float(hrs_raw) if not isinstance(hrs_raw, str) else float((hrs_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
-                    <td class="text-right"><t t-esc="'%.2f' % hrs_val"/></td>
+                    <td class="text-right align-middle"><t t-esc="'%.2f' % hrs_val"/></td>
 
                     <t t-set="payout_raw" t-value="l.get('payout') or 0.0"/>
                     <t t-set="payout_val" t-value="float(payout_raw) if not isinstance(payout_raw, str) else float((payout_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
-                    <td class="text-right">
+                    <td class="text-right align-middle">
                       <t t-if="currency_id">
                         <t t-esc="format_amount(payout_val, currency_id)"/>
                       </t>
@@ -107,64 +110,70 @@
                         <t t-esc="'%.2f' % payout_val"/>
                       </t>
                     </td>
-
-                    <td class="text-center"><t t-esc="l.get('paid_date') or ''"/></td>
+                    <td class="text-center align-middle"><t t-esc="l.get('paid_date') or ''"/></td>
                   </tr>
                 </t>
-
                 <t t-if="not (lines and len(lines))">
                   <tr>
-                    <td colspan="10" class="text-center text-muted">Sin registros</td>
+                    <td colspan="10" class="text-center text-muted py-3">Sin registros para este periodo</td>
                   </tr>
                 </t>
               </tbody>
             </table>
 
+            <!-- Cálculos de Totales -->
             <t t-set="ai_raw" t-value="amount_invoiced or 0.0"/>
             <t t-set="ai_val" t-value="float(ai_raw) if not isinstance(ai_raw, str) else float((ai_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
             <t t-set="pt_raw" t-value="payout_total or 0.0"/>
             <t t-set="pt_val" t-value="float(pt_raw) if not isinstance(pt_raw, str) else float((pt_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
 
-            <div class="mt16">
-              <table class="table table-sm" style="width:60%; margin-left:auto;">
-                <tbody>
-                  <tr>
-                    <td><b>Servicios</b></td>
+            <!-- Tabla de Resumen -->
+            <div class="mt-4 row">
+              <div class="col-7"></div>
+              <div class="col-5">
+                <table class="table table-sm table-borderless">
+                  <tr style="border-bottom: 1px solid #dee2e6;">
+                    <td><strong>Total Servicios Realizados</strong></td>
                     <td class="text-right"><t t-esc="services_count or 0"/></td>
                   </tr>
-                  <tr>
-                    <td><b>Horas totales</b></td>
+                  <tr style="border-bottom: 1px solid #dee2e6;">
+                    <td><strong>Horas Totales Trabajadas</strong></td>
                     <td class="text-right">
                       <t t-set="th_raw" t-value="total_hours or 0.0"/>
                       <t t-set="th_val" t-value="float(th_raw) if not isinstance(th_raw, str) else float((th_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
                       <t t-esc="'%.2f' % th_val"/>
                     </td>
                   </tr>
-                  <tr>
-                    <td><b>Importe facturado (cliente)</b></td>
-                    <td class="text-right">
+                  <tr style="border-bottom: 1px solid #dee2e6;">
+                    <td><strong>Importe Facturado (Cliente)</strong></td>
+                    <td class="text-right text-muted">
                       <t t-if="currency_id">
                         <t t-esc="format_amount(ai_val, currency_id)"/>
                       </t>
                       <t t-else="">
-                        <t t-esc="'%.2f' % ai_val"/>
+                        $<t t-esc="'%.2f' % ai_val"/>
                       </t>
                     </td>
                   </tr>
-                  <tr>
-                    <td><b>Total a pagar al mecánico</b></td>
-                    <td class="text-right">
-                      <t t-if="currency_id">
-                        <t t-esc="format_amount(pt_val, currency_id)"/>
-                      </t>
-                      <t t-else="">
-                        <t t-esc="'%.2f' % pt_val"/>
-                      </t>
+                  <tr style="background-color: #f8f9fa; font-size: 16px; border-top: 2px solid #333;">
+                    <td class="py-2"><strong>Total a Pagar al Mecánico</strong></td>
+                    <td class="text-right py-2">
+                      <strong>
+                        <t t-if="currency_id">
+                          <t t-esc="format_amount(pt_val, currency_id)"/>
+                        </t>
+                        <t t-else="">
+                          $<t t-esc="'%.2f' % pt_val"/>
+                        </t>
+                      </strong>
                     </td>
                   </tr>
-                </tbody>
-              </table>
+                </table>
+              </div>
             </div>
-          </div> </t> </t> </template>
+          </div>
+        </t>
+      </t>
+    </template>
   </data>
 </odoo>
