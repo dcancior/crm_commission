@@ -48,9 +48,10 @@
               optional="show"
               domain="[
                   ('active','=',True),
+                  ('department_id.name', 'ilike', 'mecan'),
                   '|',
-                  ('job_id.name', 'ilike', 'mecan'),
-                  ('department_id.name', 'ilike', 'mecan')
+                      ('company_id','=',False),
+                      ('company_id','=', company_id)
               ]"
               attrs="{'readonly':[('display_mechanic_fields','=',False)]}"/>
       </xpath>
