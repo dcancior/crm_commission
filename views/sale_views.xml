@@ -46,7 +46,7 @@
          <field name="mechanic_id"
            string="Mecánico"
            optional="show"
-           domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"
+           domain="[('active','=',True), ('department_id.name', '=', 'Mecánicos')]"
            attrs="{'readonly':[('display_mechanic_fields','=',False)]}"/>
       </xpath>
 
