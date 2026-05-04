@@ -54,9 +54,8 @@
                         <field name="mechanic_id"
                             domain="[
                                 ('active','=',True),
-                                '|',
-                                ('job_id.name', 'ilike', 'mecan'),
-                                ('department_id.name', 'ilike', 'mecan')
+                                ('department_id.name', 'ilike', 'mecan'),
+                                ('company_id','=', company_id)
                             ]"/>
                         <field name="only_empty"/>
                         <field name="affected_count" readonly="1"/>
