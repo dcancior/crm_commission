@@ -39,4 +39,12 @@
         <field name="name">Seguimiento asignación de mecánicos</field>
         <field name="category_id" ref="base.module_category_sales"/>
     </record>
+
+
+    <!-- Nuevo grupo específico para la alerta visual -->
+    <record id="group_sale_order_mechanic_alert" model="res.groups">
+        <field name="name">Ver Alerta de Mecánico Faltante (Banner)</field>
+        <field name="category_id" ref="base.module_category_sales"/>
+        <field name="comment">Usuarios que pueden ver la franja roja de advertencia cuando falta un mecánico.</field>
+    </record>
 </odoo>

@@ -90,13 +90,14 @@
           </group>
       </xpath>
 
-      <!-- Banner visial sólo para grupo de comisiones-->
+      <!-- Banner visual filtrado por el nuevo grupo específico -->
       <xpath expr="//sheet" position="before">
-          <!-- Campo técnico (obligatorio para attrs) -->
           <field name="has_missing_mechanic" invisible="1"/>
+          
+          <!-- Cambiamos crm_commission.group_mechanic_commission_view por el nuevo grupo -->
           <div class="alert alert-danger"
               attrs="{'invisible': [('has_missing_mechanic', '=', False)]}"
-              groups="crm_commission.group_mechanic_commission_view">
+              groups="crm_commission.group_sale_order_mechanic_alert">
 
               ⚠ Esta orden fue confirmada sin mecánico. Debes asignarlo.
 
