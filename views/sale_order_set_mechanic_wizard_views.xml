@@ -57,8 +57,7 @@
                                 ('department_id.name', 'ilike', 'Mecánicos'),
                                 ('company_id','=', company_id)
                             ]"
-                            options="{'no_create': True, 'no_create_edit': True, 'no_quick_create': True}"
-                            context="{'create': False}"/>
+                            options="{'no_create': True, 'no_create_edit': True, 'no_quick_create': True, 'create': False}"/>
                         <field name="only_empty"/>
                         <field name="affected_count" readonly="1"/>
                     </group>
