@@ -1,3 +1,8 @@
+/* Fila completa en naranja cuando falta mecánico */
+.o_list_view table.o_list_table tr.text-warning > td {
+  background-color: rgba(255, 152, 0, 0.18) !important;
+}
+
 /* más específico (por si el tema sobrescribe) */
 .o_list_view table.o_list_table tr.text-warning td[data-name="mechanic_id"],
 .o_list_view table.o_list_table tr.table-warning td[data-name="mechanic_id"] {
