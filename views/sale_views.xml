@@ -51,6 +51,7 @@
                   ('department_id.name', 'ilike', 'Mecánicos'),
                   ('company_id','=', company_id)
               ]"
+              options="{'no_create': True, 'no_create_edit': True, 'no_quick_create': True, 'create': False}"
               attrs="{'readonly':[('display_mechanic_fields','=',False)]}"/>
       </xpath>
 
@@ -80,7 +81,8 @@
                       ('active','=',True),
                       ('department_id.name', 'ilike', 'Mecánicos'),
                       ('company_id','=', parent.company_id)
-                  ]"/>
+                  ]"
+                  options="{'no_create': True, 'no_create_edit': True, 'no_quick_create': True, 'create': False}"/>
               <field name="mechanic_hours_required" readonly="1"
                   attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
               <field name="mechanic_cost_per_hour" readonly="1"
