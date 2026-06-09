@@ -113,6 +113,24 @@
     </field>
   </record>
 
+  <!-- Vista con prioridad alta para garantizar que decoration-warning
+       de mecánico siempre gane sobre workshop_mechanic (que también
+       modifica el mismo atributo con solo product_archived).
+       priority=25 > 16 (default) → siempre se aplica de última. -->
+  <record id="view_order_form_mechanic_decoration_final" model="ir.ui.view">
+    <field name="name">sale.order.form.mechanic.decoration.final</field>
+    <field name="model">sale.order</field>
+    <field name="inherit_id" ref="sale.view_order_form"/>
+    <field name="priority">25</field>
+    <field name="arch" type="xml">
+      <xpath expr="//field[@name='order_line']/tree" position="attributes">
+        <attribute name="decoration-warning">
+          product_archived or ((display_mechanic_fields) and (not mechanic_id or mechanic_is_placeholder) and (not mechanic_exempt))
+        </attribute>
+      </xpath>
+    </field>
+  </record>
+
   <!-- Filtro para órdenes con mecánico faltante -->
   <record id="view_sale_order_filter_mechanic" model="ir.ui.view">
     <field name="name">sale.order.search.mechanic</field>
