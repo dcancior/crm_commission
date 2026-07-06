@@ -81,6 +81,15 @@ class SaleOrderLine(models.Model):
         digits=(16, 2),
     )
 
+    mechanic_commission_calc_method = fields.Selection(
+        related="company_id.mechanic_commission_calc_method",
+        string="Cálculo de comisión (mecánico)",
+        readonly=True,
+        store=False,
+        # Uso: la vista se apoya en este campo para mostrar/ocultar
+        # mechanic_cost_subtotal vs. mechanic_commission_percent según config.
+    )
+
     @api.onchange('product_id')
     def _onchange_mechanic_commission_percent(self):
         """Precarga el % de comisión del mecánico desde la ficha del producto."""
