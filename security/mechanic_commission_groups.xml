@@ -19,7 +19,7 @@
 
      <!-- Grupo de seguridad para el report de ventas-->
     <record id="group_commission_view" model="res.groups">
-        <field name="name">Ver Reporte de Comisiones</field>
+        <field name="name">Ver Comisiones de Ventas</field>
         <field name="category_id" ref="base.module_category_sales"/>
     </record>
 
