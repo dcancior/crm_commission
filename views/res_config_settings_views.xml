@@ -18,6 +18,32 @@
         <field name="arch" type="xml">
             <xpath expr="//div[hasclass('settings')]" position="inside">
                 <div class="app_settings_block" data-string="Comisiones" string="Comisiones" data-key="crm_commission" groups="base.group_system">
+                    <h2>Visibilidad de menús</h2>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane">
+                                <field name="group_mechanic_commission_view"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <label for="group_mechanic_commission_view"/>
+                                <div class="text-muted">
+                                    Muestra el menú y reporte de Comisiones de Mecánicos a los usuarios internos.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane">
+                                <field name="group_commission_view"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <label for="group_commission_view"/>
+                                <div class="text-muted">
+                                    Muestra el menú y reporte de Comisiones de Ventas a los usuarios internos.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <h2>Comisión de mecánico</h2>
                     <div class="row mt16 o_settings_container">
                         <div class="col-12 col-lg-8 o_setting_box">

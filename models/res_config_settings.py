@@ -25,3 +25,17 @@ class ResConfigSettings(models.TransientModel):
         string='Cálculo de comisión (mecánico)',
         readonly=False,
     )
+
+    # Activan/desactivan de forma independiente el menú y acceso a cada reporte
+    # de comisiones para los usuarios internos (grupos definidos en
+    # security/mechanic_commission_groups.xml).
+    group_mechanic_commission_view = fields.Boolean(
+        string='Comisiones Mecánicos',
+        implied_group='crm_commission.group_mechanic_commission_view',
+        help='Muestra el menú y reporte de Comisiones de Mecánicos a los usuarios internos.',
+    )
+    group_commission_view = fields.Boolean(
+        string='Comisiones de Ventas',
+        implied_group='crm_commission.group_commission_view',
+        help='Muestra el menú y reporte de Comisiones de Ventas a los usuarios internos.',
+    )

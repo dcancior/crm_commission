@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -m py_compile models/res_config_settings.py)",
+      "Bash(python3 -c \"import xml.etree.ElementTree as ET; ET.parse\\('views/res_config_settings_views.xml'\\)\")",
+      "Bash(rm -f models/__pycache__/res_config_settings.cpython-*.pyc)"
+    ]
+  }
+}
