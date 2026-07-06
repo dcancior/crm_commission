@@ -267,12 +267,129 @@ class MechanicCommissionWizard(models.TransientModel):
         for w in self:
             w.month_name = sel.get(w.month or "", "")
 
+    # Construye/actualiza las entries a partir de LÍNEAS DE FACTURA pagadas
+    # (modo 'paid': comportamiento histórico del módulo)
+    def _build_entries_from_paid_invoices(self, date_start, date_end, month, year):
+        w = self
+        moves = w.env['account.move'].search([
+            ('move_type', '=', 'out_invoice'),
+            ('state', '=', 'posted'),
+            ('payment_state', '=', 'paid'),
+            ('invoice_date', '>=', date_start),
+            ('invoice_date', '<=', date_end),
+        ])
+
+        inv_lines = moves.mapped('invoice_line_ids').filtered(
+            lambda l: l.product_id.type == 'service'
+                      and getattr(l, 'mechanic_id', False)
+                      and l.mechanic_id.id == w.employee_id.id
+        )
+
+        Entry = w.env['mechanic.commission.entry']
+        entries_to_keep = Entry.browse()
+
+        for line in inv_lines:
+            cph = (getattr(line.product_id.product_tmpl_id, 'service_cost_per_hour', 0.0) or 0.0)
+            hrs_req = (getattr(line.product_id.product_tmpl_id, 'service_hours_required', 0.0) or 0.0)
+            qty = line.quantity or 0.0
+            hrs = hrs_req * qty
+            payout = cph * hrs
+
+            vals_base = {
+                'company_id': w.env.company.id,
+                'employee_id': w.employee_id.id,
+                'invoice_id': line.move_id.id,
+                'invoice_line_id': line.id,
+                'invoice_name': f'{line.move_id.name or line.move_id.payment_reference or ""} - {line.move_id.partner_id.display_name}',
+                'invoice_date': line.move_id.invoice_date,
+                'product_id': line.product_id.id,
+                'product_name': line.product_id.display_name,
+                'quantity': qty,
+                'hours': hrs,
+                'subtotal_customer': line.price_subtotal,
+                'payout': payout,
+                'cost_per_hour': cph,
+                'currency_id': line.currency_id.id or w.env.company.currency_id.id,
+                'month': str(month).zfill(2),
+                'year': str(year),
+            }
+
+            entry = Entry.search([
+                ('employee_id', '=', w.employee_id.id),
+                ('invoice_line_id', '=', line.id)
+            ], limit=1)
+            if entry:
+                entry.write(vals_base)
+            else:
+                entry = Entry.create(vals_base)
+
+            entries_to_keep |= entry
+
+        return entries_to_keep
+
+    # Construye/actualiza las entries a partir de LÍNEAS DE COTIZACIÓN confirmadas
+    # (modo 'confirm': la comisión se hace efectiva al confirmar el pedido, sin
+    # esperar a que exista o se pague la factura)
+    def _build_entries_from_confirmed_orders(self, date_start, date_end, month, year):
+        w = self
+        orders = w.env['sale.order'].search([
+            ('state', '=', 'sale'),
+            ('date_order', '>=', date_start),
+            ('date_order', '<=', date_end),
+        ])
+
+        order_lines = orders.mapped('order_line').filtered(
+            lambda l: l.product_id and l.product_id.type == 'service'
+                      and getattr(l, 'mechanic_id', False)
+                      and l.mechanic_id.id == w.employee_id.id
+        )
+
+        Entry = w.env['mechanic.commission.entry']
+        entries_to_keep = Entry.browse()
+
+        for line in order_lines:
+            cph = (getattr(line.product_id.product_tmpl_id, 'service_cost_per_hour', 0.0) or 0.0)
+            hrs_req = (getattr(line.product_id.product_tmpl_id, 'service_hours_required', 0.0) or 0.0)
+            qty = line.product_uom_qty or 0.0
+            hrs = hrs_req * qty
+            payout = cph * hrs
+
+            vals_base = {
+                'company_id': w.env.company.id,
+                'employee_id': w.employee_id.id,
+                'sale_order_id': line.order_id.id,
+                'sale_order_line_id': line.id,
+                'invoice_name': f'{line.order_id.name or ""} - {line.order_id.partner_id.display_name}',
+                'invoice_date': line.order_id.date_order and line.order_id.date_order.date(),
+                'product_id': line.product_id.id,
+                'product_name': line.product_id.display_name,
+                'quantity': qty,
+                'hours': hrs,
+                'subtotal_customer': line.price_subtotal,
+                'payout': payout,
+                'cost_per_hour': cph,
+                'currency_id': line.currency_id.id or w.env.company.currency_id.id,
+                'month': str(month).zfill(2),
+                'year': str(year),
+            }
+
+            entry = Entry.search([
+                ('employee_id', '=', w.employee_id.id),
+                ('sale_order_line_id', '=', line.id)
+            ], limit=1)
+            if entry:
+                entry.write(vals_base)
+            else:
+                entry = Entry.create(vals_base)
+
+            entries_to_keep |= entry
+
+        return entries_to_keep
+
     # ÚNICO lugar que construye line_ids (blindado y por registro)
     @api.onchange('employee_id', 'month', 'year')
     def _onchange_build_lines(self):
         for w in self:
-            lines_cmds = []
-
             if not (w.employee_id and w.month and w.year):
                 w.line_ids = [(5, 0, 0)]
                 continue
@@ -283,63 +400,12 @@ class MechanicCommissionWizard(models.TransientModel):
             date_start = f"{year}-{str(month).zfill(2)}-01"
             date_end = f"{year}-{str(month).zfill(2)}-{last_day}"
 
-            # FACTURAS DEL CLIENTE pagadas
-            moves = w.env['account.move'].search([
-                ('move_type', '=', 'out_invoice'),
-                ('state', '=', 'posted'),
-                ('payment_state', '=', 'paid'),
-                ('invoice_date', '>=', date_start),
-                ('invoice_date', '<=', date_end),
-            ])
+            trigger = w.env.company.mechanic_commission_trigger or 'paid'
+            if trigger == 'confirm':
+                entries_to_keep = w._build_entries_from_confirmed_orders(date_start, date_end, month, year)
+            else:
+                entries_to_keep = w._build_entries_from_paid_invoices(date_start, date_end, month, year)
 
-            # LÍNEAS DE SERVICIO DEL mecánico seleccionado
-            inv_lines = moves.mapped('invoice_line_ids').filtered(
-                lambda l: l.product_id.type == 'service'
-                          and getattr(l, 'mechanic_id', False)
-                          and l.mechanic_id.id == w.employee_id.id
-            )
-
-            Entry = w.env['mechanic.commission.entry']
-            entries_to_keep = Entry.browse()
-
-            for line in inv_lines:
-                cph = (getattr(line.product_id.product_tmpl_id, 'service_cost_per_hour', 0.0) or 0.0)
-                hrs_req = (getattr(line.product_id.product_tmpl_id, 'service_hours_required', 0.0) or 0.0)
-                qty = line.quantity or 0.0
-                hrs = hrs_req * qty
-                payout = cph * hrs
-
-                vals_base = {
-                    'company_id': w.env.company.id,
-                    'employee_id': w.employee_id.id,
-                    'invoice_id': line.move_id.id,
-                    'invoice_line_id': line.id,
-                    'invoice_name': f'{line.move_id.name or line.move_id.payment_reference or ""} - {line.move_id.partner_id.display_name}',
-                    'invoice_date': line.move_id.invoice_date,
-                    'product_id': line.product_id.id,
-                    'product_name': line.product_id.display_name,
-                    'quantity': qty,
-                    'hours': hrs,
-                    'subtotal_customer': line.price_subtotal,
-                    'payout': payout,
-                    'cost_per_hour': cph,
-                    'currency_id': line.currency_id.id or w.env.company.currency_id.id,
-                    'month': str(month).zfill(2),
-                    'year': str(year),
-                }
-
-                entry = Entry.search([
-                    ('employee_id', '=', w.employee_id.id),
-                    ('invoice_line_id', '=', line.id)
-                ], limit=1)
-                if entry:
-                    entry.write(vals_base)
-                else:
-                    entry = Entry.create(vals_base)
-
-                entries_to_keep |= entry
-
-            # Construir comandos (aplicando filtro si corresponde)
             # Construir comandos (aplicando filtro si corresponde)
             lines_cmds = [
                 (0, 0, {

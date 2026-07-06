@@ -8,16 +8,21 @@
 # ║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html   ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
-from . import res_company
-from . import res_config_settings
-from . import crm_team
-from . import sale_commission_user
-from . import sale_order_commission
-from . import account_move_commission
-from . import account_extend
-from . import product_extend
-from . import sale_extend
-from . import mechanic_commission_entry
-from . import sale_order_set_mechanic_wizard
+from odoo import models, fields
 
 
+class ResCompany(models.Model):
+    _inherit = 'res.company'
+
+    mechanic_commission_trigger = fields.Selection(
+        [
+            ('confirm', 'Al confirmar la cotización'),
+            ('paid', 'Cuando se paga la factura'),
+        ],
+        string='Momento de pago de comisión (mecánico)',
+        default='paid',
+        required=True,
+        help="Define cuándo se genera/hace efectiva la comisión del mecánico:\n"
+             "- Al confirmar la cotización: se genera al confirmar el pedido de venta.\n"
+             "- Cuando se paga la factura: se genera cuando la factura del cliente queda pagada (comportamiento actual).",
+    )

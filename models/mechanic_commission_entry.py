@@ -27,6 +27,11 @@ class MechanicCommissionEntry(models.Model):
     invoice_name = fields.Char(string='Factura (folio/cliente)')
     invoice_date = fields.Date(string='Fecha factura')
 
+    # Origen alternativo cuando la comisión se genera al confirmar la cotización
+    # (sin esperar a que exista/se pague la factura).
+    sale_order_id = fields.Many2one('sale.order', string='Cotización', ondelete='set null', index=True)
+    sale_order_line_id = fields.Many2one('sale.order.line', string='Línea de cotización', ondelete='set null', index=True)
+
     product_id = fields.Many2one('product.product', string='Servicio', index=True)
     product_name = fields.Char(string='Producto/Servicio')
     quantity = fields.Float(string='Cantidad', digits='Product Unit of Measure')
@@ -59,6 +64,11 @@ class MechanicCommissionEntry(models.Model):
         ('uniq_employee_invoice_line',
          'unique(employee_id, invoice_line_id)',
          'Ya existe una entrada de comisión para esta línea y mecánico.'),
+        # Evita duplicados por misma línea de cotización para el mismo mecánico
+        # (modo "al confirmar la cotización")
+        ('uniq_employee_order_line',
+         'unique(employee_id, sale_order_line_id)',
+         'Ya existe una entrada de comisión para esta línea de cotización y mecánico.'),
     ]
 
     @api.constrains('month', 'year')
