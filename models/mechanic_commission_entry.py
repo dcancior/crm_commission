@@ -39,6 +39,17 @@ class MechanicCommissionEntry(models.Model):
     # NUEVO: costo por hora (persistente)
     cost_per_hour = fields.Monetary(string='Costo por hora', currency_field='currency_id')
 
+    # Método de cálculo usado al generar esta entrada, y % aplicado cuando el
+    # método es "percent" (ver res.company.mechanic_commission_calc_method).
+    calc_method = fields.Selection(
+        [
+            ('hours_cost', 'Costo por hora y horas de reparación'),
+            ('percent', 'Porcentaje de comisión'),
+        ],
+        string='Método de cálculo',
+    )
+    commission_percent = fields.Float(string='Comisión (%)', digits=(16, 2))
+
     subtotal_customer = fields.Monetary(string='Subtotal al cliente', currency_field='currency_id')
     payout = fields.Monetary(string='Comisión del Mecánico', currency_field='currency_id')
 

@@ -59,6 +59,7 @@
                   <th class="text-right">Cantidad</th>
                   <th class="text-right">Costo/Hora</th>
                   <th class="text-right">Horas</th>
+                  <th class="text-right">Comisión %</th>
                   <th class="text-right">Pago Mecánico</th>
                   <th class="text-center">Fecha pago</th>
                 </tr>
@@ -95,6 +96,9 @@
                     <t t-set="hrs_val" t-value="float(hrs_raw) if not isinstance(hrs_raw, str) else float((hrs_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
                     <td class="text-right"><t t-esc="'%.2f' % hrs_val"/></td>
 
+                    <!-- Comisión % (solo aplica en modo porcentaje) -->
+                    <td class="text-right"><t t-esc="l.get('commission_percent') or ''"/></td>
+
                     <!-- Pago Mecánico -->
                     <t t-set="payout_raw" t-value="l.get('payout') or 0.0"/>
                     <t t-set="payout_val" t-value="float(payout_raw) if not isinstance(payout_raw, str) else float((payout_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
@@ -114,7 +118,7 @@
                 <!-- Sin líneas -->
                 <t t-if="not (lines and len(lines))">
                   <tr>
-                    <td colspan="7" class="text-center text-muted">Sin registros</td>
+                    <td colspan="8" class="text-center text-muted">Sin registros</td>
                   </tr>
                 </t>
               </tbody>

@@ -40,6 +40,13 @@ class AccountMoveLine(models.Model):
         store=False,
     )
 
+    mechanic_commission_percent = fields.Float(
+        string="Comisión mecánico (%)",
+        help="Porcentaje de comisión del mecánico sobre el subtotal de esta línea "
+             "(copiado desde la línea de la cotización).",
+        digits=(16, 2),
+    )
+
     @api.depends("product_id")
     def _compute_mechanic_meta(self):
         for line in self:

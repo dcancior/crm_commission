@@ -54,6 +54,10 @@
         <field name="mechanic_cost_subtotal"
                optional="hide"
                attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+        <field name="mechanic_commission_percent"
+               string="Comisión %"
+               optional="hide"
+               attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
       </xpath>
 
       <!-- 5) Inyección de flags en el FORM (grupo oculto) -->
@@ -77,6 +81,8 @@
           <field name="mechanic_cost_per_hour" readonly="1"
                  attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
           <field name="mechanic_cost_subtotal" readonly="1"
+                 attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+          <field name="mechanic_commission_percent"
                  attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
         </group>
       </xpath>

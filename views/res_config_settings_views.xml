@@ -31,6 +31,17 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="col-12 col-lg-8 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="mechanic_commission_calc_method"/>
+                                <div class="text-muted">
+                                    Define cómo se calcula el monto de la comisión del mecánico.
+                                </div>
+                                <div class="mt8">
+                                    <field name="mechanic_commission_calc_method" widget="radio"/>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </xpath>

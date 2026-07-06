@@ -25,4 +25,12 @@ class ProductTemplate(models.Model):
         digits=(16, 2),
         default=0.0,
     )
+    mechanic_commission_percent = fields.Float(
+        string="Comisión mecánico (%)",
+        help="Porcentaje de comisión que se le paga al mecánico sobre el subtotal de la línea. "
+             "Solo se usa si en Configuración se eligió el cálculo de comisión por porcentaje. "
+             "Es el valor por defecto; se puede editar por línea en la cotización.",
+        digits=(16, 2),
+        default=0.0,
+    )
 

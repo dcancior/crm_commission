@@ -41,6 +41,7 @@
                                     <field name="pago_comision"/>
                                     <field name="quantity" readonly="1"/>
                                     <field name="cost_per_hour" readonly="1"/>
+                                    <field name="commission_percent" readonly="1" optional="hide"/>
                                     <field name="paid_date" readonly="1"/>
                                     <field name="paid_by" readonly="1"/>
                                 </tree>
@@ -61,6 +62,7 @@
                                         <field name="subtotal_customer" readonly="1"/>
                                         <field name="payout" readonly="1"/>
                                         <field name="cost_per_hour" readonly="1"/>
+                                        <field name="commission_percent" readonly="1"/>
 
                                         <field name="is_paid" readonly="1"/>
                                         <field name="pago_comision"/>

@@ -241,6 +241,7 @@ class MechanicCommissionWizard(models.TransientModel):
             "quantity": _num(l.quantity, 2),
             "cost_per_hour": _money(l.cost_per_hour),
             "hours": _num(l.hours, 2),
+            "commission_percent": _num(l.commission_percent, 2) if l.calc_method == 'percent' else "",
             "subtotal_customer": _money(l.subtotal_customer),
             "payout": _money(l.payout),
             "paid_date": fields.Datetime.to_string(l.paid_date) if l.paid_date else "",
@@ -267,6 +268,27 @@ class MechanicCommissionWizard(models.TransientModel):
         for w in self:
             w.month_name = sel.get(w.month or "", "")
 
+    # Calcula horas, costo/hora, % y monto a pagar según el método de cálculo
+    # configurado en la compañía (res.company.mechanic_commission_calc_method).
+    # 'line' puede ser una línea de factura o de cotización (ambas exponen
+    # product_id, price_subtotal y mechanic_commission_percent).
+    def _calc_commission(self, line, qty):
+        w = self
+        tmpl = line.product_id.product_tmpl_id
+        cph = (getattr(tmpl, 'service_cost_per_hour', 0.0) or 0.0)
+        hrs_req = (getattr(tmpl, 'service_hours_required', 0.0) or 0.0)
+        hrs = hrs_req * (qty or 0.0)
+
+        calc_method = w.env.company.mechanic_commission_calc_method or 'hours_cost'
+        if calc_method == 'percent':
+            percent = line.mechanic_commission_percent or tmpl.mechanic_commission_percent or 0.0
+            payout = (line.price_subtotal or 0.0) * (percent / 100.0)
+        else:
+            percent = 0.0
+            payout = cph * hrs
+
+        return calc_method, hrs, cph, percent, payout
+
     # Construye/actualiza las entries a partir de LÍNEAS DE FACTURA pagadas
     # (modo 'paid': comportamiento histórico del módulo)
     def _build_entries_from_paid_invoices(self, date_start, date_end, month, year):
@@ -289,11 +311,8 @@ class MechanicCommissionWizard(models.TransientModel):
         entries_to_keep = Entry.browse()
 
         for line in inv_lines:
-            cph = (getattr(line.product_id.product_tmpl_id, 'service_cost_per_hour', 0.0) or 0.0)
-            hrs_req = (getattr(line.product_id.product_tmpl_id, 'service_hours_required', 0.0) or 0.0)
             qty = line.quantity or 0.0
-            hrs = hrs_req * qty
-            payout = cph * hrs
+            calc_method, hrs, cph, percent, payout = w._calc_commission(line, qty)
 
             vals_base = {
                 'company_id': w.env.company.id,
@@ -309,6 +328,8 @@ class MechanicCommissionWizard(models.TransientModel):
                 'subtotal_customer': line.price_subtotal,
                 'payout': payout,
                 'cost_per_hour': cph,
+                'commission_percent': percent,
+                'calc_method': calc_method,
                 'currency_id': line.currency_id.id or w.env.company.currency_id.id,
                 'month': str(month).zfill(2),
                 'year': str(year),
@@ -348,11 +369,8 @@ class MechanicCommissionWizard(models.TransientModel):
         entries_to_keep = Entry.browse()
 
         for line in order_lines:
-            cph = (getattr(line.product_id.product_tmpl_id, 'service_cost_per_hour', 0.0) or 0.0)
-            hrs_req = (getattr(line.product_id.product_tmpl_id, 'service_hours_required', 0.0) or 0.0)
             qty = line.product_uom_qty or 0.0
-            hrs = hrs_req * qty
-            payout = cph * hrs
+            calc_method, hrs, cph, percent, payout = w._calc_commission(line, qty)
 
             vals_base = {
                 'company_id': w.env.company.id,
@@ -368,6 +386,8 @@ class MechanicCommissionWizard(models.TransientModel):
                 'subtotal_customer': line.price_subtotal,
                 'payout': payout,
                 'cost_per_hour': cph,
+                'commission_percent': percent,
+                'calc_method': calc_method,
                 'currency_id': line.currency_id.id or w.env.company.currency_id.id,
                 'month': str(month).zfill(2),
                 'year': str(year),
@@ -491,6 +511,14 @@ class MechanicCommissionWizardLine(models.TransientModel):
         readonly=True,
         currency_field='currency_id',
         related='commission_entry_id.cost_per_hour'
+    )
+
+    # Método de cálculo y % aplicado (solo relevante en modo "percent")
+    calc_method = fields.Selection(related='commission_entry_id.calc_method', readonly=True)
+    commission_percent = fields.Float(
+        string='Comisión %',
+        readonly=True,
+        related='commission_entry_id.commission_percent'
     )
 
     # Estado de pago (editable)

@@ -19,3 +19,9 @@ class ResConfigSettings(models.TransientModel):
         string='Momento de pago de comisión (mecánico)',
         readonly=False,
     )
+
+    mechanic_commission_calc_method = fields.Selection(
+        related='company_id.mechanic_commission_calc_method',
+        string='Cálculo de comisión (mecánico)',
+        readonly=False,
+    )
