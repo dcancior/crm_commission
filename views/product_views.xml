@@ -18,8 +18,13 @@
         <field name="arch" type="xml">
             <xpath expr="//field[@name='type']" position="after">
                 <group string="Parámetros de servicio (mecánico)" attrs="{'invisible': [('type','!=','service')]}">
-                    <field name="service_hours_required"/>
-                    <field name="service_cost_per_hour"/>
+                    <field name="mechanic_commission_calc_method" invisible="1"/>
+                    <field name="service_hours_required"
+                           attrs="{'invisible': [('mechanic_commission_calc_method','=','percent')]}"/>
+                    <field name="service_cost_per_hour"
+                           attrs="{'invisible': [('mechanic_commission_calc_method','=','percent')]}"/>
+                    <field name="porcentaje_comision_mecanico"
+                           attrs="{'invisible': [('mechanic_commission_calc_method','=','hours_cost')]}"/>
                 </group>
             </xpath>
         </field>

@@ -404,9 +404,19 @@ class MechanicCommissionWizard(models.TransientModel):
 
                 qty = line.product_uom_qty or 0.0
                 hrs = hrs_req * qty
-                payout = cph * hrs
 
-                porcentaje = getattr(tmpl, 'porcentaje_comision_mecanico', 0.0) or 0.0
+                # Cálculo según el método configurado en la compañía:
+                # - hours_cost: costo por hora × horas (comportamiento original)
+                # - percent: % del precio unitario × cantidad (el % viene de la
+                #   línea de cotización; si no, del producto)
+                calc_method = w.env.company.mechanic_commission_calc_method or 'hours_cost'
+                if calc_method == 'percent':
+                    porcentaje = (getattr(line, 'porcentaje_comision_mecanico', 0.0)
+                                  or getattr(tmpl, 'porcentaje_comision_mecanico', 0.0) or 0.0)
+                    payout = (line.price_unit or 0.0) * qty * (porcentaje / 100.0)
+                else:
+                    porcentaje = getattr(tmpl, 'porcentaje_comision_mecanico', 0.0) or 0.0
+                    payout = cph * hrs
 
                 # Información del vehículo desde el pedido
                 car_id = False
@@ -441,6 +451,7 @@ class MechanicCommissionWizard(models.TransientModel):
                     'payout': payout,
                     'cost_per_hour': cph,
                     'porcentaje_comision': porcentaje,
+                    'calc_method': calc_method,
                     'currency_id': line.currency_id.id or w.env.company.currency_id.id,
                     'car_id': car_id,
                     'marca_auto': marca_auto,

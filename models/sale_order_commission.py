@@ -39,6 +39,15 @@ class SaleOrder(models.Model):
         currency_field='currency_id',
     )
 
+    mechanic_commission_calc_method = fields.Selection(
+        related='company_id.mechanic_commission_calc_method',
+        string='Cálculo de comisión (mecánico)',
+        readonly=True,
+        store=False,
+        # Uso: el tree de líneas lo referencia como parent.* para ocultar
+        # la columna de costo mecánico o la de porcentaje según config.
+    )
+
     @api.depends(
         'user_id',
         'amount_untaxed',

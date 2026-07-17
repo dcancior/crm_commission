@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  DCR INFORMATIC SERVICES SAS DE CV                                 ║
+║  Web: https://www.dcrsoluciones.com                                ║
+║  Contacto: info@dcrsoluciones.com                                  ║
+║                                                                    ║
+║  Este módulo está bajo licencia (LGPLv3).                          ║
+║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html     ║
+╚════════════════════════════════════════════════════════════════════╝
+-->
+
+<odoo>
+    <record id="res_config_settings_view_form_commission" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.crm.commission</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base_setup.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[hasclass('settings')]" position="inside">
+                <div class="app_settings_block" data-string="Comisiones" string="Comisiones" data-key="crm_commission" groups="base.group_system">
+                    <h2>Visibilidad de menús</h2>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane">
+                                <field name="group_mechanic_commission_view"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <label for="group_mechanic_commission_view"/>
+                                <div class="text-muted">
+                                    Muestra el menú y reporte de Comisiones de Mecánicos a los usuarios internos.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane">
+                                <field name="group_commission_view"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <label for="group_commission_view"/>
+                                <div class="text-muted">
+                                    Muestra el menú y reporte de Comisiones de Ventas a los usuarios internos.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h2>Comisión de mecánico</h2>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-8 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="mechanic_commission_trigger"/>
+                                <div class="text-muted">
+                                    Define en qué momento se genera/hace efectiva la comisión del mecánico.
+                                </div>
+                                <div class="mt8">
+                                    <field name="mechanic_commission_trigger" widget="radio"/>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-8 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="mechanic_commission_calc_method"/>
+                                <div class="text-muted">
+                                    Define cómo se calcula el monto de la comisión del mecánico:
+                                    costo por hora × horas del servicio, o un porcentaje del
+                                    precio unitario editable en cada línea de la cotización.
+                                </div>
+                                <div class="mt8">
+                                    <field name="mechanic_commission_calc_method" widget="radio"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>

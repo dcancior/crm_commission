@@ -50,11 +50,22 @@
            attrs="{'readonly':[('display_mechanic_fields','=',False)]}"/>
       </xpath>
 
-      <!-- 4) Costo mecánico después del subtotal -->
+      <!-- 4) Costo mecánico / Porcentaje mecánico después del subtotal, según método -->
       <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="after">
         <field name="mechanic_cost_subtotal"
                optional="hide"
-               attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+               attrs="{'invisible':[('display_mechanic_fields','=',False)],
+                       'column_invisible':[('parent.mechanic_commission_calc_method','=','percent')]}"/>
+        <field name="porcentaje_comision_mecanico"
+               string="Porcentaje mecánico"
+               attrs="{'readonly':[('display_mechanic_fields','=',False)],
+                       'invisible':[('display_mechanic_fields','=',False)],
+                       'column_invisible':[('parent.mechanic_commission_calc_method','=','hours_cost')]}"/>
+      </xpath>
+
+      <!-- 4b) Campo auxiliar en el encabezado del pedido para column_invisible -->
+      <xpath expr="//field[@name='partner_id']" position="after">
+        <field name="mechanic_commission_calc_method" invisible="1"/>
       </xpath>
 
       <!-- 5) Inyección de flags en el FORM (grupo oculto) -->
@@ -65,6 +76,8 @@
           <field name="mechanic_is_placeholder"/>
           <!-- NUEVO: misma bandera en el form -->
           <field name="mechanic_exempt"/>
+          <!-- NUEVO: método de cálculo de comisión configurado en la compañía -->
+          <field name="mechanic_commission_calc_method"/>
         </group>
       </xpath>
 
@@ -74,11 +87,14 @@
           <field name="mechanic_id"
                  domain="[('active','=',True), ('job_id.name', '=', 'Mecánico')]"/>
           <field name="mechanic_hours_required" readonly="1"
-                 attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+                 attrs="{'invisible':['|', ('display_mechanic_fields','=',False), ('mechanic_commission_calc_method','=','percent')]}"/>
           <field name="mechanic_cost_per_hour" readonly="1"
-                 attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+                 attrs="{'invisible':['|', ('display_mechanic_fields','=',False), ('mechanic_commission_calc_method','=','percent')]}"/>
           <field name="mechanic_cost_subtotal" readonly="1"
-                 attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+                 attrs="{'invisible':['|', ('display_mechanic_fields','=',False), ('mechanic_commission_calc_method','=','percent')]}"/>
+          <field name="porcentaje_comision_mecanico"
+                 string="Porcentaje mecánico"
+                 attrs="{'invisible':['|', ('display_mechanic_fields','=',False), ('mechanic_commission_calc_method','=','hours_cost')]}"/>
         </group>
       </xpath>
 

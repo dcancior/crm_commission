@@ -8,6 +8,8 @@
 # ║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html   ║
 # ╚══════════════════════════════════════════════════════════════════╝
 
+from . import res_company
+from . import res_config_settings
 from . import crm_team
 from . import sale_commission_user
 from . import sale_order_commission

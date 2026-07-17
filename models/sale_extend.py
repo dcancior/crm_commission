@@ -73,6 +73,30 @@ class SaleOrderLine(models.Model):
         help="Fórmula: Horas requeridas × Costo por hora × Cantidad (solo en servicios).",
     )
 
+    porcentaje_comision_mecanico = fields.Float(
+        string="Porcentaje mecánico",
+        help="Porcentaje del precio unitario que se le paga al mecánico como comisión "
+             "por esta línea. Se precarga desde la ficha del producto y puede editarse. "
+             "Solo aplica si en Configuración el cálculo de comisión es por porcentaje.",
+        digits=(16, 2),
+    )
+
+    mechanic_commission_calc_method = fields.Selection(
+        related="company_id.mechanic_commission_calc_method",
+        string="Cálculo de comisión (mecánico)",
+        readonly=True,
+        store=False,
+        # Uso: la vista se apoya en este campo para mostrar/ocultar
+        # mechanic_cost_subtotal vs. porcentaje_comision_mecanico según config.
+    )
+
+    @api.onchange('product_id')
+    def _onchange_porcentaje_comision_mecanico(self):
+        """Precarga el % de comisión del mecánico desde la ficha del producto."""
+        for line in self:
+            tmpl = line.product_id.product_tmpl_id if line.product_id else False
+            line.porcentaje_comision_mecanico = tmpl.porcentaje_comision_mecanico if tmpl else 0.0
+
     product_type = fields.Selection(
         related="product_id.type",
         store=True,  # Persistimos para usar en decoraciones/filtrado de vistas árbol
@@ -283,6 +307,7 @@ class SaleOrderLine(models.Model):
         vals = super()._prepare_invoice_line(**optional_values)
         if self.mechanic_id and not self.mechanic_is_placeholder:
             vals["mechanic_id"] = self.mechanic_id.id
+        vals["porcentaje_comision_mecanico"] = self.porcentaje_comision_mecanico
         return vals
 
 

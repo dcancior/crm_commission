@@ -17,12 +17,6 @@ class MechanicCommissionEntry(models.Model):
     _order = 'invoice_date desc, id desc'
     _rec_name = 'invoice_name'
 
-    order_id = fields.Many2one('sale.order', string='Cotización/Orden', ondelete='set null', index=True)
-    order_line_id = fields.Many2one('sale.order.line', string='Línea de cotización/orden', ondelete='set null', index=True)
-    _description = 'Entrada de comisión por servicio mecánico'
-    _order = 'invoice_date desc, id desc'
-    _rec_name = 'invoice_name'
-
     company_id = fields.Many2one('res.company', default=lambda self: self.env.company, required=True)
 
     employee_id = fields.Many2one('hr.employee', string='Mecánico', required=True, index=True)
@@ -32,6 +26,11 @@ class MechanicCommissionEntry(models.Model):
     invoice_line_id = fields.Many2one('account.move.line', string='Línea de factura', ondelete='set null', index=True)
     invoice_name = fields.Char(string='Factura (folio/cliente)')
     invoice_date = fields.Date(string='Fecha factura')
+
+    # Origen alternativo cuando la comisión se genera al confirmar la cotización
+    # (sin esperar a que exista/se pague la factura).
+    order_id = fields.Many2one('sale.order', string='Cotización/Orden', ondelete='set null', index=True)
+    order_line_id = fields.Many2one('sale.order.line', string='Línea de cotización/orden', ondelete='set null', index=True)
 
     product_id = fields.Many2one('product.product', string='Servicio', index=True)
     product_name = fields.Char(string='Producto/Servicio')
@@ -45,6 +44,16 @@ class MechanicCommissionEntry(models.Model):
         string='% Comisión',
         digits=(5, 2),
         help='Porcentaje de comisión aplicado del producto'
+    )
+
+    # Método de cálculo usado al generar esta entrada
+    # (ver res.company.mechanic_commission_calc_method)
+    calc_method = fields.Selection(
+        [
+            ('hours_cost', 'Comisión costo por hora'),
+            ('percent', 'Comisión por porcentaje'),
+        ],
+        string='Método de cálculo',
     )
 
     subtotal_customer = fields.Monetary(string='Subtotal al cliente', currency_field='currency_id')
@@ -97,6 +106,11 @@ class MechanicCommissionEntry(models.Model):
         ('uniq_employee_invoice_line',
          'unique(employee_id, invoice_line_id)',
          'Ya existe una entrada de comisión para esta línea y mecánico.'),
+        # Evita duplicados por misma línea de cotización para el mismo mecánico
+        # (modo "al confirmar la cotización")
+        ('uniq_employee_order_line',
+         'unique(employee_id, order_line_id)',
+         'Ya existe una entrada de comisión para esta línea de cotización y mecánico.'),
     ]
 
     @api.constrains('month', 'year')
