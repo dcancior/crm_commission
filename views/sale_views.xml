@@ -55,11 +55,10 @@
               attrs="{'readonly':[('display_mechanic_fields','=',False)]}"/>
       </xpath>
 
-      <!-- 4) Costo mecánico después del subtotal -->
+      <!-- 4) Costo mecánico después del subtotal (oculto siempre: es solo un
+           cálculo interno de referencia, no se usa en ningún otro lugar del módulo) -->
       <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="after">
-        <field name="mechanic_cost_subtotal"
-               optional="hide"
-               attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+        <field name="mechanic_cost_subtotal" invisible="1"/>
       </xpath>
 
       <!-- 5) Inyección de flags en el FORM (grupo oculto) -->
@@ -87,8 +86,7 @@
                   attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
               <field name="mechanic_cost_per_hour" readonly="1"
                   attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
-              <field name="mechanic_cost_subtotal" readonly="1"
-                  attrs="{'invisible':[('display_mechanic_fields','=',False)]}"/>
+              <field name="mechanic_cost_subtotal" readonly="1" invisible="1"/>
           </group>
       </xpath>
 
