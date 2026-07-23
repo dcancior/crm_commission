@@ -50,12 +50,10 @@
            attrs="{'readonly':[('display_mechanic_fields','=',False)]}"/>
       </xpath>
 
-      <!-- 4) Costo mecánico / Porcentaje mecánico después del subtotal, según método -->
+      <!-- 4) Costo mecánico (oculto siempre: es solo un cálculo interno de referencia,
+           no se usa en ningún otro lugar del módulo) / Porcentaje mecánico según método -->
       <xpath expr="//field[@name='order_line']/tree/field[@name='price_subtotal']" position="after">
-        <field name="mechanic_cost_subtotal"
-               optional="hide"
-               attrs="{'invisible':[('display_mechanic_fields','=',False)],
-                       'column_invisible':[('parent.mechanic_commission_calc_method','=','percent')]}"/>
+        <field name="mechanic_cost_subtotal" invisible="1"/>
         <field name="porcentaje_comision_mecanico"
                string="Porcentaje mecánico"
                attrs="{'readonly':[('display_mechanic_fields','=',False)],
@@ -90,12 +88,24 @@
                  attrs="{'invisible':['|', ('display_mechanic_fields','=',False), ('mechanic_commission_calc_method','=','percent')]}"/>
           <field name="mechanic_cost_per_hour" readonly="1"
                  attrs="{'invisible':['|', ('display_mechanic_fields','=',False), ('mechanic_commission_calc_method','=','percent')]}"/>
-          <field name="mechanic_cost_subtotal" readonly="1"
-                 attrs="{'invisible':['|', ('display_mechanic_fields','=',False), ('mechanic_commission_calc_method','=','percent')]}"/>
+          <field name="mechanic_cost_subtotal" readonly="1" invisible="1"/>
           <field name="porcentaje_comision_mecanico"
                  string="Porcentaje mecánico"
                  attrs="{'invisible':['|', ('display_mechanic_fields','=',False), ('mechanic_commission_calc_method','=','hours_cost')]}"/>
         </group>
+      </xpath>
+
+      <!-- 7) Ocultar "Ruta" (route_id, de sale_stock): no es parte de comisiones
+           y no se usa en este módulo; se oculta para no confundir al vendedor. -->
+      <xpath expr="//field[@name='order_line']//field[@name='route_id']" position="attributes">
+        <attribute name="invisible">1</attribute>
+      </xpath>
+
+      <!-- 8) Ocultar "Plazo de entrega" (customer_lead, del módulo sale base):
+           no se usa en este negocio; ocultarlo no afecta su cálculo interno,
+           solo deja de ser editable/visible por línea. -->
+      <xpath expr="//field[@name='order_line']//field[@name='customer_lead']" position="attributes">
+        <attribute name="invisible">1</attribute>
       </xpath>
 
     </field>
