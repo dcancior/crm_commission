@@ -110,6 +110,19 @@
           </div>
       </xpath>
 
+      <!-- 7) Ocultar "Ruta" (route_id, de sale_stock): no es parte de comisiones
+           y no se usa en este módulo; se oculta para no confundir al vendedor. -->
+      <xpath expr="//field[@name='order_line']//field[@name='route_id']" position="attributes">
+        <attribute name="invisible">1</attribute>
+      </xpath>
+
+      <!-- 8) Ocultar "Plazo de entrega" (customer_lead, del módulo sale base):
+           no se usa en este negocio; ocultarlo no afecta su cálculo interno,
+           solo deja de ser editable/visible por línea. -->
+      <xpath expr="//field[@name='order_line']//field[@name='customer_lead']" position="attributes">
+        <attribute name="invisible">1</attribute>
+      </xpath>
+
     </field>
   </record>
 

@@ -14,7 +14,7 @@
     'name': 'CRM Commission',
     'version': '16.0.1.0.1',
     'summary': 'Permite asignar comisión a los vendedores del CRM',
-    'depends': ['web', 'crm', 'sale', 'hr', 'workshop_mechanic'],
+    'depends': ['web', 'crm', 'sale', 'sale_stock', 'hr', 'workshop_mechanic'],
     'data': [
         'security/mechanic_commission_groups.xml',
         'security/ir.model.access.csv',
