@@ -95,7 +95,7 @@ class SaleCommissionGoalReport(models.Model):
                     SELECT ru.id
                     FROM res_users ru
                     JOIN crm_team ct ON ct.id = ru.sale_team_id
-                    WHERE ct.name ILIKE '%%Ventas%%'
+                    WHERE ct.name::text ILIKE '%%Ventas%%'
                 )
             )
         """ % {'table': self._table})
