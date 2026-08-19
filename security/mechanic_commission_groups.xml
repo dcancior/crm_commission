@@ -21,6 +21,11 @@
     <record id="group_commission_view" model="res.groups">
         <field name="name">Ver Reporte de Comisiones</field>
         <field name="category_id" ref="base.module_category_sales"/>
+        <field name="comment">Usuarios en este grupo pueden abrir el menú "Comisiones de Ventas" y ver el
+Reporte de Comisión de cualquier vendedor del equipo de Ventas (no solo el
+propio): eligen al vendedor en el filtro del reporte y consultan sus
+facturas comisionables, el % y monto de comisión, y su avance de meta de
+venta mensual.</field>
     </record>
 
     <!-- Grupo solo para la vista de comisiones en pedidos de venta -->
