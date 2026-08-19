@@ -17,5 +17,6 @@ from . import product_extend
 from . import sale_extend
 from . import mechanic_commission_entry
 from . import sale_order_set_mechanic_wizard
+from . import sale_commission_goal
 
 

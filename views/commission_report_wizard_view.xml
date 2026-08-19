@@ -114,6 +114,37 @@
                 </form>
               </field>
             </page>
+
+            <page string="Meta de Venta">
+              <field name="has_goal" invisible="1"/>
+
+              <div class="alert alert-warning" role="alert"
+                   attrs="{'invisible': [('has_goal', '=', True)]}">
+                No hay una meta de venta configurada para este vendedor en el periodo seleccionado.
+                <span groups="sales_team.group_sale_manager">
+                  Puedes configurarla en el menú "Metas de Venta".
+                </span>
+              </div>
+
+              <group>
+                <group string="Meta del periodo">
+                  <field name="goal_total" widget="monetary" options="{'currency_field': 'currency_id'}" readonly="1"/>
+                  <field name="achieved_total" widget="monetary" options="{'currency_field': 'currency_id'}" readonly="1"/>
+                  <field name="remaining_total" widget="monetary" options="{'currency_field': 'currency_id'}" readonly="1"/>
+                </group>
+                <group string="Avance">
+                  <field name="percent_goal" widget="percentpie" readonly="1"/>
+                  <field name="achieved_total" nolabel="1" readonly="1"
+                         widget="progressbar"
+                         options="{'current_value': 'achieved_total', 'max_value': 'goal_total'}"/>
+                </group>
+              </group>
+
+              <group string="Unidades vendidas en el periodo">
+                <field name="qty_products_sold" readonly="1"/>
+                <field name="qty_services_sold" readonly="1"/>
+              </group>
+            </page>
           </notebook>
         </sheet>
 

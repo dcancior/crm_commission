@@ -112,6 +112,20 @@ class CommissionReportWizard(models.TransientModel):
     # ========= Detalle =========
     line_ids = fields.One2many('commission.report.wizard.line', 'wizard_id')
 
+    # ========= Meta de venta (segunda pestaña) =========
+    has_goal = fields.Boolean(string='Tiene meta configurada', compute='_compute_goal_progress')
+    goal_total = fields.Monetary(string='Meta del periodo', compute='_compute_goal_progress',
+                                  currency_field='currency_id')
+    achieved_total = fields.Monetary(string='Alcanzado', compute='_compute_goal_progress',
+                                      currency_field='currency_id')
+    remaining_total = fields.Monetary(string='Falta para la meta', compute='_compute_goal_progress',
+                                       currency_field='currency_id')
+    percent_goal = fields.Float(string='% de la meta', compute='_compute_goal_progress', digits=(16, 2))
+    qty_products_sold = fields.Float(string='Productos vendidos', compute='_compute_goal_progress',
+                                      digits=(16, 2))
+    qty_services_sold = fields.Float(string='Servicios vendidos', compute='_compute_goal_progress',
+                                      digits=(16, 2))
+
     # ----------------- UTILIDADES PRIVADAS -----------------
 
     def _moves_domain(self):
@@ -221,6 +235,67 @@ class CommissionReportWizard(models.TransientModel):
             rec.lines_count = len(rec.line_ids)
             rec.amount_total = sum(rec.line_ids.mapped('amount_untaxed')) if rec.line_ids else 0.0
             rec.commission_total = sum(rec.line_ids.mapped('commission_amount')) if rec.line_ids else 0.0
+
+    @staticmethod
+    def _months_in_range(date_start, date_end):
+        """Lista de tuplas ('YYYY', 'MM') cubiertas por [date_start, date_end]."""
+        months = []
+        if not (date_start and date_end):
+            return months
+        y, m = date_start.year, date_start.month
+        while (y, m) <= (date_end.year, date_end.month):
+            months.append((str(y), str(m).zfill(2)))
+            m += 1
+            if m > 12:
+                m = 1
+                y += 1
+        return months
+
+    @api.depends('user_id', 'date_start', 'date_end')
+    def _compute_goal_progress(self):
+        """Avance de la meta de venta del vendedor para el rango seleccionado.
+
+        El "alcanzado" se calcula sobre TODAS las facturas pagadas del vendedor
+        en el rango (mismo dominio que _moves_domain), sin importar el filtro
+        de "pago de comisión" (filter_payment), que solo aplica a la tabla de
+        facturas de abajo.
+        """
+        Goal = self.env['sale.commission.goal']
+        for rec in self:
+            rec.has_goal = False
+            rec.goal_total = 0.0
+            rec.achieved_total = 0.0
+            rec.remaining_total = 0.0
+            rec.percent_goal = 0.0
+            rec.qty_products_sold = 0.0
+            rec.qty_services_sold = 0.0
+
+            if not (rec.user_id and rec.date_start and rec.date_end):
+                continue
+
+            periods = rec._months_in_range(rec.date_start, rec.date_end)
+            if periods:
+                goals = Goal.search([
+                    ('user_id', '=', rec.user_id.id),
+                    ('company_id', '=', rec.env.company.id),
+                ])
+                applicable = goals.filtered(lambda g: (g.year, g.month) in periods)
+                rec.goal_total = sum(applicable.mapped('amount_goal'))
+                rec.has_goal = bool(applicable)
+
+            moves = self.env['account.move'].search(rec._moves_domain())
+            rec.achieved_total = sum(moves.mapped('amount_untaxed'))
+            rec.remaining_total = max(rec.goal_total - rec.achieved_total, 0.0)
+            if rec.goal_total:
+                rec.percent_goal = (rec.achieved_total / rec.goal_total) * 100.0
+
+            lines = moves.mapped('invoice_line_ids').filtered(
+                lambda l: l.product_id and l.display_type not in ('line_section', 'line_note')
+            )
+            service_lines = lines.filtered(lambda l: l.product_id.type == 'service')
+            product_lines = lines - service_lines
+            rec.qty_services_sold = sum(service_lines.mapped('quantity'))
+            rec.qty_products_sold = sum(product_lines.mapped('quantity'))
 
     # ----------------- ACCIONES -----------------
 
