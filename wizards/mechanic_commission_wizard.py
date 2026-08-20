@@ -10,8 +10,9 @@
 
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError
-from datetime import datetime, date
+from datetime import datetime, date, time
 import calendar
+import pytz
 import re  # para _get_report_base_filename
 
 
@@ -367,6 +368,39 @@ class MechanicCommissionWizard(models.TransientModel):
         }
         return self.env.ref('crm_commission.action_mechanic_commission_report').report_action(self, data=data)
 
+    def _local_day_bounds_utc(self):
+        """Convierte el rango [date_from, date_to] (fechas locales del usuario) a
+        límites datetime en UTC.
+
+        sale.order.date_order es Datetime y se guarda en UTC. Comparar ese campo
+        contra una fecha suelta ('2026-08-20') equivale a '2026-08-20 00:00:00',
+        por lo que las órdenes confirmadas ese mismo día quedaban fuera del
+        reporte. Aquí se toma el día completo en la zona horaria del usuario.
+        """
+        self.ensure_one()
+        tz_name = self.env.user.tz or self.env.context.get('tz') or 'UTC'
+        try:
+            user_tz = pytz.timezone(tz_name)
+        except Exception:
+            user_tz = pytz.UTC
+
+        start_local = datetime.combine(self.date_from, time.min)
+        end_local = datetime.combine(self.date_to, time.max)  # 23:59:59.999999
+        start_utc = user_tz.localize(start_local).astimezone(pytz.UTC).replace(tzinfo=None)
+        end_utc = user_tz.localize(end_local).astimezone(pytz.UTC).replace(tzinfo=None)
+        return fields.Datetime.to_string(start_utc), fields.Datetime.to_string(end_utc)
+
+    def _order_local_date(self, order):
+        """Fecha (local del usuario) en la que se confirmó/registró la orden.
+
+        Se usa para invoice_date/month/year de la entry, de modo que coincida con
+        el día que ve el usuario y con el rango del reporte.
+        """
+        self.ensure_one()
+        if order and order.date_order:
+            return fields.Datetime.context_timestamp(self, order.date_order).date()
+        return fields.Date.context_today(self)
+
     # ÚNICO lugar que construye line_ids (blindado y por registro)
     @api.onchange('employee_selection', 'date_from', 'date_to')
     def _onchange_build_lines(self):
@@ -377,15 +411,18 @@ class MechanicCommissionWizard(models.TransientModel):
                 w.line_ids = [(5, 0, 0)]
                 continue
 
+            # Rango como fechas (para comparar contra entry.invoice_date, que es Date)
             date_start = fields.Date.to_string(w.date_from)
             date_end = fields.Date.to_string(w.date_to)
 
+            # Rango completo del día local convertido a UTC (date_order es Datetime UTC)
+            dt_start, dt_end = w._local_day_bounds_utc()
 
             # PEDIDOS DE VENTA CONFIRMADOS (state = 'sale'), dentro del rango
             orders = w.env['sale.order'].search([
                 ('state', '=', 'sale'),  # solo pedidos confirmados/publicados
-                ('date_order', '>=', date_start),
-                ('date_order', '<=', date_end),
+                ('date_order', '>=', dt_start),
+                ('date_order', '<=', dt_end),
             ])
 
             # LÍNEAS DE SERVICIO DE LOS mecánicos seleccionados
@@ -457,9 +494,11 @@ class MechanicCommissionWizard(models.TransientModel):
                     nombre_auto = getattr(car, 'nombre_auto', False)
                     color_auto = getattr(car, 'color_auto', False)
 
-                order_dt = line.order_id.date_order or fields.Date.context_today(w)
-                month_text = str(order_dt.month).zfill(2)
-                year_text = str(order_dt.year)
+                # Fecha local (no UTC): si la orden se confirmó por la tarde, la fecha
+                # UTC podía caer al día siguiente y la comisión salía en otro día.
+                order_date = w._order_local_date(line.order_id)
+                month_text = str(order_date.month).zfill(2)
+                year_text = str(order_date.year)
 
                 vals_base = {
                     'company_id': w.env.company.id,
@@ -469,7 +508,7 @@ class MechanicCommissionWizard(models.TransientModel):
                     'order_id': line.order_id.id,
                     'order_line_id': line.id,
                     'invoice_name': f'{line.order_id.name or ""} - {line.order_id.partner_id.display_name}',
-                    'invoice_date': order_dt,
+                    'invoice_date': order_date,
                     'product_id': line.product_id.id,
                     'product_name': line.product_id.display_name,
                     'quantity': qty,
