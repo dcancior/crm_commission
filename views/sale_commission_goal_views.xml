@@ -11,11 +11,14 @@
 -->
 <odoo>
 
+  <!-- Sin editable="bottom": abrir cada fila lleva al formulario (con
+       chatter) para editar. Esto evita el error común de crear sin querer
+       una línea duplicada en vez de modificar la meta ya existente. -->
   <record id="view_sale_commission_goal_tree" model="ir.ui.view">
     <field name="name">sale.commission.goal.tree</field>
     <field name="model">sale.commission.goal</field>
     <field name="arch" type="xml">
-      <tree editable="bottom" string="Metas de venta">
+      <tree string="Metas de venta">
         <field name="user_id" options="{'no_create_edit': True}"/>
         <field name="month"/>
         <field name="year"/>
@@ -40,6 +43,11 @@
             <field name="currency_id" invisible="1"/>
           </group>
         </sheet>
+        <div class="oe_chatter">
+          <field name="message_follower_ids"/>
+          <field name="activity_ids"/>
+          <field name="message_ids"/>
+        </div>
       </form>
     </field>
   </record>
