@@ -50,7 +50,7 @@ class SaleCommissionGoalReport(models.Model):
                 SELECT
                     row_number() OVER (ORDER BY combo.year, combo.month, combo.user_id) AS id,
                     combo.user_id AS user_id,
-                    combo.company_id AS company_id,
+                    COALESCE(combo.company_id, (SELECT id FROM res_company ORDER BY id LIMIT 1)) AS company_id,
                     rc.currency_id AS currency_id,
                     combo.year AS year,
                     combo.month AS month,
@@ -65,7 +65,9 @@ class SaleCommissionGoalReport(models.Model):
                 FROM (
                     SELECT
                         COALESCE(g.user_id, s.user_id) AS user_id,
-                        COALESCE(g.company_id, s.company_id) AS company_id,
+                        -- La compañía NO participa del cruce (ver nota abajo): solo se
+                        -- toma para mostrarla, priorizando la de la meta si existe.
+                        g.company_id AS company_id,
                         COALESCE(g.year, s.year) AS year,
                         COALESCE(g.month, s.month) AS month,
                         COALESCE(g.amount_goal, 0.0) AS amount_goal,
@@ -74,7 +76,6 @@ class SaleCommissionGoalReport(models.Model):
                     FULL OUTER JOIN (
                         SELECT
                             m.invoice_user_id AS user_id,
-                            m.company_id AS company_id,
                             to_char(m.invoice_date, 'YYYY') AS year,
                             to_char(m.invoice_date, 'MM') AS month,
                             sum(m.amount_untaxed) AS amount_achieved
@@ -83,14 +84,19 @@ class SaleCommissionGoalReport(models.Model):
                           AND m.state = 'posted'
                           AND m.payment_state = 'paid'
                           AND m.invoice_user_id IS NOT NULL
-                        GROUP BY m.invoice_user_id, m.company_id,
+                        GROUP BY m.invoice_user_id,
                                  to_char(m.invoice_date, 'YYYY'), to_char(m.invoice_date, 'MM')
                     ) s ON s.user_id = g.user_id
-                       AND s.company_id = g.company_id
                        AND s.year = g.year
                        AND s.month = g.month
+                    -- NOTA: el cruce se hace solo por vendedor + año + mes (sin
+                    -- compañía). Si se exige también company_id, una meta creada
+                    -- con la compañía activa distinta a la de las facturas nunca
+                    -- hace match y aparece como una fila nueva y separada en vez
+                    -- de completar la fila que ya existía con lo alcanzado.
                 ) combo
-                LEFT JOIN res_company rc ON rc.id = combo.company_id
+                LEFT JOIN res_company rc
+                    ON rc.id = COALESCE(combo.company_id, (SELECT id FROM res_company ORDER BY id LIMIT 1))
                 WHERE combo.user_id IN (
                     SELECT ru.id
                     FROM res_users ru
