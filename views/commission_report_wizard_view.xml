@@ -62,6 +62,10 @@
             <field name="date_start" required="1"/>
             <field name="date_end" required="1"/>
             <field name="filter_payment"/>
+            <!-- Orden actual de la tabla; lo sincroniza list_sort_sync.js al pulsar
+                 un encabezado, para que el PDF salga en el mismo orden -->
+            <field name="sort_field" invisible="1"/>
+            <field name="sort_direction" invisible="1"/>
           </group>
 
           <!-- Totales / KPIs -->

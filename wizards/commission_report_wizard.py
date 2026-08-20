@@ -12,7 +12,7 @@ from odoo import models, fields, api
 from odoo.exceptions import ValidationError
 import base64
 import json  # ← NUEVO
-from datetime import datetime  # ← NUEVO
+from datetime import datetime, date  # ← NUEVO
 
 PAYMENT_METHODS = [
     ('efectivo', 'Efectivo'),
@@ -98,6 +98,13 @@ class CommissionReportWizard(models.TransientModel):
         string='Filtro pago comisión', default='all'
     )
 
+    # ========= Ordenación de la tabla (se sincroniza al pulsar un encabezado) =========
+    # Guarda el criterio de orden elegido en la vista para que el PDF salga en el
+    # mismo orden que la tabla. Se rellena desde JS (list_sort_sync.js) y también
+    # sirve como orden por defecto del servidor.
+    sort_field = fields.Char(string='Ordenar por', default='invoice_date')
+    sort_direction = fields.Char(string='Sentido del orden', default='asc')
+
     # ========= KPIs / Totales =========
     commission_percent = fields.Float(string='Porcentaje Comisión (Equipo)', digits=(16, 2), compute='_compute_totals')
     lines_count = fields.Integer(string='Líneas', compute='_compute_totals')
@@ -180,6 +187,40 @@ class CommissionReportWizard(models.TransientModel):
         # 5) Ensambla pares en el mismo orden de 'moves'
         return [(m, entry_by_move.get(m.id)) for m in moves if entry_by_move.get(m.id)]
 
+    def _sort_key_funcs(self):
+        """Mapa columna de la tabla -> función clave de ordenación sobre (move, entry).
+
+        Las claves coinciden con los name= de las columnas del tree para poder
+        reutilizar directamente lo que envía el clic en el encabezado.
+        """
+        return {
+            'commission_paid': lambda m, e: bool(e and e.commission_paid),
+            'move_id': lambda m, e: (m.name or ''),
+            'invoice_date': lambda m, e: m.invoice_date or date.min,
+            'invoice_payment_date': lambda m, e: get_invoice_payment_date(m) or date.min,
+            'partner_id': lambda m, e: (m.partner_id.display_name or '').lower(),
+            'payment_method': lambda m, e: (e.payment_method or '') if e else '',
+            'payment_datetime': lambda m, e: (e.payment_datetime if e and e.payment_datetime else datetime.min),
+            'payment_user_id': lambda m, e: ((e.payment_user_id.name or '') if e else '').lower(),
+            'amount_untaxed': lambda m, e: m.amount_untaxed or 0.0,
+            'commission_percent': lambda m, e: m.commission_percent or 0.0,
+            'commission_amount': lambda m, e: m.commission_amount or 0.0,
+        }
+
+    def _sort_pairs(self, pairs):
+        """Ordena los pares (move, entry) según sort_field / sort_direction.
+
+        Si el campo no es ordenable (o no hay ninguno elegido) se respeta el
+        orden por defecto de _iter_moves_with_entries: invoice_date asc, name asc.
+        """
+        self.ensure_one()
+        key_func = self._sort_key_funcs().get(self.sort_field or '')
+        if not key_func:
+            return pairs
+        reverse = (self.sort_direction or 'asc') == 'desc'
+        # Desempate estable por número de factura
+        return sorted(pairs, key=lambda p: (key_func(p[0], p[1]), p[0].name or ''), reverse=reverse)
+
     def _filter_pair_by_selection(self, pair):
         """Aplica el filtro (all/paid/unpaid) sobre (move, entry)."""
         self.ensure_one()
@@ -201,6 +242,8 @@ class CommissionReportWizard(models.TransientModel):
             pairs = rec._iter_moves_with_entries(create_missing=True)
             # Aplica el filtro actual del wizard
             pairs = [p for p in pairs if rec._filter_pair_by_selection(p)]
+            # Aplica el orden elegido en la tabla (mismo que usará el PDF)
+            pairs = rec._sort_pairs(pairs)
 
             rec.line_ids = [(5, 0, 0)] + [
                 (0, 0, {
@@ -222,6 +265,9 @@ class CommissionReportWizard(models.TransientModel):
                 pass
         return recs
 
+    # Nota: sort_field / sort_direction NO disparan recarga de líneas a propósito.
+    # El reordenado en pantalla ya lo hace el cliente y recargar aquí borraría
+    # ediciones sin guardar (p. ej. la forma de pago de comisión).
     @api.onchange('user_id', 'date_start', 'date_end', 'filter_payment')
     def _onchange_any_filter(self):
         self._load_lines()
@@ -332,6 +378,8 @@ class CommissionReportWizard(models.TransientModel):
         # Solo entradas existentes (no crear al generar PDF)
         pairs = self._iter_moves_with_entries(create_missing=False)
         pairs = [p for p in pairs if self._filter_pair_by_selection(p)]
+        # Respeta el orden con el que el usuario dejó la tabla en pantalla
+        pairs = self._sort_pairs(pairs)
         if not pairs:
             return {
                 'type': 'ir.actions.client',
