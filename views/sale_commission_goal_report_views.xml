@@ -91,11 +91,14 @@
               context="{'search_default_group_by_user': 1}"
               groups="crm_commission.group_commission_view"/>
 
+  <!-- sequence="5": es el primer submenú (no es modal), así al entrar a
+       "Comisiones de Ventas" se abre este tablero en vez del wizard de
+       reporte (que es target='new' y obligaba a cerrarlo para ver el resto). -->
   <menuitem id="menu_sale_commission_goal_report"
             name="Tablero de Metas"
             parent="menu_commission_report_root"
             action="action_sale_commission_goal_report"
-            sequence="15"
+            sequence="5"
             groups="crm_commission.group_commission_view"/>
 
 </odoo>
