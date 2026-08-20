@@ -493,7 +493,9 @@ class CommissionReportWizardLine(models.TransientModel):
 
     # Datos de factura (related)
     partner_id = fields.Many2one(related='move_id.partner_id', store=False)
-    invoice_date = fields.Date(related='move_id.invoice_date', store=False)
+    # store=True para que la columna se pueda ordenar (clic en el encabezado);
+    # Odoo solo permite ordenar por columnas de campos almacenados.
+    invoice_date = fields.Date(related='move_id.invoice_date', store=True)
     amount_untaxed = fields.Monetary(related='move_id.amount_untaxed', currency_field='currency_id', store=False)
     commission_percent = fields.Float(related='move_id.commission_percent', store=False)
     commission_amount = fields.Monetary(related='move_id.commission_amount', currency_field='currency_id', store=False)
@@ -501,10 +503,12 @@ class CommissionReportWizardLine(models.TransientModel):
     payment_state = fields.Selection(related='move_id.payment_state', string='Estado Pago', store=False)
 
     # NUEVO: fecha en que el cliente pagó la factura (la más reciente si hubo pagos parciales)
+    # store=True para que la columna se pueda ordenar (clic en el encabezado);
+    # se recalcula cada vez que se reconstruyen las líneas (_load_lines).
     invoice_payment_date = fields.Date(
         string='Fecha de pago (cliente)',
         compute='_compute_invoice_payment_date',
-        store=False
+        store=True,
     )
 
     # Datos de pago (RELATED al entry)
@@ -522,6 +526,7 @@ class CommissionReportWizardLine(models.TransientModel):
                 line.payment_entry_id.payment_datetime = fields.Datetime.now()
                 line.payment_entry_id.payment_user_id = self.env.user
 
+    @api.depends('move_id', 'move_id.payment_state')
     def _compute_invoice_payment_date(self):
         for r in self:
             r.invoice_payment_date = get_invoice_payment_date(r.move_id) if r.move_id else False
