@@ -10,7 +10,7 @@
 
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError
-from datetime import datetime
+from datetime import datetime, date
 import calendar
 import re  # para _get_report_base_filename
 
@@ -97,6 +97,12 @@ class MechanicCommissionWizard(models.TransientModel):
         string="Filtrar para PDF",
         default='all',
     )
+
+    # === Ordenación de la tabla (se sincroniza al pulsar un encabezado) ===
+    # Guarda el criterio de orden elegido en la vista para que el PDF salga en el
+    # mismo orden que la tabla. Lo rellena list_sort_sync.js.
+    sort_field = fields.Char(string="Ordenar por")
+    sort_direction = fields.Char(string="Sentido del orden", default='asc')
 
     # --- Validaciones de rango ---
     @api.constrains('date_from', 'date_to')
@@ -261,6 +267,34 @@ class MechanicCommissionWizard(models.TransientModel):
             w.payout_total = sum(entries.mapped('payout') or [0.0])
             w.amount_invoiced = sum(entries.mapped('subtotal_customer') or [0.0])
 
+    def _sort_line_records(self, line_records):
+        """Ordena las líneas según sort_field / sort_direction (columna pulsada en la tabla).
+
+        sort_field guarda el name= de la columna del tree; si está vacío o no
+        corresponde a un campo del modelo se conserva el orden original.
+        """
+        self.ensure_one()
+        name = self.sort_field or ''
+        field = line_records._fields.get(name)
+        if not field:
+            return line_records
+
+        def sort_key(line):
+            value = line[name]
+            if field.type == 'many2one':
+                return (value.display_name or '').lower() if value else ''
+            if field.type in ('char', 'text', 'selection', 'html'):
+                return (value or '').lower() if isinstance(value, str) else ''
+            if field.type == 'datetime':
+                return value or datetime.min
+            if field.type == 'date':
+                return value or date.min
+            if field.type == 'boolean':
+                return bool(value)
+            return value or 0.0
+
+        return line_records.sorted(key=sort_key, reverse=(self.sort_direction or 'asc') == 'desc')
+
     def action_print_pdf(self):
         self.ensure_one()
         self._compute_totals()
@@ -283,6 +317,9 @@ class MechanicCommissionWizard(models.TransientModel):
             line_records = line_records.filtered(lambda r: bool(r.is_paid))
         elif self.report_paid_filter == 'unpaid':
             line_records = line_records.filtered(lambda r: not bool(r.is_paid))
+
+        # Respeta el orden con el que el usuario dejó la tabla en pantalla
+        line_records = self._sort_line_records(line_records)
 
         # KPIs recalculados para el PDF según el filtro
         services_count_pdf = len(line_records)
@@ -568,7 +605,10 @@ class MechanicCommissionWizardLine(models.TransientModel):
     _name = 'mechanic.commission.wizard.line'
     _description = 'Línea wizard comisión mecánicos'
 
-    order_id = fields.Many2one('sale.order', string='Cotización/Orden', related='commission_entry_id.order_id', readonly=True)
+    # store=True para que la columna se pueda ordenar (clic en el encabezado);
+    # Odoo solo permite ordenar por columnas de campos almacenados.
+    order_id = fields.Many2one('sale.order', string='Cotización/Orden', related='commission_entry_id.order_id',
+                               readonly=True, store=True)
     order_line_id = fields.Many2one('sale.order.line', string='Línea de cotización/orden', related='commission_entry_id.order_line_id', readonly=True)
 
     wizard_id = fields.Many2one('mechanic.commission.wizard', required=True, ondelete='cascade')

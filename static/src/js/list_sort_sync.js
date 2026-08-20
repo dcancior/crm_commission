@@ -1,24 +1,27 @@
 /** @odoo-module **/
 /*
- * Sincroniza el orden de la tabla de facturas del wizard de comisiones con los
- * campos sort_field / sort_direction del wizard.
+ * Sincroniza el orden de las tablas de los wizards de comisiones con los campos
+ * sort_field / sort_direction del wizard padre.
  *
  * Motivo: al pulsar un encabezado, Odoo reordena la lista solo en el cliente y
  * el servidor no se entera, por lo que el PDF (action_print_pdf) siempre salía
- * en el orden por defecto. Al escribir el criterio en el wizard, el onchange
- * recarga las líneas ya ordenadas y el PDF usa el mismo orden.
+ * en el orden por defecto. Guardando el criterio en el wizard, el PDF puede
+ * reproducir exactamente el orden que se ve en pantalla.
  */
 
 import { patch } from "@web/core/utils/patch";
 import { ListRenderer } from "@web/views/list/list_renderer";
 
-const LINE_MODEL = "commission.report.wizard.line";
-const WIZARD_MODEL = "commission.report.wizard";
+// Listas x2many cuyo orden se sincroniza con el wizard padre.
+const LINE_MODELS = [
+    "commission.report.wizard.line",     // Reporte de Comisión de Ventas
+    "mechanic.commission.wizard.line",   // Reporte de Comisiones (Mecánicos)
+];
 
 patch(ListRenderer.prototype, "crm_commission.list_sort_sync", {
     async onClickSortColumn(column) {
         const list = this.props.list;
-        const isCommissionList = list && list.resModel === LINE_MODEL;
+        const isCommissionList = list && LINE_MODELS.includes(list.resModel);
 
         // Estado previo (antes de que el super reordene en cliente), por si la
         // lista no expone orderBy en esta versión.
@@ -29,7 +32,8 @@ patch(ListRenderer.prototype, "crm_commission.list_sort_sync", {
 
         await this._super(...arguments);
 
-        if (!isCommissionList || !root || root.resModel !== WIZARD_MODEL) {
+        // El wizard padre debe exponer los campos de orden en la vista.
+        if (!isCommissionList || !root || !root.data || !("sort_field" in root.data)) {
             return;
         }
 
