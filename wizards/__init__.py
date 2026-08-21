@@ -10,3 +10,4 @@
 
 from . import commission_report_wizard
 from . import mechanic_commission_wizard
+from . import commission_units_detail_wizard

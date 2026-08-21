@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  DCR INFORMATIC SERVICES SAS DE CV                                 ║
+║  Web: https://www.dcrsoluciones.com                                ║
+║  Contacto: info@dcrsoluciones.com                                  ║
+║                                                                    ║
+║  Este módulo está bajo licencia (LGPLv3).                          ║
+║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html     ║
+╚════════════════════════════════════════════════════════════════════╝
+-->
+<odoo>
+
+  <template id="commission_units_detail_pdf">
+    <t t-call="web.html_container">
+      <t t-foreach="docs" t-as="doc">
+        <t t-call="web.external_layout">
+          <div class="page">
+
+            <style type="text/css">
+              table.units-table {
+                width: 100%;
+                border-collapse: collapse;
+                table-layout: fixed;
+              }
+              table.units-table th,
+              table.units-table td {
+                padding: 4px 6px;
+                vertical-align: top;
+                border-bottom: 1px solid #dee2e6;
+              }
+              table.units-table thead th {
+                border-bottom: 2px solid #adb5bd;
+                text-align: left;
+              }
+              table.units-table tbody td { font-size: 10pt; }
+              .u-num { text-align: right; white-space: nowrap; }
+              .u-name { word-break: break-word; }
+              .u-kpi {
+                display: inline-block;
+                margin-right: 24px;
+              }
+              .u-kpi-label { font-size: 9pt; color: #6b7280; display: block; }
+              .u-kpi-value { font-size: 14pt; font-weight: 600; }
+            </style>
+
+            <h2 style="margin-bottom:2px;">
+              <span t-if="doc.unit_type == 'product'">Productos vendidos</span>
+              <span t-else="">Servicios vendidos</span>
+            </h2>
+            <div style="color:#6b7280;margin-bottom:12px;">
+              <span t-field="doc.user_id.name"/>
+              <span> · </span>
+              <span t-esc="doc._period_label()"/>
+            </div>
+
+            <div style="margin-bottom:16px;">
+              <div class="u-kpi">
+                <span class="u-kpi-label">Unidades totales</span>
+                <span class="u-kpi-value" t-esc="'%.2f' % (doc.total_qty or 0.0)"/>
+              </div>
+              <div class="u-kpi">
+                <span class="u-kpi-label">Productos distintos</span>
+                <span class="u-kpi-value" t-esc="doc.product_count"/>
+              </div>
+              <div class="u-kpi">
+                <span class="u-kpi-label">Importe sin IVA</span>
+                <span class="u-kpi-value"
+                      t-esc="doc.total_amount"
+                      t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+              </div>
+            </div>
+
+            <h4 style="margin-bottom:6px;">Más vendidos</h4>
+            <div style="margin-bottom:16px;" t-out="doc.chart_html"/>
+
+            <h4 style="margin-bottom:6px;">Detalle por producto</h4>
+            <table class="units-table">
+              <colgroup>
+                <col style="width:14%"/>
+                <col style="width:40%"/>
+                <col style="width:12%"/>
+                <col style="width:10%"/>
+                <col style="width:9%"/>
+                <col style="width:15%"/>
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Referencia</th>
+                  <th>Producto</th>
+                  <th class="u-num">Unidades</th>
+                  <th class="u-num">% del total</th>
+                  <th class="u-num">Facturas</th>
+                  <th class="u-num">Importe sin IVA</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr t-foreach="doc.line_ids" t-as="line">
+                  <td><span t-esc="line.default_code or ''"/></td>
+                  <td class="u-name"><span t-esc="line.product_name or ''"/></td>
+                  <td class="u-num"><span t-esc="'%.2f' % (line.quantity or 0.0)"/></td>
+                  <td class="u-num"><span t-esc="'%.2f %%' % (line.share or 0.0)"/></td>
+                  <td class="u-num"><span t-esc="line.invoice_count"/></td>
+                  <td class="u-num">
+                    <span t-esc="line.amount_untaxed"
+                          t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="2"><strong>Total</strong></td>
+                  <td class="u-num"><strong t-esc="'%.2f' % (doc.total_qty or 0.0)"/></td>
+                  <td class="u-num"/>
+                  <td class="u-num"/>
+                  <td class="u-num">
+                    <strong t-esc="doc.total_amount"
+                            t-options="{'widget': 'monetary', 'display_currency': doc.currency_id}"/>
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+
+          </div>
+        </t>
+      </t>
+    </t>
+  </template>
+
+  <report
+    id="action_commission_units_detail_pdf"
+    model="commission.units.detail.wizard"
+    string="Detalle de unidades vendidas"
+    report_type="qweb-pdf"
+    name="crm_commission.commission_units_detail_pdf"
+    file="crm_commission.commission_units_detail_pdf"
+    print_report_name="'Unidades vendidas - %s - %s a %s' % (object.user_id.name or '', object.date_start or '', object.date_end or '')"
+  />
+
+</odoo>

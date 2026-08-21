@@ -144,10 +144,20 @@
                 </group>
               </group>
 
-              <group string="Unidades vendidas en el periodo">
-                <field name="qty_products_sold" readonly="1"/>
-                <field name="qty_services_sold" readonly="1"/>
-              </group>
+              <separator string="Unidades vendidas en el periodo"/>
+              <!-- KPIs pulsables: abren el detalle por producto con gráfica y PDF -->
+              <div class="oe_button_box">
+                <button name="action_view_products_sold" type="object"
+                        class="oe_stat_button" icon="fa-cubes"
+                        help="Ver el detalle de los productos vendidos en el periodo">
+                  <field name="qty_products_sold" widget="statinfo" string="Productos vendidos"/>
+                </button>
+                <button name="action_view_services_sold" type="object"
+                        class="oe_stat_button" icon="fa-wrench"
+                        help="Ver el detalle de los servicios vendidos en el periodo">
+                  <field name="qty_services_sold" widget="statinfo" string="Servicios vendidos"/>
+                </button>
+              </div>
             </page>
           </notebook>
         </sheet>

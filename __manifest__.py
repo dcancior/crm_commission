@@ -25,6 +25,8 @@
         'views/sale_commission_goal_views.xml',
         'views/sale_commission_goal_report_views.xml',
         'views/commission_report_pdf.xml',
+        'views/commission_units_detail_views.xml',
+        'views/commission_units_detail_pdf.xml',
         'views/sale_order_views.xml',
         'views/account_move_views.xml',
         'views/account_payment_inherit.xml',

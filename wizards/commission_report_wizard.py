@@ -297,6 +297,26 @@ class CommissionReportWizard(models.TransientModel):
                 y += 1
         return months
 
+    def _sold_invoice_lines(self, moves=None):
+        """Líneas de factura vendidas en el periodo, separadas en (productos, servicios).
+
+        Usa el mismo dominio que los KPIs (_moves_domain), por lo que el detalle
+        siempre cuadra con "Productos vendidos" / "Servicios vendidos".
+        """
+        self.ensure_one()
+        AML = self.env['account.move.line']
+        if not (self.user_id and self.date_start and self.date_end):
+            return AML, AML
+
+        if moves is None:
+            moves = self.env['account.move'].search(self._moves_domain())
+
+        lines = moves.mapped('invoice_line_ids').filtered(
+            lambda l: l.product_id and l.display_type not in ('line_section', 'line_note')
+        )
+        service_lines = lines.filtered(lambda l: l.product_id.type == 'service')
+        return (lines - service_lines), service_lines
+
     @api.depends('user_id', 'date_start', 'date_end')
     def _compute_goal_progress(self):
         """Avance de la meta de venta del vendedor para el rango seleccionado.
@@ -335,11 +355,7 @@ class CommissionReportWizard(models.TransientModel):
             if rec.goal_total:
                 rec.percent_goal = (rec.achieved_total / rec.goal_total) * 100.0
 
-            lines = moves.mapped('invoice_line_ids').filtered(
-                lambda l: l.product_id and l.display_type not in ('line_section', 'line_note')
-            )
-            service_lines = lines.filtered(lambda l: l.product_id.type == 'service')
-            product_lines = lines - service_lines
+            product_lines, service_lines = rec._sold_invoice_lines(moves=moves)
             rec.qty_services_sold = sum(service_lines.mapped('quantity'))
             rec.qty_products_sold = sum(product_lines.mapped('quantity'))
 
@@ -369,6 +385,34 @@ class CommissionReportWizard(models.TransientModel):
                 'message': 'Pagos de comisión actualizados.',
                 'sticky': False,
             }
+        }
+
+    def action_view_products_sold(self):
+        """Detalle de los productos vendidos en el periodo (clic en el KPI)."""
+        return self._action_open_units_detail('product')
+
+    def action_view_services_sold(self):
+        """Detalle de los servicios vendidos en el periodo (clic en el KPI)."""
+        return self._action_open_units_detail('service')
+
+    def _action_open_units_detail(self, unit_type):
+        self.ensure_one()
+        detail = self.env['commission.units.detail.wizard'].create({
+            'unit_type': unit_type,
+            'user_id': self.user_id.id,
+            'date_start': self.date_start,
+            'date_end': self.date_end,
+            'currency_id': (self.currency_id or self.env.company.currency_id).id,
+        })
+        detail._build_lines_from(self)
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Productos vendidos' if unit_type == 'product' else 'Servicios vendidos',
+            'res_model': 'commission.units.detail.wizard',
+            'view_mode': 'form',
+            'view_id': self.env.ref('crm_commission.view_commission_units_detail_form').id,
+            'res_id': detail.id,
+            'target': 'new',
         }
 
     def action_print_pdf(self):
