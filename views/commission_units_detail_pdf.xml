@@ -34,6 +34,8 @@
                 text-align: left;
               }
               table.units-table tbody td { font-size: 10pt; }
+              /* Que una fila no se parta entre dos hojas */
+              table.units-table tr { page-break-inside: avoid; }
               .u-num { text-align: right; white-space: nowrap; }
               .u-name { word-break: break-word; }
               .u-kpi {
@@ -129,6 +131,25 @@
     </t>
   </template>
 
+  <!-- Formato propio de este reporte: el encabezado (logo + rótulo) es alto y,
+       al repetirse la fila de títulos de la tabla en cada hoja, se montaba sobre
+       él a partir de la segunda página. Con más margen superior y más espacio de
+       encabezado, la tabla empieza siempre por debajo. Si aún se solapa, subir
+       margin_top / header_spacing en Ajustes › Técnico › Formatos de papel. -->
+  <record id="paperformat_units_detail" model="report.paperformat">
+    <field name="name">Comisiones - Unidades vendidas (Carta)</field>
+    <field name="default" eval="False"/>
+    <field name="format">Letter</field>
+    <field name="orientation">Portrait</field>
+    <field name="margin_top">55</field>
+    <field name="margin_bottom">18</field>
+    <field name="margin_left">7</field>
+    <field name="margin_right">7</field>
+    <field name="header_line" eval="False"/>
+    <field name="header_spacing">48</field>
+    <field name="dpi">90</field>
+  </record>
+
   <report
     id="action_commission_units_detail_pdf"
     model="commission.units.detail.wizard"
@@ -137,6 +158,7 @@
     name="crm_commission.commission_units_detail_pdf"
     file="crm_commission.commission_units_detail_pdf"
     print_report_name="'Unidades vendidas - %s - %s a %s' % (object.user_id.name or '', object.date_start or '', object.date_end or '')"
+    paperformat="crm_commission.paperformat_units_detail"
   />
 
 </odoo>
