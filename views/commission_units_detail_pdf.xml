@@ -131,22 +131,24 @@
     </t>
   </template>
 
-  <!-- Formato propio de este reporte: el encabezado (logo + rótulo) es alto y,
-       al repetirse la fila de títulos de la tabla en cada hoja, se montaba sobre
-       él a partir de la segunda página. Con más margen superior y más espacio de
-       encabezado, la tabla empieza siempre por debajo. Si aún se solapa, subir
-       margin_top / header_spacing en Ajustes › Técnico › Formatos de papel. -->
+  <!-- Formato propio de este reporte. El contenido de cada hoja arranca en
+       margin_top; el encabezado (logo + rótulo + su línea) mide ~21 mm, así que
+       con 32 mm queda un aire de ~10 mm y la fila de títulos repetida ya no se
+       monta sobre la línea en la 2ª hoja.
+       Para afinarlo no hace falta tocar código: Ajustes › Técnico › Formatos de
+       papel › "Comisiones - Unidades vendidas (Carta)"; subir margin_top si
+       vuelve a solaparse, bajarlo si sobra espacio. -->
   <record id="paperformat_units_detail" model="report.paperformat">
     <field name="name">Comisiones - Unidades vendidas (Carta)</field>
     <field name="default" eval="False"/>
     <field name="format">Letter</field>
     <field name="orientation">Portrait</field>
-    <field name="margin_top">55</field>
-    <field name="margin_bottom">18</field>
+    <field name="margin_top">32</field>
+    <field name="margin_bottom">15</field>
     <field name="margin_left">7</field>
     <field name="margin_right">7</field>
     <field name="header_line" eval="False"/>
-    <field name="header_spacing">48</field>
+    <field name="header_spacing">8</field>
     <field name="dpi">90</field>
   </record>
 
