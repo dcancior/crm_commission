@@ -99,7 +99,9 @@
                   <td><span t-esc="line.default_code or ''"/></td>
                   <td class="u-name"><span t-esc="line.product_name or ''"/></td>
                   <td class="u-num"><span t-esc="'%.2f' % (line.quantity or 0.0)"/></td>
-                  <td class="u-num"><span t-esc="'%.2f %%' % (line.share or 0.0)"/></td>
+                  <!-- El signo % va como texto: al compilar la plantilla, '%%' dentro de
+                       la expresión se colapsa a '%' y rompe el formato -->
+                  <td class="u-num"><span t-esc="'%.2f' % (line.share or 0.0)"/><span> %</span></td>
                   <td class="u-num"><span t-esc="line.invoice_count"/></td>
                   <td class="u-num">
                     <span t-esc="line.amount_untaxed"
