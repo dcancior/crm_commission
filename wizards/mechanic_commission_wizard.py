@@ -102,8 +102,10 @@ class MechanicCommissionWizard(models.TransientModel):
     # === Ordenación de la tabla (se sincroniza al pulsar un encabezado) ===
     # Guarda el criterio de orden elegido en la vista para que el PDF salga en el
     # mismo orden que la tabla. Lo rellena list_sort_sync.js.
-    sort_field = fields.Char(string="Ordenar por")
+    sort_field = fields.Char(string="Ordenar por", default='order_id')
     sort_direction = fields.Char(string="Sentido del orden", default='asc')
+    # Solo informativo en pantalla (no aparece en el PDF)
+    sort_label = fields.Char(string="Orden actual", compute='_compute_sort_label')
 
     # --- Validaciones de rango ---
     @api.constrains('date_from', 'date_to')
@@ -268,14 +270,44 @@ class MechanicCommissionWizard(models.TransientModel):
             w.payout_total = sum(entries.mapped('payout') or [0.0])
             w.amount_invoiced = sum(entries.mapped('subtotal_customer') or [0.0])
 
+    @api.depends('sort_field', 'sort_direction')
+    def _compute_sort_label(self):
+        """Texto que explica con qué columna y en qué sentido se está mostrando la tabla.
+
+        La etiqueta de la columna se toma del propio campo, así que si algún día
+        se le cambia el string al campo, este aviso se actualiza solo.
+        """
+        Line = self.env['mechanic.commission.wizard.line']
+        for w in self:
+            field = Line._fields.get(w.sort_field or 'order_id')
+            if not field:
+                w.sort_label = ''
+                continue
+            sentido = 'descendente' if (w.sort_direction or 'asc') == 'desc' else 'ascendente'
+            w.sort_label = (
+                f"Se muestra ordenado de manera {sentido} por la columna «{field.string}»"
+            )
+
+    @staticmethod
+    def _natural_key(value):
+        """Clave de orden natural para nombres de documento.
+
+        Separa los números del texto para que S00009 / S9 quede antes que S10,
+        y devuelve tuplas homogéneas para que nunca se comparen int con str.
+        """
+        chunks = [c for c in re.split(r'(\d+)', value or '') if c]
+        return tuple((0, int(c), '') if c.isdigit() else (1, 0, c.lower()) for c in chunks)
+
     def _sort_line_records(self, line_records):
         """Ordena las líneas según sort_field / sort_direction (columna pulsada en la tabla).
 
-        sort_field guarda el name= de la columna del tree; si está vacío o no
-        corresponde a un campo del modelo se conserva el orden original.
+        sort_field guarda el name= de la columna del tree. Si está vacío se usa
+        order_id (número de cotización/orden ascendente), que es el orden por
+        defecto de la tabla; si no corresponde a ningún campo del modelo se
+        conserva el orden original.
         """
         self.ensure_one()
-        name = self.sort_field or ''
+        name = self.sort_field or 'order_id'
         field = line_records._fields.get(name)
         if not field:
             return line_records
@@ -283,9 +315,9 @@ class MechanicCommissionWizard(models.TransientModel):
         def sort_key(line):
             value = line[name]
             if field.type == 'many2one':
-                return (value.display_name or '').lower() if value else ''
+                return self._natural_key(value.display_name) if value else ()
             if field.type in ('char', 'text', 'selection', 'html'):
-                return (value or '').lower() if isinstance(value, str) else ''
+                return self._natural_key(value) if isinstance(value, str) else ()
             if field.type == 'datetime':
                 return value or datetime.min
             if field.type == 'date':
@@ -583,7 +615,10 @@ class MechanicCommissionWizard(models.TransientModel):
                     (0, 0, {
                         'commission_entry_id': e.id,
                     })
-                    for e in entries_to_keep.sorted(lambda r: (r.invoice_date or fields.Date.today(), r.id)) if e.payout and e.payout > 0
+                    # Orden por defecto: número de cotización/orden ascendente
+                    for e in entries_to_keep.sorted(
+                        lambda r: (w._natural_key(r.order_id.name), r.id)
+                    ) if e.payout and e.payout > 0
                 ]
 
             if w.report_paid_filter == 'paid':

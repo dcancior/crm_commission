@@ -30,6 +30,14 @@
                     <!-- Detalle -->
                     <notebook>
                         <page string="Detalle de líneas facturadas (activas)">
+                            <!-- Aviso del orden actual: solo pantalla, no sale en el PDF -->
+                            <div class="text-muted mb-2">
+                                <i class="fa fa-sort-amount-asc me-1" role="img" aria-label="Orden ascendente"
+                                   attrs="{'invisible': [('sort_direction', '=', 'desc')]}"/>
+                                <i class="fa fa-sort-amount-desc me-1" role="img" aria-label="Orden descendente"
+                                   attrs="{'invisible': [('sort_direction', '!=', 'desc')]}"/>
+                                <field name="sort_label" nolabel="1" readonly="1" class="oe_inline"/>
+                            </div>
                             <field name="line_ids" nolabel="1"
                                 context="{'no_open': 1}"
                                 options="{'no_create': True}">

@@ -78,6 +78,15 @@
 
           <notebook>
             <page string="Facturas Comisionadas">
+              <!-- Aviso del orden actual: solo pantalla, no sale en el PDF -->
+              <div class="text-muted mb-2">
+                <i class="fa fa-sort-amount-asc me-1" role="img" aria-label="Orden ascendente"
+                   attrs="{'invisible': [('sort_direction', '=', 'desc')]}"/>
+                <i class="fa fa-sort-amount-desc me-1" role="img" aria-label="Orden descendente"
+                   attrs="{'invisible': [('sort_direction', '!=', 'desc')]}"/>
+                <field name="sort_label" nolabel="1" readonly="1" class="oe_inline"/>
+              </div>
+
               <!-- ÚNICA tabla: las líneas ya vienen filtradas desde Python con _load_lines() -->
               <field name="line_ids" nolabel="1" mode="tree" context="{'no_open': 0, 'default_wizard_id': active_id, 'form_view_ref': 'crm_commission.view_commission_report_line_form'}" options="{'no_open': False, 'no_create': True}">
                 <tree create="0" edit="0" delete="0">

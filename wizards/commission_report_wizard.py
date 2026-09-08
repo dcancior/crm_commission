@@ -19,6 +19,22 @@ PAYMENT_METHODS = [
     ('transferencia', 'Transferencia'),
 ]
 
+# Etiquetas tal y como se ven en los encabezados de la tabla, para el aviso de
+# orden en pantalla. Las claves son los name= de las columnas del tree.
+SORT_COLUMN_LABELS = {
+    'commission_paid': 'Comisión pagada',
+    'move_id': 'Factura',
+    'invoice_date': 'Fecha Factura',
+    'invoice_payment_date': 'Fecha de pago',
+    'partner_id': 'Cliente',
+    'payment_method': 'Forma de pago comisión',
+    'payment_datetime': 'Fecha pago comisión',
+    'payment_user_id': 'Registró',
+    'amount_untaxed': 'Factura sin IVA',
+    'commission_percent': '% Comisión',
+    'commission_amount': 'Comisión',
+}
+
 
 def _default_date_start(self):
     today = fields.Date.context_today(self)
@@ -104,6 +120,8 @@ class CommissionReportWizard(models.TransientModel):
     # sirve como orden por defecto del servidor.
     sort_field = fields.Char(string='Ordenar por', default='invoice_date')
     sort_direction = fields.Char(string='Sentido del orden', default='asc')
+    # Solo informativo en pantalla (no aparece en el PDF)
+    sort_label = fields.Char(string='Orden actual', compute='_compute_sort_label')
 
     # ========= KPIs / Totales =========
     commission_percent = fields.Float(string='Porcentaje Comisión (Equipo)', digits=(16, 2), compute='_compute_totals')
@@ -186,6 +204,24 @@ class CommissionReportWizard(models.TransientModel):
 
         # 5) Ensambla pares en el mismo orden de 'moves'
         return [(m, entry_by_move.get(m.id)) for m in moves if entry_by_move.get(m.id)]
+
+    @api.depends('sort_field', 'sort_direction')
+    def _compute_sort_label(self):
+        """Texto que explica con qué columna y en qué sentido se está mostrando la tabla."""
+        Line = self.env['commission.report.wizard.line']
+        for rec in self:
+            name = rec.sort_field or ''
+            label = SORT_COLUMN_LABELS.get(name)
+            if not label:
+                field = Line._fields.get(name)
+                label = field.string if field else ''
+            if not label:
+                rec.sort_label = ''
+                continue
+            sentido = 'descendente' if (rec.sort_direction or 'asc') == 'desc' else 'ascendente'
+            rec.sort_label = (
+                f"Se muestra ordenado de manera {sentido} por la columna «{label}»"
+            )
 
     def _sort_key_funcs(self):
         """Mapa columna de la tabla -> función clave de ordenación sobre (move, entry).
