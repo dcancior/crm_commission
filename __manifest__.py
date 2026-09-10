@@ -31,6 +31,7 @@
         'views/account_move_views.xml',
         'views/account_payment_inherit.xml',
         'views/product_views.xml',
+        'views/mechanic_manual_service_views.xml',
         'views/sale_views.xml',
         'views/sale_order_set_mechanic_wizard_views.xml',
         # 'views/assets.xml',  # <-- quítalo para evitar el inherit

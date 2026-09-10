@@ -32,6 +32,8 @@
         <field name="mechanic_is_placeholder" invisible="1"/>
         <!-- NUEVO: bandera para exentar líneas cuyo producto empiece con 'PAQ' -->
         <field name="mechanic_exempt" invisible="1"/>
+        <!-- Servicios que exigen elegir el mecánico a mano -->
+        <field name="mechanic_manual_only" optional="hide" string="Mecánico manual" readonly="1"/>
       </xpath>
 
       <!-- 2) Decoración de fila (warning) con exención por 'PAQ*' -->
@@ -69,6 +71,7 @@
           <field name="mechanic_is_placeholder"/>
           <!-- NUEVO: misma bandera en el form -->
           <field name="mechanic_exempt"/>
+          <field name="mechanic_manual_only"/>
         </group>
       </xpath>
 

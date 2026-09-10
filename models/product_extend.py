@@ -26,3 +26,12 @@ class ProductTemplate(models.Model):
         default=0.0,
     )
 
+    mechanic_manual_only = fields.Boolean(
+        string="Mecánico solo manual",
+        default=False,
+        help="Si está activo, al seleccionar un mecánico en la cotización este servicio NO lo "
+             "recibe de forma automática: hay que elegirlo a mano en la columna 'Mecánico'.\n"
+             "La línea sigue exigiendo mecánico para poder confirmar el pedido.\n"
+             "La lista se administra en Comisiones Mecánicos › Servicios de asignación manual.",
+    )
+

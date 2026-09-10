@@ -19,3 +19,5 @@ access_sale_commission_goal_manager,access.sale.commission.goal.manager,model_sa
 access_sale_commission_goal_report_user,access.sale.commission.goal.report.user,model_sale_commission_goal_report,crm_commission.group_commission_view,1,0,0,0
 access_commission_units_detail_wizard,access.commission.units.detail.wizard,model_commission_units_detail_wizard,crm_commission.group_commission_view,1,1,1,1
 access_commission_units_detail_line,access.commission.units.detail.line,model_commission_units_detail_line,crm_commission.group_commission_view,1,1,1,1
+access_mechanic_manual_service_wizard,access.mechanic.manual.service.wizard,model_mechanic_manual_service_wizard,crm_commission.group_mechanic_commission_view,1,1,1,1
+access_mechanic_manual_service_wizard_mgr,access.mechanic.manual.service.wizard.manager,model_mechanic_manual_service_wizard,sales_team.group_sale_manager,1,1,1,1

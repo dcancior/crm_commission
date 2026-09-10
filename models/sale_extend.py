@@ -79,6 +79,15 @@ class SaleOrderLine(models.Model):
         # Nota: 'type' es el tipo general (product/consu/service); en Odoo 16 también está detailed_type.
     )
 
+    mechanic_manual_only = fields.Boolean(
+        string="Mecánico solo manual",
+        related="product_id.product_tmpl_id.mechanic_manual_only",
+        readonly=True,
+        store=False,  # Basta con leerlo del producto; evita recomputar líneas al marcar el producto
+        # True => el servicio está en la lista de asignación manual: no recibe (ni propaga)
+        # mecánico automáticamente, pero sigue exigiéndolo para confirmar.
+    )
+
     mechanic_is_placeholder = fields.Boolean(
         string="Mecánico placeholder",
         compute="_compute_mechanic_is_placeholder",
@@ -122,7 +131,13 @@ class SaleOrderLine(models.Model):
                 name = (getattr(line.product_id, 'display_name', '') or getattr(line.product_id, 'name', '') or '').strip().upper()
                 is_exempt = name.startswith('PAQ')
 
-            # 3) Solo autoasignar si: es servicio, NO exento, y aún no hay mecánico
+            # 3) Los servicios marcados como "mecánico solo manual" tampoco reciben el
+            #    placeholder: se dejan vacíos para que el bloqueo al confirmar obligue
+            #    a elegir el mecánico a mano.
+            if line.mechanic_manual_only:
+                continue
+
+            # 4) Solo autoasignar si: es servicio, NO exento, y aún no hay mecánico
             if is_service_line and (not is_exempt) and (not line.mechanic_id):
                 placeholder = line._get_placeholder_mechanic()
                 if placeholder:
@@ -308,6 +323,10 @@ class SaleOrderLine(models.Model):
             if not line.display_mechanic_fields or line.mechanic_exempt:
                 return
 
+            # Un servicio de asignación manual no propaga su mecánico al resto
+            if line.mechanic_manual_only:
+                return
+
             for other_line in line.order_id.order_line:
                 # Saltar la línea actual
                 if other_line == line:
@@ -319,6 +338,10 @@ class SaleOrderLine(models.Model):
 
                 # Respetar exenciones PAQ*
                 if other_line.mechanic_exempt:
+                    continue
+
+                # Respetar los servicios de asignación manual
+                if other_line.mechanic_manual_only:
                     continue
 
                 # Si ya tiene mecánico real, no tocar

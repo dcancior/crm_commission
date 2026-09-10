@@ -58,17 +58,35 @@ class SaleOrderSetMechanicWizard(models.TransientModel):  # noqa: E265
     # -------------------------------
     # Helpers del wizard
     # -------------------------------
+    manual_count = fields.Integer(  # Líneas que se dejan fuera por ser de asignación manual  # noqa: E265
+        string='Líneas de asignación manual',
+        compute='_compute_preview',
+        help="Servicios marcados como 'Mecánico solo manual': no se tocan desde aquí, "
+             "su mecánico se elige a mano en la línea del pedido.",
+    )
+
     def _get_target_lines(self):  # Obtiene las líneas objetivo según filtros  # noqa: E265
         self.ensure_one()  # Un solo wizard  # noqa: E265
         lines = self.order_id.order_line.filtered(lambda l: l.product_id and l.product_id.type == 'service')  # Solo servicios  # noqa: E265
+        # Los servicios de asignación manual quedan siempre fuera: su mecánico se
+        # captura a mano en la columna 'Mecánico' de la línea.
+        lines = lines.filtered(lambda l: not l.mechanic_manual_only)
         if self.only_empty:  # Si solo vacías  # noqa: E265
             lines = lines.filtered(lambda l: not l.mechanic_id)  # Sin mecánico  # noqa: E265
         return lines  # Retorna recordset  # noqa: E265
+
+    def _get_manual_lines(self):
+        """Servicios del pedido que exigen elegir el mecánico a mano."""
+        self.ensure_one()
+        return self.order_id.order_line.filtered(
+            lambda l: l.product_id and l.product_id.type == 'service' and l.mechanic_manual_only
+        )
 
     @api.depends('order_id', 'only_empty')  # Recalcula al cambiar pedido o flag  # noqa: E265
     def _compute_preview(self):  # Calcula affected_count  # noqa: E265
         for w in self:  # Itera wizards  # noqa: E265
             w.affected_count = len(w._get_target_lines()) if w.order_id else 0  # Conteo  # noqa: E265
+            w.manual_count = len(w._get_manual_lines()) if w.order_id else 0
 
     def action_apply(self):
         self.ensure_one()

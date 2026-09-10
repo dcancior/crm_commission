@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  DCR INFORMATIC SERVICES SAS DE CV                                 ║
+║  Web: https://www.dcrsoluciones.com                                ║
+║  Contacto: info@dcrsoluciones.com                                  ║
+║                                                                    ║
+║  Este módulo está bajo licencia (LGPLv3).                          ║
+║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html     ║
+╚════════════════════════════════════════════════════════════════════╝
+-->
+<odoo>
+
+  <record id="view_mechanic_manual_service_wizard_form" model="ir.ui.view">
+    <field name="name">mechanic.manual.service.wizard.form</field>
+    <field name="model">mechanic.manual.service.wizard</field>
+    <field name="arch" type="xml">
+      <form string="Servicios de asignación manual">
+        <div class="alert alert-info" role="alert">
+          Los servicios de esta lista <b>no reciben el mecánico automáticamente</b> al
+          asignar uno en la cotización: hay que elegirlo a mano en la columna "Mecánico"
+          de la línea. Siguen siendo obligatorios para confirmar el pedido, salvo que se
+          active "Orden sin mecánico".
+        </div>
+
+        <!-- Tree no editable: el botón "Agregar una línea" abre el buscador de
+             productos; no_create evita crear productos nuevos desde aquí. -->
+        <field name="product_tmpl_ids" nolabel="1" widget="many2many"
+               options="{'no_create': True, 'no_create_edit': True, 'no_quick_create': True}">
+            <tree>
+              <field name="default_code" string="Referencia" optional="show"/>
+              <field name="name" string="Servicio"/>
+              <field name="categ_id" string="Categoría" optional="hide"/>
+              <field name="list_price" string="Precio" optional="hide"/>
+            </tree>
+        </field>
+
+        <footer>
+          <button name="action_apply" type="object" string="Guardar" class="btn-primary"/>
+          <button string="Cancelar" class="btn-secondary" special="cancel"/>
+        </footer>
+      </form>
+    </field>
+  </record>
+
+  <act_window id="action_mechanic_manual_service_wizard"
+              name="Servicios de asignación manual"
+              res_model="mechanic.manual.service.wizard"
+              view_mode="form"
+              target="new"/>
+
+  <menuitem id="menu_mechanic_manual_service"
+            name="Servicios de asignación manual"
+            parent="crm_commission.menu_mechanic_commission_root"
+            action="action_mechanic_manual_service_wizard"
+            sequence="20"
+            groups="crm_commission.group_mechanic_commission_view"/>
+
+</odoo>

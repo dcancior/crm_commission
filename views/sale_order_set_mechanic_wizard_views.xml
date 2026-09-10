@@ -60,12 +60,18 @@
                             options="{'no_create': True, 'no_create_edit': True, 'no_quick_create': True, 'create': False}"/>
                         <field name="only_empty"/>
                         <field name="affected_count" readonly="1"/>
+                        <field name="manual_count" readonly="1"
+                               attrs="{'invisible': [('manual_count', '=', 0)]}"/>
                     </group>
                     <group>
                         <separator string="Notas"/>
                         <p>
                             Se actualizarán las líneas de <b>tipo servicio</b> del pedido.
                             <br/>Active "Solo líneas sin mecánico" para no sobrescribir líneas ya asignadas.
+                        </p>
+                        <p attrs="{'invisible': [('manual_count', '=', 0)]}">
+                            Los servicios marcados como <b>"Mecánico solo manual"</b> no se modifican
+                            desde aquí: su mecánico se elige a mano en la columna "Mecánico" de la línea.
                         </p>
                     </group>
                 </group>

@@ -216,6 +216,7 @@ class SaleOrder(models.Model):
                     if line.mechanic_id
                     and line.display_mechanic_fields
                     and not line.mechanic_exempt
+                    and not line.mechanic_manual_only
                     and not line.mechanic_is_placeholder
                 ),
                 None
@@ -230,6 +231,9 @@ class SaleOrder(models.Model):
                 if not line.display_mechanic_fields:
                     continue
                 if line.mechanic_exempt:
+                    continue
+                # Los servicios de asignación manual se rellenan a mano
+                if line.mechanic_manual_only:
                     continue
                 if line.mechanic_id and not line.mechanic_is_placeholder:
                     continue
