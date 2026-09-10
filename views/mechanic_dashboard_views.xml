@@ -286,6 +286,14 @@
     <field name="view_id" ref="board_mechanic_dashboard_form"/>
   </record>
 
+  <!-- Volver al tablero original (borra la personalización del usuario) -->
+  <record id="action_server_reset_mechanic_dashboard" model="ir.actions.server">
+    <field name="name">Restablecer tablero</field>
+    <field name="model_id" ref="model_board_board"/>
+    <field name="state">code</field>
+    <field name="code">action = model.reset_dashboard()</field>
+  </record>
+
   <!-- ============================ MENÚS ============================ -->
 
   <!-- Primer hijo del menú raíz: al entrar a "Comisiones Mecánicos" abre el tablero -->
@@ -294,6 +302,13 @@
             parent="crm_commission.menu_mechanic_commission_root"
             action="action_mechanic_dashboard"
             sequence="1"
+            groups="crm_commission.group_mechanic_commission_view"/>
+
+  <menuitem id="menu_mechanic_dashboard_reset"
+            name="Restablecer tablero"
+            parent="crm_commission.menu_mechanic_commission_root"
+            action="action_server_reset_mechanic_dashboard"
+            sequence="30"
             groups="crm_commission.group_mechanic_commission_view"/>
 
   <menuitem id="menu_mechanic_commission_analysis"

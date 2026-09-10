@@ -42,6 +42,7 @@
             'crm_commission/static/src/css/mechanic_highlight.css',
             # 'crm_commission/static/src/js/mechanic_notify.js',
             'crm_commission/static/src/js/list_sort_sync.js',
+            'crm_commission/static/src/js/board_first_save.js',
         ],
     },
     'installable': True,

@@ -19,5 +19,4 @@ from . import mechanic_commission_entry
 from . import sale_order_set_mechanic_wizard
 from . import sale_commission_goal
 from . import sale_commission_goal_report
-
-
+from . import board_dashboard
