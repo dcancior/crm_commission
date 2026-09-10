@@ -27,14 +27,14 @@ class SaleCommissionGoal(models.Model):
     company_id = fields.Many2one('res.company', default=lambda self: self.env.company, required=True,
                                  tracking=True)
 
-    # Vendedor = usuario asignado a algún equipo de ventas. No se filtra por el
-    # nombre del equipo a propósito: cada instalación nombra sus equipos distinto
-    # y el % de comisión vive en crm.team.commission_percent, no en el nombre.
+    # Cualquier usuario interno: es el mismo criterio que usa el Reporte de
+    # Comisión de Ventas, que tampoco filtra por equipo. Exigir equipo de ventas
+    # dejaba fuera a vendedores reales que no lo tienen asignado.
     user_id = fields.Many2one(
         'res.users',
         string='Vendedor',
         required=True,
-        domain="[('sale_team_id', '!=', False)]",
+        domain="[('share', '=', False)]",
         tracking=True,
     )
     # Rango amplio (varios años atrás) para poder capturar/corregir metas de

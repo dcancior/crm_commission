@@ -24,6 +24,7 @@
         'views/commission_report_wizard_view.xml',
         'views/sale_commission_goal_views.xml',
         'views/sale_commission_goal_report_views.xml',
+        'views/sale_dashboard_views.xml',
         'views/commission_report_pdf.xml',
         'views/sale_order_views.xml',
         'views/account_move_views.xml',

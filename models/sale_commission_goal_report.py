@@ -97,13 +97,11 @@ class SaleCommissionGoalReport(models.Model):
                 ) combo
                 LEFT JOIN res_company rc
                     ON rc.id = COALESCE(combo.company_id, (SELECT id FROM res_company ORDER BY id LIMIT 1))
-                WHERE combo.user_id IN (
-                    -- Vendedores = usuarios con equipo de ventas asignado. No se
-                    -- filtra por el nombre del equipo: cada instalación los nombra
-                    -- distinto y un nombre que no coincida dejaría el tablero vacío.
-                    SELECT ru.id
-                    FROM res_users ru
-                    WHERE ru.sale_team_id IS NOT NULL
-                )
+                -- Sin filtro por equipo de ventas: aparece todo usuario que
+                -- tenga meta capturada o facturas a su nombre. Exigir equipo
+                -- dejaba fuera a los vendedores que no lo tienen asignado, que
+                -- aquí son los que concentran casi toda la facturación, y el
+                -- tablero salía practicamente vacío.
+                WHERE combo.user_id IS NOT NULL
             )
         """ % {'table': self._table})

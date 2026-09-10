@@ -1,0 +1,303 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  DCR INFORMATIC SERVICES SAS DE CV                                 ║
+║  Web: https://www.dcrsoluciones.com                                ║
+║  Contacto: info@dcrsoluciones.com                                  ║
+║                                                                    ║
+║  Este módulo está bajo licencia (LGPLv3).                          ║
+║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html     ║
+╚════════════════════════════════════════════════════════════════════╝
+
+  Tablero de vendedores: mismo planteamiento que el de mecánicos, pero sobre
+  sale.commission.report (las facturas de cliente ya publicadas) y sobre las
+  metas de venta. Responde de un vistazo a: quién vende más, cuánto cuesta esa
+  venta en comisión, qué se facturó pero no se ha cobrado, y quién va llegando
+  a su meta.
+-->
+<odoo>
+
+  <!-- ============================ VISTAS ============================ -->
+
+  <record id="view_sale_commission_report_search" model="ir.ui.view">
+    <field name="name">sale.commission.report.search</field>
+    <field name="model">sale.commission.report</field>
+    <field name="arch" type="xml">
+      <search string="Ventas y comisiones">
+        <field name="user_id" string="Vendedor"/>
+        <field name="partner_id" string="Cliente"/>
+        <field name="move_id" string="Factura"/>
+        <field name="team_id" string="Equipo"/>
+
+        <filter name="invoice_paid" string="Facturas cobradas" domain="[('invoice_paid', '=', True)]"/>
+        <filter name="invoice_unpaid" string="Pendientes de cobro" domain="[('invoice_paid', '=', False)]"/>
+        <separator/>
+        <filter name="commission_pending" string="Comisión pendiente de pagar"
+                domain="[('invoice_paid', '=', True), ('commission_paid', '=', False)]"/>
+        <filter name="commission_paid" string="Comisión ya pagada" domain="[('commission_paid', '=', True)]"/>
+        <separator/>
+        <filter name="last_12m" string="Últimos 12 meses"
+                domain="[('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]"/>
+        <filter name="filter_invoice_date" string="Fecha de factura" date="invoice_date"/>
+
+        <group expand="0" string="Agrupar por">
+          <filter name="group_user" string="Vendedor" context="{'group_by': 'user_id'}"/>
+          <filter name="group_partner" string="Cliente" context="{'group_by': 'partner_id'}"/>
+          <filter name="group_team" string="Equipo de ventas" context="{'group_by': 'team_id'}"/>
+          <filter name="group_payment_state" string="Estado de cobro" context="{'group_by': 'payment_state'}"/>
+          <filter name="group_month" string="Mes de factura" context="{'group_by': 'invoice_date:month'}"/>
+        </group>
+      </search>
+    </field>
+  </record>
+
+  <record id="view_sale_commission_report_tree" model="ir.ui.view">
+    <field name="name">sale.commission.report.tree</field>
+    <field name="model">sale.commission.report</field>
+    <field name="arch" type="xml">
+      <tree string="Ventas y comisiones" create="0" edit="0" delete="0"
+            default_order="invoice_date desc, id desc" sample="1"
+            decoration-warning="invoice_paid == False">
+        <field name="invoice_date" string="Fecha"/>
+        <field name="move_id" string="Factura"/>
+        <field name="user_id" string="Vendedor"/>
+        <field name="partner_id" string="Cliente"/>
+        <field name="team_id" string="Equipo" optional="hide"/>
+        <field name="amount_untaxed" string="Venta (base)" sum="Venta"/>
+        <field name="commission_percent" string="%" optional="hide"/>
+        <field name="commission_amount" string="Comisión" sum="Comisión"/>
+        <field name="amount_residual" string="Pendiente de cobro" sum="Pendiente" optional="show"/>
+        <field name="payment_state" string="Cobro"/>
+        <field name="commission_paid" string="Comisión pagada" widget="boolean_toggle" readonly="1"/>
+        <field name="invoice_paid" invisible="1"/>
+        <field name="currency_id" invisible="1"/>
+      </tree>
+    </field>
+  </record>
+
+  <record id="view_sale_commission_report_pivot" model="ir.ui.view">
+    <field name="name">sale.commission.report.pivot</field>
+    <field name="model">sale.commission.report</field>
+    <field name="arch" type="xml">
+      <pivot string="Ventas y comisiones" sample="1">
+        <field name="user_id" type="row"/>
+        <field name="invoice_date" interval="month" type="col"/>
+        <field name="amount_untaxed" type="measure"/>
+        <field name="commission_amount" type="measure"/>
+      </pivot>
+    </field>
+  </record>
+
+  <!-- Gráficas de los paneles del tablero -->
+
+  <record id="view_sale_commission_report_graph_sales" model="ir.ui.view">
+    <field name="name">sale.commission.report.graph.sales</field>
+    <field name="model">sale.commission.report</field>
+    <field name="arch" type="xml">
+      <graph string="Ventas por vendedor" type="bar" sample="1">
+        <field name="user_id" type="row"/>
+        <field name="amount_untaxed" type="measure"/>
+      </graph>
+    </field>
+  </record>
+
+  <record id="view_sale_commission_report_graph_commission" model="ir.ui.view">
+    <field name="name">sale.commission.report.graph.commission</field>
+    <field name="model">sale.commission.report</field>
+    <field name="arch" type="xml">
+      <graph string="Comisión por vendedor" type="bar" sample="1">
+        <field name="user_id" type="row"/>
+        <field name="commission_amount" type="measure"/>
+      </graph>
+    </field>
+  </record>
+
+  <record id="view_sale_commission_report_graph_month" model="ir.ui.view">
+    <field name="name">sale.commission.report.graph.month</field>
+    <field name="model">sale.commission.report</field>
+    <field name="arch" type="xml">
+      <graph string="Evolución mensual" type="line" sample="1">
+        <field name="invoice_date" interval="month" type="row"/>
+        <field name="amount_untaxed" type="measure"/>
+      </graph>
+    </field>
+  </record>
+
+  <record id="view_sale_commission_report_graph_residual" model="ir.ui.view">
+    <field name="name">sale.commission.report.graph.residual</field>
+    <field name="model">sale.commission.report</field>
+    <field name="arch" type="xml">
+      <graph string="Pendiente de cobro por vendedor" type="bar" sample="1">
+        <field name="user_id" type="row"/>
+        <field name="amount_residual" type="measure"/>
+      </graph>
+    </field>
+  </record>
+
+  <record id="view_sale_commission_report_graph_partner" model="ir.ui.view">
+    <field name="name">sale.commission.report.graph.partner</field>
+    <field name="model">sale.commission.report</field>
+    <field name="arch" type="xml">
+      <graph string="Clientes que más compran" type="bar" sample="1">
+        <field name="partner_id" type="row"/>
+        <field name="amount_untaxed" type="measure"/>
+      </graph>
+    </field>
+  </record>
+
+  <!-- Meta vs. alcanzado por vendedor: vive en el otro modelo (el histórico
+       de metas), pero es el panel que cierra la lectura del tablero. -->
+  <record id="view_sale_commission_goal_report_graph_by_user" model="ir.ui.view">
+    <field name="name">sale.commission.goal.report.graph.by.user</field>
+    <field name="model">sale.commission.goal.report</field>
+    <field name="arch" type="xml">
+      <graph string="Meta vs. alcanzado por vendedor" type="bar" sample="1">
+        <field name="user_id" type="row"/>
+        <field name="amount_goal" type="measure"/>
+        <field name="amount_achieved" type="measure"/>
+      </graph>
+    </field>
+  </record>
+
+  <!-- ============================ ACCIONES ============================ -->
+
+  <record id="action_sale_commission_analysis" model="ir.actions.act_window">
+    <field name="name">Análisis de ventas y comisiones</field>
+    <field name="res_model">sale.commission.report</field>
+    <field name="view_mode">graph,pivot,tree</field>
+    <field name="search_view_id" ref="view_sale_commission_report_search"/>
+    <field name="context">{'search_default_last_12m': 1, 'search_default_group_user': 1}</field>
+    <field name="help" type="html">
+      <p class="o_view_nocontent_smiling_face">Todavía no hay facturas en este periodo</p>
+      <p>Aquí aparecen las facturas de cliente ya publicadas, con la comisión que
+         le corresponde a cada vendedor. La comisión se gana cuando la factura
+         se cobra; el pago al vendedor se registra en el Reporte de Comisión de Ventas.</p>
+    </field>
+  </record>
+
+  <!-- Acciones de cada panel del tablero -->
+
+  <record id="action_board_sales_by_user" model="ir.actions.act_window">
+    <field name="name">Ventas cobradas por vendedor (12 meses)</field>
+    <field name="res_model">sale.commission.report</field>
+    <field name="view_mode">graph</field>
+    <field name="view_id" ref="view_sale_commission_report_graph_sales"/>
+    <field name="search_view_id" ref="view_sale_commission_report_search"/>
+    <field name="domain">[('invoice_paid', '=', True), ('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]</field>
+  </record>
+
+  <record id="action_board_sales_monthly" model="ir.actions.act_window">
+    <field name="name">Evolución mensual de ventas cobradas</field>
+    <field name="res_model">sale.commission.report</field>
+    <field name="view_mode">graph</field>
+    <field name="view_id" ref="view_sale_commission_report_graph_month"/>
+    <field name="search_view_id" ref="view_sale_commission_report_search"/>
+    <field name="domain">[('invoice_paid', '=', True), ('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]</field>
+  </record>
+
+  <record id="action_board_commission_by_user" model="ir.actions.act_window">
+    <field name="name">Comisión por vendedor (12 meses)</field>
+    <field name="res_model">sale.commission.report</field>
+    <field name="view_mode">graph</field>
+    <field name="view_id" ref="view_sale_commission_report_graph_commission"/>
+    <field name="search_view_id" ref="view_sale_commission_report_search"/>
+    <field name="domain">[('invoice_paid', '=', True), ('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]</field>
+  </record>
+
+  <record id="action_board_residual_by_user" model="ir.actions.act_window">
+    <field name="name">Facturado sin cobrar por vendedor</field>
+    <field name="res_model">sale.commission.report</field>
+    <field name="view_mode">graph</field>
+    <field name="view_id" ref="view_sale_commission_report_graph_residual"/>
+    <field name="search_view_id" ref="view_sale_commission_report_search"/>
+    <field name="domain">[('invoice_paid', '=', False)]</field>
+  </record>
+
+  <record id="action_board_top_partners" model="ir.actions.act_window">
+    <field name="name">Clientes que más compran (12 meses)</field>
+    <field name="res_model">sale.commission.report</field>
+    <field name="view_mode">graph</field>
+    <field name="view_id" ref="view_sale_commission_report_graph_partner"/>
+    <field name="search_view_id" ref="view_sale_commission_report_search"/>
+    <field name="domain">[('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]</field>
+  </record>
+
+  <record id="action_board_goal_vs_achieved" model="ir.actions.act_window">
+    <field name="name">Meta vs. alcanzado por vendedor (año en curso)</field>
+    <field name="res_model">sale.commission.goal.report</field>
+    <field name="view_mode">graph</field>
+    <field name="view_id" ref="view_sale_commission_goal_report_graph_by_user"/>
+    <field name="search_view_id" ref="view_sale_commission_goal_report_search"/>
+    <field name="domain">[('year', '=', context_today().strftime('%Y'))]</field>
+  </record>
+
+  <!-- ============================ TABLERO ============================ -->
+
+  <record id="board_sale_dashboard_form" model="ir.ui.view">
+    <field name="name">Tablero de vendedores</field>
+    <field name="model">board.board</field>
+    <field name="arch" type="xml">
+      <form string="Tablero de vendedores">
+        <board style="1-1">
+          <column>
+            <action name="%(action_board_sales_by_user)d"
+                    string="Ventas cobradas por vendedor (12 meses)" view_mode="graph"/>
+            <action name="%(action_board_sales_monthly)d"
+                    string="Evolución mensual de ventas cobradas" view_mode="graph"/>
+            <action name="%(action_board_top_partners)d"
+                    string="Clientes que más compran (12 meses)" view_mode="graph"/>
+          </column>
+          <column>
+            <action name="%(action_board_commission_by_user)d"
+                    string="Comisión por vendedor (12 meses)" view_mode="graph"/>
+            <action name="%(action_board_residual_by_user)d"
+                    string="Facturado sin cobrar por vendedor" view_mode="graph"/>
+            <action name="%(action_board_goal_vs_achieved)d"
+                    string="Meta vs. alcanzado por vendedor (año en curso)" view_mode="graph"/>
+          </column>
+        </board>
+      </form>
+    </field>
+  </record>
+
+  <record id="action_sale_dashboard" model="ir.actions.act_window">
+    <field name="name">Tablero de vendedores</field>
+    <field name="res_model">board.board</field>
+    <field name="view_mode">form</field>
+    <field name="usage">menu</field>
+    <field name="view_id" ref="board_sale_dashboard_form"/>
+  </record>
+
+  <!-- Volver al tablero original (borra la personalización del usuario) -->
+  <record id="action_server_reset_sale_dashboard" model="ir.actions.server">
+    <field name="name">Restablecer tablero</field>
+    <field name="model_id" ref="model_board_board"/>
+    <field name="state">code</field>
+    <field name="code">action = model.reset_dashboard('crm_commission.board_sale_dashboard_form')</field>
+  </record>
+
+  <!-- ============================ MENÚS ============================ -->
+
+  <!-- Primer hijo del menú raíz: al entrar a "Vendedores" abre el tablero -->
+  <menuitem id="menu_sale_dashboard"
+            name="Tablero"
+            parent="crm_commission.menu_commission_report_root"
+            action="action_sale_dashboard"
+            sequence="1"
+            groups="crm_commission.group_commission_view"/>
+
+  <menuitem id="menu_sale_commission_analysis"
+            name="Análisis de ventas y comisiones"
+            parent="crm_commission.menu_commission_report_root"
+            action="action_sale_commission_analysis"
+            sequence="15"
+            groups="crm_commission.group_commission_view"/>
+
+  <menuitem id="menu_sale_dashboard_reset"
+            name="Restablecer tablero"
+            parent="crm_commission.menu_commission_report_root"
+            action="action_server_reset_sale_dashboard"
+            sequence="30"
+            groups="crm_commission.group_commission_view"/>
+
+</odoo>
