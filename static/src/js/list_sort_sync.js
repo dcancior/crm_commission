@@ -20,6 +20,10 @@ const LINE_MODELS = [
 
 patch(ListRenderer.prototype, "crm_commission.list_sort_sync", {
     async onClickSortColumn(column) {
+        // this._super solo existe durante la ejecución síncrona del parche: se
+        // guarda antes de cualquier await (aquí aún no hay ninguno, pero deja el
+        // parche a salvo si se añade uno más adelante).
+        const _super = this._super.bind(this);
         const list = this.props.list;
         const isCommissionList = list && LINE_MODELS.includes(list.resModel);
 
@@ -30,7 +34,7 @@ patch(ListRenderer.prototype, "crm_commission.list_sort_sync", {
         const previousField = previous.sort_field;
         const previousDirection = previous.sort_direction || "asc";
 
-        await this._super(...arguments);
+        await _super(...arguments);
 
         // El wizard padre debe exponer los campos de orden en la vista.
         if (!isCommissionList || !root || !root.data || !("sort_field" in root.data)) {
