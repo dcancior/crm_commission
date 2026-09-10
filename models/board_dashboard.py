@@ -20,11 +20,48 @@ Aquí se expone el método que crea esa copia la primera vez (lo llama
 board_first_save.js) y uno para restablecer el tablero original.
 """
 
+from lxml import etree
+
 from odoo import models, api
+
+# El cliente serializa como el texto "null" los atributos que no existen en el
+# XML del tablero; al releerlos, Odoo intenta evaluarlos como expresión Python
+# y revienta con "Name 'null' is not defined".
+_NULL_VALUES = ('null', 'undefined', 'none')
 
 
 class Board(models.AbstractModel):
     _inherit = 'board.board'
+
+    @api.model
+    def _arch_preprocessing(self, arch):
+        """Limpia los atributos "null" que el cliente graba al guardar el diseño.
+
+        Al guardar, el tablero vuelve a serializar cada panel y escribe
+        context="null" (y domain="null") cuando el XML original no traía esos
+        atributos. Al volver a abrir el tablero, el cliente evalúa ese texto como
+        expresión Python y falla con "Name 'null' is not defined".
+
+        Se quitan en lugar de sustituirlos por {} / [] a propósito: así el panel
+        sigue usando el contexto y el dominio de su propia acción.
+        """
+        arch = super()._arch_preprocessing(arch)
+        try:
+            root = etree.fromstring(arch)
+        except Exception:
+            return arch
+
+        limpiado = False
+        for node in root.iter('action'):
+            for attr in ('context', 'domain'):
+                value = (node.get(attr) or '').strip().lower()
+                if value in _NULL_VALUES:
+                    del node.attrib[attr]
+                    limpiado = True
+
+        if not limpiado:
+            return arch
+        return etree.tostring(root, pretty_print=True, encoding='unicode')
 
     @api.model
     def ensure_custom_view(self, view_id):
