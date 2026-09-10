@@ -95,11 +95,17 @@
         </group>
       </xpath>
 
-      <!-- 7) Ocultar "Ruta" (route_id, de sale_stock): no es parte de comisiones
-           y no se usa en este módulo; se oculta para no confundir al vendedor. -->
-      <xpath expr="//field[@name='order_line']//field[@name='route_id']" position="attributes">
-        <attribute name="invisible">1</attribute>
-      </xpath>
+      <!-- 7) "Ruta" (route_id, de sale_stock) YA NO se oculta aquí.
+
+           sale_stock declara ese campo con groups="stock.group_adv_location",
+           así que Odoo lo borra del arch combinado de quien no tenga el grupo:
+           el xpath se quedaba sin nodo y la actualización del módulo moría con
+           "cannot be located in parent view". Tampoco se puede aislar en una
+           vista con groups_id, porque Odoo 16 lo prohíbe en vistas heredadas.
+
+           No se pierde nada: el campo solo aparece si se activan las rutas de
+           varios pasos (grupo "Ubicaciones avanzadas") y, aun entonces, en la
+           lista de líneas viene como optional="hide". -->
 
       <!-- 8) Ocultar "Plazo de entrega" (customer_lead, del módulo sale base):
            no se usa en este negocio; ocultarlo no afecta su cálculo interno,
@@ -110,4 +116,5 @@
 
     </field>
   </record>
+
 </odoo>
