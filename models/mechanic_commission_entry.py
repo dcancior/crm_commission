@@ -101,6 +101,36 @@ class MechanicCommissionEntry(models.Model):
         readonly=True,
     )
 
+    # ------------------------------------------------------------------
+    # Actualización de datos para el tablero
+    # ------------------------------------------------------------------
+    @api.model
+    def action_refresh_current_month(self):
+        """Regenera las entradas del mes en curso (mismo cálculo que el reporte mensual).
+
+        El libro de comisiones se construye cuando alguien abre el reporte de un
+        periodo; esto permite refrescarlo desde el tablero sin abrir el reporte.
+        """
+        today = fields.Date.context_today(self)
+        wizard = self.env['mechanic.commission.wizard'].create({
+            'employee_selection': 'all',
+            'date_from': today.replace(day=1),
+            'date_to': today,
+        })
+        wizard._onchange_build_lines()
+        return {
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Comisiones actualizadas',
+                'message': f"Se recalculó del {today.replace(day=1).strftime('%d/%m/%Y')} "
+                           f"al {today.strftime('%d/%m/%Y')}.",
+                'sticky': False,
+                'type': 'success',
+                'next': {'type': 'ir.actions.act_window_close'},
+            },
+        }
+
     _sql_constraints = [
         # Evita duplicados por misma línea de factura para el mismo mecánico
         ('uniq_employee_invoice_line',

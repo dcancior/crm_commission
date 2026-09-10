@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  DCR INFORMATIC SERVICES SAS DE CV                                 ║
+║  Web: https://www.dcrsoluciones.com                                ║
+║  Contacto: info@dcrsoluciones.com                                  ║
+║                                                                    ║
+║  Este módulo está bajo licencia (LGPLv3).                          ║
+║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html     ║
+╚════════════════════════════════════════════════════════════════════╝
+
+  Tablero de mecánicos: gráficas sobre mechanic.commission.entry (el libro de
+  comisiones que ya alimenta el reporte mensual), para ver de un vistazo quién
+  produce más, qué servicios dejan más comisión y cuánto está pendiente de pago.
+-->
+<odoo>
+
+  <!-- ============================ VISTAS ============================ -->
+
+  <record id="view_mechanic_entry_search" model="ir.ui.view">
+    <field name="name">mechanic.commission.entry.search</field>
+    <field name="model">mechanic.commission.entry</field>
+    <field name="arch" type="xml">
+      <search string="Comisiones de mecánicos">
+        <field name="employee_id" string="Mecánico"/>
+        <field name="product_id" string="Servicio"/>
+        <field name="invoice_name" string="Factura / Cliente"/>
+        <field name="order_id" string="Cotización/Orden"/>
+
+        <filter name="active_mechanics" string="Solo mecánicos activos"
+                domain="[('employee_id.active', '=', True)]"/>
+        <separator/>
+        <filter name="pending" string="Comisión pendiente" domain="[('is_paid', '=', False)]"/>
+        <filter name="paid" string="Comisión pagada" domain="[('is_paid', '=', True)]"/>
+        <separator/>
+        <filter name="last_12m" string="Últimos 12 meses"
+                domain="[('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]"/>
+        <filter name="filter_invoice_date" string="Fecha de factura" date="invoice_date"/>
+
+        <group expand="0" string="Agrupar por">
+          <filter name="group_employee" string="Mecánico" context="{'group_by': 'employee_id'}"/>
+          <filter name="group_product" string="Servicio" context="{'group_by': 'product_id'}"/>
+          <filter name="group_paid" string="Estado de pago" context="{'group_by': 'is_paid'}"/>
+          <filter name="group_pay_method" string="Forma de pago" context="{'group_by': 'pago_comision'}"/>
+          <filter name="group_month" string="Mes de factura" context="{'group_by': 'invoice_date:month'}"/>
+          <filter name="group_brand" string="Marca del auto" context="{'group_by': 'marca_auto'}"/>
+        </group>
+      </search>
+    </field>
+  </record>
+
+  <record id="view_mechanic_entry_tree" model="ir.ui.view">
+    <field name="name">mechanic.commission.entry.tree</field>
+    <field name="model">mechanic.commission.entry</field>
+    <field name="arch" type="xml">
+      <tree string="Comisiones de mecánicos" create="0" edit="0" delete="0"
+            default_order="invoice_date desc, id desc" sample="1">
+        <field name="invoice_date" string="Fecha"/>
+        <field name="employee_id" string="Mecánico"/>
+        <field name="invoice_name" string="Factura / Cliente" optional="show"/>
+        <field name="order_id" string="Orden" optional="hide"/>
+        <field name="product_name" string="Servicio"/>
+        <field name="quantity" string="Cant." sum="Cantidad" optional="hide"/>
+        <field name="hours" string="Horas" sum="Horas"/>
+        <field name="subtotal_customer" string="Facturado" sum="Facturado" optional="show"/>
+        <field name="payout" string="Comisión" sum="Comisión"/>
+        <field name="is_paid" string="Pagada" widget="boolean_toggle" readonly="1"/>
+        <field name="currency_id" invisible="1"/>
+      </tree>
+    </field>
+  </record>
+
+  <record id="view_mechanic_entry_form" model="ir.ui.view">
+    <field name="name">mechanic.commission.entry.form</field>
+    <field name="model">mechanic.commission.entry</field>
+    <field name="arch" type="xml">
+      <form string="Comisión" create="0" edit="0">
+        <sheet>
+          <group>
+            <group>
+              <field name="employee_id" readonly="1"/>
+              <field name="invoice_date" readonly="1"/>
+              <field name="invoice_name" readonly="1"/>
+              <field name="order_id" readonly="1"/>
+              <field name="product_name" readonly="1"/>
+            </group>
+            <group>
+              <field name="currency_id" invisible="1"/>
+              <field name="quantity" readonly="1"/>
+              <field name="hours" readonly="1"/>
+              <field name="cost_per_hour" readonly="1"/>
+              <field name="subtotal_customer" readonly="1"/>
+              <field name="payout" readonly="1"/>
+              <field name="is_paid" readonly="1"/>
+              <field name="paid_date" readonly="1"/>
+              <field name="paid_by" readonly="1"/>
+            </group>
+          </group>
+        </sheet>
+      </form>
+    </field>
+  </record>
+
+  <record id="view_mechanic_entry_pivot" model="ir.ui.view">
+    <field name="name">mechanic.commission.entry.pivot</field>
+    <field name="model">mechanic.commission.entry</field>
+    <field name="arch" type="xml">
+      <pivot string="Comisiones de mecánicos" sample="1">
+        <field name="employee_id" type="row"/>
+        <field name="invoice_date" interval="month" type="col"/>
+        <field name="payout" type="measure"/>
+      </pivot>
+    </field>
+  </record>
+
+  <!-- Gráficas de los paneles del tablero -->
+
+  <record id="view_mechanic_entry_graph_payout" model="ir.ui.view">
+    <field name="name">mechanic.commission.entry.graph.payout</field>
+    <field name="model">mechanic.commission.entry</field>
+    <field name="arch" type="xml">
+      <graph string="Comisión por mecánico" type="bar" sample="1">
+        <field name="employee_id" type="row"/>
+        <field name="payout" type="measure"/>
+      </graph>
+    </field>
+  </record>
+
+  <record id="view_mechanic_entry_graph_count" model="ir.ui.view">
+    <field name="name">mechanic.commission.entry.graph.count</field>
+    <field name="model">mechanic.commission.entry</field>
+    <field name="arch" type="xml">
+      <!-- Sin measure: la gráfica usa el conteo de servicios -->
+      <graph string="Servicios por mecánico" type="bar" sample="1">
+        <field name="employee_id" type="row"/>
+      </graph>
+    </field>
+  </record>
+
+  <record id="view_mechanic_entry_graph_month" model="ir.ui.view">
+    <field name="name">mechanic.commission.entry.graph.month</field>
+    <field name="model">mechanic.commission.entry</field>
+    <field name="arch" type="xml">
+      <graph string="Evolución mensual" type="line" sample="1">
+        <field name="invoice_date" interval="month" type="row"/>
+        <field name="payout" type="measure"/>
+      </graph>
+    </field>
+  </record>
+
+  <record id="view_mechanic_entry_graph_product" model="ir.ui.view">
+    <field name="name">mechanic.commission.entry.graph.product</field>
+    <field name="model">mechanic.commission.entry</field>
+    <field name="arch" type="xml">
+      <graph string="Servicios que más comisión generan" type="bar" sample="1">
+        <field name="product_id" type="row"/>
+        <field name="payout" type="measure"/>
+      </graph>
+    </field>
+  </record>
+
+  <record id="view_mechanic_entry_graph_hours" model="ir.ui.view">
+    <field name="name">mechanic.commission.entry.graph.hours</field>
+    <field name="model">mechanic.commission.entry</field>
+    <field name="arch" type="xml">
+      <graph string="Horas por mecánico" type="bar" sample="1">
+        <field name="employee_id" type="row"/>
+        <field name="hours" type="measure"/>
+      </graph>
+    </field>
+  </record>
+
+  <!-- ============================ ACCIONES ============================ -->
+
+  <!-- Análisis completo (gráfica / tabla dinámica / lista) -->
+  <record id="action_mechanic_commission_analysis" model="ir.actions.act_window">
+    <field name="name">Análisis de comisiones</field>
+    <field name="res_model">mechanic.commission.entry</field>
+    <field name="view_mode">graph,pivot,tree,form</field>
+    <field name="search_view_id" ref="view_mechanic_entry_search"/>
+    <field name="context">{'search_default_last_12m': 1, 'search_default_active_mechanics': 1, 'search_default_group_employee': 1}</field>
+    <field name="help" type="html">
+      <p class="o_view_nocontent_smiling_face">Todavía no hay comisiones en este periodo</p>
+      <p>El libro de comisiones se alimenta al abrir el reporte mensual de mecánicos.
+         También puedes actualizarlo desde el menú "Acción → Actualizar comisiones del mes en curso".</p>
+    </field>
+  </record>
+
+  <!-- Acciones de cada panel del tablero -->
+
+  <record id="action_board_payout_by_employee" model="ir.actions.act_window">
+    <field name="name">Comisión por mecánico (12 meses)</field>
+    <field name="res_model">mechanic.commission.entry</field>
+    <field name="view_mode">graph</field>
+    <field name="view_id" ref="view_mechanic_entry_graph_payout"/>
+    <field name="search_view_id" ref="view_mechanic_entry_search"/>
+    <field name="domain">[('employee_id.active', '=', True), ('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]</field>
+  </record>
+
+  <record id="action_board_services_by_employee" model="ir.actions.act_window">
+    <field name="name">Servicios por mecánico (12 meses)</field>
+    <field name="res_model">mechanic.commission.entry</field>
+    <field name="view_mode">graph</field>
+    <field name="view_id" ref="view_mechanic_entry_graph_count"/>
+    <field name="search_view_id" ref="view_mechanic_entry_search"/>
+    <field name="domain">[('employee_id.active', '=', True), ('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]</field>
+  </record>
+
+  <record id="action_board_monthly_evolution" model="ir.actions.act_window">
+    <field name="name">Evolución mensual de comisiones</field>
+    <field name="res_model">mechanic.commission.entry</field>
+    <field name="view_mode">graph</field>
+    <field name="view_id" ref="view_mechanic_entry_graph_month"/>
+    <field name="search_view_id" ref="view_mechanic_entry_search"/>
+    <field name="domain">[('employee_id.active', '=', True), ('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]</field>
+  </record>
+
+  <record id="action_board_pending_payout" model="ir.actions.act_window">
+    <field name="name">Comisión pendiente de pago</field>
+    <field name="res_model">mechanic.commission.entry</field>
+    <field name="view_mode">graph</field>
+    <field name="view_id" ref="view_mechanic_entry_graph_payout"/>
+    <field name="search_view_id" ref="view_mechanic_entry_search"/>
+    <field name="domain">[('employee_id.active', '=', True), ('is_paid', '=', False)]</field>
+  </record>
+
+  <record id="action_board_top_services" model="ir.actions.act_window">
+    <field name="name">Servicios que más comisión generan (12 meses)</field>
+    <field name="res_model">mechanic.commission.entry</field>
+    <field name="view_mode">graph</field>
+    <field name="view_id" ref="view_mechanic_entry_graph_product"/>
+    <field name="search_view_id" ref="view_mechanic_entry_search"/>
+    <field name="domain">[('employee_id.active', '=', True), ('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]</field>
+  </record>
+
+  <record id="action_board_hours_by_employee" model="ir.actions.act_window">
+    <field name="name">Horas por mecánico (12 meses)</field>
+    <field name="res_model">mechanic.commission.entry</field>
+    <field name="view_mode">graph</field>
+    <field name="view_id" ref="view_mechanic_entry_graph_hours"/>
+    <field name="search_view_id" ref="view_mechanic_entry_search"/>
+    <field name="domain">[('employee_id.active', '=', True), ('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]</field>
+  </record>
+
+  <!-- Actualizar el libro de comisiones sin abrir el reporte mensual -->
+  <record id="action_server_refresh_mechanic_entries" model="ir.actions.server">
+    <field name="name">Actualizar comisiones del mes en curso</field>
+    <field name="model_id" ref="model_mechanic_commission_entry"/>
+    <field name="binding_model_id" ref="model_mechanic_commission_entry"/>
+    <field name="binding_view_types">list,form</field>
+    <field name="state">code</field>
+    <field name="code">action = model.action_refresh_current_month()</field>
+  </record>
+
+  <!-- ============================ TABLERO ============================ -->
+
+  <record id="board_mechanic_dashboard_form" model="ir.ui.view">
+    <field name="name">Tablero de mecánicos</field>
+    <field name="model">board.board</field>
+    <field name="arch" type="xml">
+      <form string="Tablero de mecánicos">
+        <board style="1-1">
+          <column>
+            <action name="%(action_board_payout_by_employee)d"
+                    string="Comisión por mecánico (12 meses)" view_mode="graph"/>
+            <action name="%(action_board_monthly_evolution)d"
+                    string="Evolución mensual de comisiones" view_mode="graph"/>
+            <action name="%(action_board_top_services)d"
+                    string="Servicios que más comisión generan" view_mode="graph"/>
+          </column>
+          <column>
+            <action name="%(action_board_services_by_employee)d"
+                    string="Servicios por mecánico (12 meses)" view_mode="graph"/>
+            <action name="%(action_board_pending_payout)d"
+                    string="Comisión pendiente de pago" view_mode="graph"/>
+            <action name="%(action_board_hours_by_employee)d"
+                    string="Horas por mecánico (12 meses)" view_mode="graph"/>
+          </column>
+        </board>
+      </form>
+    </field>
+  </record>
+
+  <record id="action_mechanic_dashboard" model="ir.actions.act_window">
+    <field name="name">Tablero de mecánicos</field>
+    <field name="res_model">board.board</field>
+    <field name="view_mode">form</field>
+    <field name="usage">menu</field>
+    <field name="view_id" ref="board_mechanic_dashboard_form"/>
+  </record>
+
+  <!-- Volver al tablero original (borra la personalización del usuario) -->
+  <record id="action_server_reset_mechanic_dashboard" model="ir.actions.server">
+    <field name="name">Restablecer tablero</field>
+    <field name="model_id" ref="model_board_board"/>
+    <field name="state">code</field>
+    <field name="code">action = model.reset_dashboard()</field>
+  </record>
+
+  <!-- ============================ MENÚS ============================ -->
+
+  <!-- Primer hijo del menú raíz: al entrar a "Comisiones Mecánicos" abre el tablero -->
+  <menuitem id="menu_mechanic_dashboard"
+            name="Tablero"
+            parent="crm_commission.menu_mechanic_commission_root"
+            action="action_mechanic_dashboard"
+            sequence="1"
+            groups="crm_commission.group_mechanic_commission_view"/>
+
+  <menuitem id="menu_mechanic_dashboard_reset"
+            name="Restablecer tablero"
+            parent="crm_commission.menu_mechanic_commission_root"
+            action="action_server_reset_mechanic_dashboard"
+            sequence="30"
+            groups="crm_commission.group_mechanic_commission_view"/>
+
+  <menuitem id="menu_mechanic_commission_analysis"
+            name="Análisis de comisiones"
+            parent="crm_commission.menu_mechanic_commission_root"
+            action="action_mechanic_commission_analysis"
+            sequence="15"
+            groups="crm_commission.group_mechanic_commission_view"/>
+
+</odoo>

@@ -13,7 +13,7 @@
     'name': 'CRM Commission',
     'version': '16.0.1.0.1',
     'summary': 'Permite asignar comisión a los vendedores del CRM',
-    'depends': ['web', 'crm', 'sale', 'sale_stock', 'hr', 'workshop_mechanic', 'base_setup'],
+    'depends': ['web', 'board', 'crm', 'sale', 'sale_stock', 'hr', 'workshop_mechanic', 'base_setup'],
     'data': [
         'security/mechanic_commission_groups.xml',
         'security/ir.model.access.csv',
@@ -27,6 +27,7 @@
         'views/account_move_views.xml',
         'views/account_payment_inherit.xml',
         'views/product_views.xml',
+        'views/mechanic_dashboard_views.xml',
         'views/sale_views.xml',
         'views/sale_order_set_mechanic_wizard_views.xml',
         # 'views/assets.xml',  # <-- quítalo para evitar el inherit
@@ -35,6 +36,7 @@
         'web.assets_backend': [
             'crm_commission/static/src/css/mechanic_highlight.css',
             # 'crm_commission/static/src/js/mechanic_notify.js',
+            'crm_commission/static/src/js/board_first_save.js',
         ],
     },
     'installable': True,
