@@ -27,6 +27,9 @@
         <field name="invoice_name" string="Factura / Cliente"/>
         <field name="order_id" string="Cotización/Orden"/>
 
+        <filter name="active_mechanics" string="Solo mecánicos activos"
+                domain="[('employee_id.active', '=', True)]"/>
+        <separator/>
         <filter name="pending" string="Comisión pendiente" domain="[('is_paid', '=', False)]"/>
         <filter name="paid" string="Comisión pagada" domain="[('is_paid', '=', True)]"/>
         <separator/>
@@ -175,7 +178,7 @@
     <field name="res_model">mechanic.commission.entry</field>
     <field name="view_mode">graph,pivot,tree,form</field>
     <field name="search_view_id" ref="view_mechanic_entry_search"/>
-    <field name="context">{'search_default_last_12m': 1, 'search_default_group_employee': 1}</field>
+    <field name="context">{'search_default_last_12m': 1, 'search_default_active_mechanics': 1, 'search_default_group_employee': 1}</field>
     <field name="help" type="html">
       <p class="o_view_nocontent_smiling_face">Todavía no hay comisiones en este periodo</p>
       <p>El libro de comisiones se alimenta al abrir el reporte mensual de mecánicos.
@@ -191,7 +194,7 @@
     <field name="view_mode">graph</field>
     <field name="view_id" ref="view_mechanic_entry_graph_payout"/>
     <field name="search_view_id" ref="view_mechanic_entry_search"/>
-    <field name="domain">[('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]</field>
+    <field name="domain">[('employee_id.active', '=', True), ('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]</field>
   </record>
 
   <record id="action_board_services_by_employee" model="ir.actions.act_window">
@@ -200,7 +203,7 @@
     <field name="view_mode">graph</field>
     <field name="view_id" ref="view_mechanic_entry_graph_count"/>
     <field name="search_view_id" ref="view_mechanic_entry_search"/>
-    <field name="domain">[('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]</field>
+    <field name="domain">[('employee_id.active', '=', True), ('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]</field>
   </record>
 
   <record id="action_board_monthly_evolution" model="ir.actions.act_window">
@@ -209,7 +212,7 @@
     <field name="view_mode">graph</field>
     <field name="view_id" ref="view_mechanic_entry_graph_month"/>
     <field name="search_view_id" ref="view_mechanic_entry_search"/>
-    <field name="domain">[('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]</field>
+    <field name="domain">[('employee_id.active', '=', True), ('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]</field>
   </record>
 
   <record id="action_board_pending_payout" model="ir.actions.act_window">
@@ -218,7 +221,7 @@
     <field name="view_mode">graph</field>
     <field name="view_id" ref="view_mechanic_entry_graph_payout"/>
     <field name="search_view_id" ref="view_mechanic_entry_search"/>
-    <field name="domain">[('is_paid', '=', False)]</field>
+    <field name="domain">[('employee_id.active', '=', True), ('is_paid', '=', False)]</field>
   </record>
 
   <record id="action_board_top_services" model="ir.actions.act_window">
@@ -227,7 +230,7 @@
     <field name="view_mode">graph</field>
     <field name="view_id" ref="view_mechanic_entry_graph_product"/>
     <field name="search_view_id" ref="view_mechanic_entry_search"/>
-    <field name="domain">[('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]</field>
+    <field name="domain">[('employee_id.active', '=', True), ('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]</field>
   </record>
 
   <record id="action_board_hours_by_employee" model="ir.actions.act_window">
@@ -236,7 +239,7 @@
     <field name="view_mode">graph</field>
     <field name="view_id" ref="view_mechanic_entry_graph_hours"/>
     <field name="search_view_id" ref="view_mechanic_entry_search"/>
-    <field name="domain">[('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]</field>
+    <field name="domain">[('employee_id.active', '=', True), ('invoice_date', '&gt;=', (context_today() - relativedelta(months=12)).strftime('%Y-%m-%d'))]</field>
   </record>
 
   <!-- Actualizar el libro de comisiones sin abrir el reporte mensual -->
