@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  DCR INFORMATIC SERVICES SAS DE CV                                 ║
+║  Web: https://www.dcrsoluciones.com                                ║
+║  Contacto: info@dcrsoluciones.com                                  ║
+║                                                                    ║
+║  Este módulo está bajo licencia (LGPLv3).                          ║
+║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html     ║
+╚════════════════════════════════════════════════════════════════════╝
+-->
+<odoo>
+
+  <record id="view_sale_commission_goal_report_graph" model="ir.ui.view">
+    <field name="name">sale.commission.goal.report.graph</field>
+    <field name="model">sale.commission.goal.report</field>
+    <field name="arch" type="xml">
+      <graph string="Meta vs. Ventas" type="bar">
+        <field name="year" type="row"/>
+        <field name="month" type="row"/>
+        <field name="amount_goal" type="measure"/>
+        <field name="amount_achieved" type="measure"/>
+      </graph>
+    </field>
+  </record>
+
+  <record id="view_sale_commission_goal_report_pivot" model="ir.ui.view">
+    <field name="name">sale.commission.goal.report.pivot</field>
+    <field name="model">sale.commission.goal.report</field>
+    <field name="arch" type="xml">
+      <pivot string="Histórico de metas de venta" display_quantity="1">
+        <field name="user_id" type="row"/>
+        <field name="month" type="row"/>
+        <field name="year" type="col"/>
+        <field name="amount_goal" type="measure"/>
+        <field name="amount_achieved" type="measure"/>
+        <field name="amount_difference" type="measure"/>
+        <field name="percent_achieved" type="measure"/>
+      </pivot>
+    </field>
+  </record>
+
+  <record id="view_sale_commission_goal_report_tree" model="ir.ui.view">
+    <field name="name">sale.commission.goal.report.tree</field>
+    <field name="model">sale.commission.goal.report</field>
+    <field name="arch" type="xml">
+      <tree string="Histórico de metas de venta" create="0" edit="0" delete="0"
+            decoration-success="reached_goal == True"
+            decoration-danger="reached_goal == False and amount_goal &gt; 0"
+            decoration-muted="amount_goal == 0">
+        <field name="user_id"/>
+        <field name="year"/>
+        <field name="month"/>
+        <field name="amount_goal" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+        <field name="amount_achieved" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+        <field name="amount_difference" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+        <field name="amount_achieved" nolabel="1" string="Avance"
+               widget="progressbar"
+               options="{'current_value': 'amount_achieved', 'max_value': 'amount_goal'}"/>
+        <field name="reached_goal" widget="boolean_toggle" readonly="1"/>
+        <field name="currency_id" invisible="1"/>
+      </tree>
+    </field>
+  </record>
+
+  <record id="view_sale_commission_goal_report_search" model="ir.ui.view">
+    <field name="name">sale.commission.goal.report.search</field>
+    <field name="model">sale.commission.goal.report</field>
+    <field name="arch" type="xml">
+      <search string="Histórico de metas de venta">
+        <field name="user_id"/>
+        <field name="year"/>
+        <filter name="filter_reached" string="Llegaron a la meta" domain="[('reached_goal', '=', True)]"/>
+        <filter name="filter_not_reached" string="No llegaron a la meta"
+                domain="[('reached_goal', '=', False), ('amount_goal', '&gt;', 0)]"/>
+        <separator/>
+        <group expand="1" string="Agrupar por">
+          <filter name="group_by_user" string="Vendedor" context="{'group_by': 'user_id'}"/>
+          <filter name="group_by_year" string="Año" context="{'group_by': 'year'}"/>
+          <filter name="group_by_month" string="Mes" context="{'group_by': 'month'}"/>
+        </group>
+      </search>
+    </field>
+  </record>
+
+  <!-- Mismo grupo que ve el Reporte de Comisión de Ventas: solo lectura -->
+  <act_window id="action_sale_commission_goal_report"
+              name="Tablero de Metas"
+              res_model="sale.commission.goal.report"
+              view_mode="graph,pivot,tree"
+              context="{'search_default_group_by_user': 1}"
+              groups="crm_commission.group_commission_view"/>
+
+  <!-- sequence="5": es el primer submenú (no es modal), así al entrar a
+       "Comisiones de Ventas" se abre este tablero en vez del wizard de
+       reporte (que es target='new' y obligaba a cerrarlo para ver el resto). -->
+  <menuitem id="menu_sale_commission_goal_report"
+            name="Tablero de Metas"
+            parent="menu_commission_report_root"
+            action="action_sale_commission_goal_report"
+            sequence="5"
+            groups="crm_commission.group_commission_view"/>
+
+</odoo>

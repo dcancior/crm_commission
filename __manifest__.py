@@ -11,9 +11,9 @@
 # ╚══════════════════════════════════════════════════════════════════╝
 {
     'name': 'CRM Commission',
-    'version': '16.0.1.0.1',
+    'version': '16.0.1.0.2',
     'summary': 'Permite asignar comisión a los vendedores del CRM',
-    'depends': ['web', 'board', 'crm', 'sale', 'sale_stock', 'hr', 'workshop_mechanic', 'base_setup'],
+    'depends': ['web', 'board', 'mail', 'crm', 'sale', 'sale_stock', 'hr', 'workshop_mechanic', 'base_setup'],
     'data': [
         'security/mechanic_commission_groups.xml',
         'security/ir.model.access.csv',
@@ -22,6 +22,8 @@
         'views/res_config_settings_views.xml',
         'views/crm_team_views.xml',
         'views/commission_report_wizard_view.xml',
+        'views/sale_commission_goal_views.xml',
+        'views/sale_commission_goal_report_views.xml',
         'views/commission_report_pdf.xml',
         'views/sale_order_views.xml',
         'views/account_move_views.xml',

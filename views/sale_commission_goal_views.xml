@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  DCR INFORMATIC SERVICES SAS DE CV                                 ║
+║  Web: https://www.dcrsoluciones.com                                ║
+║  Contacto: info@dcrsoluciones.com                                  ║
+║                                                                    ║
+║  Este módulo está bajo licencia (LGPLv3).                          ║
+║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html     ║
+╚════════════════════════════════════════════════════════════════════╝
+
+  Metas de venta por vendedor/mes: es el insumo que el "Tablero de Metas"
+  compara contra lo realmente facturado y cobrado.
+-->
+<odoo>
+
+  <!-- Sin editable="bottom": abrir cada fila lleva al formulario (con
+       chatter) para editar. Esto evita el error común de crear sin querer
+       una línea duplicada en vez de modificar la meta ya existente. -->
+  <record id="view_sale_commission_goal_tree" model="ir.ui.view">
+    <field name="name">sale.commission.goal.tree</field>
+    <field name="model">sale.commission.goal</field>
+    <field name="arch" type="xml">
+      <tree string="Metas de venta">
+        <field name="user_id" options="{'no_create_edit': True}"/>
+        <field name="month"/>
+        <field name="year"/>
+        <field name="amount_goal" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+        <field name="currency_id" invisible="1"/>
+        <field name="company_id" invisible="1"/>
+      </tree>
+    </field>
+  </record>
+
+  <record id="view_sale_commission_goal_form" model="ir.ui.view">
+    <field name="name">sale.commission.goal.form</field>
+    <field name="model">sale.commission.goal</field>
+    <field name="arch" type="xml">
+      <form string="Meta de venta">
+        <sheet>
+          <group>
+            <field name="user_id" options="{'no_create_edit': True}"/>
+            <field name="month"/>
+            <field name="year"/>
+            <field name="amount_goal" widget="monetary" options="{'currency_field': 'currency_id'}"/>
+            <field name="currency_id" invisible="1"/>
+          </group>
+        </sheet>
+        <div class="oe_chatter">
+          <field name="message_follower_ids"/>
+          <field name="activity_ids"/>
+          <field name="message_ids"/>
+        </div>
+      </form>
+    </field>
+  </record>
+
+  <record id="view_sale_commission_goal_search" model="ir.ui.view">
+    <field name="name">sale.commission.goal.search</field>
+    <field name="model">sale.commission.goal</field>
+    <field name="arch" type="xml">
+      <search string="Metas de venta">
+        <field name="user_id"/>
+        <field name="month"/>
+        <field name="year"/>
+        <group expand="0" string="Agrupar por">
+          <filter name="group_by_user" string="Vendedor" context="{'group_by': 'user_id'}"/>
+          <filter name="group_by_year" string="Año" context="{'group_by': 'year'}"/>
+          <filter name="group_by_month" string="Mes" context="{'group_by': 'month'}"/>
+        </group>
+      </search>
+    </field>
+  </record>
+
+  <!-- Solo el dueño/gerente de ventas puede definir y editar metas -->
+  <act_window id="action_sale_commission_goal"
+              name="Metas de Venta"
+              res_model="sale.commission.goal"
+              view_mode="tree,form"
+              groups="sales_team.group_sale_manager"/>
+
+  <menuitem id="menu_sale_commission_goal"
+            name="Metas de Venta"
+            parent="menu_commission_report_root"
+            action="action_sale_commission_goal"
+            sequence="20"
+            groups="sales_team.group_sale_manager"/>
+
+</odoo>
