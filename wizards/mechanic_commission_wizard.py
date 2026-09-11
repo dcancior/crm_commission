@@ -15,6 +15,28 @@ import calendar
 import re  # para _get_report_base_filename
 
 
+def _calc_method_note(methods):
+    """Texto corto que dice con qué método se calculó la comisión mostrada.
+
+    Recibe los métodos REALMENTE usados al generar cada comisión (se guardan en
+    mechanic.commission.entry.calc_method), no el que esté configurado hoy: si
+    alguien cambia el ajuste, las comisiones ya generadas conservan el método
+    con el que se calcularon, y tanto el wizard como el PDF tienen que decir la
+    verdad sobre lo que están mostrando.
+
+    Devuelve '' si no hay métodos, para que quien llame decida el respaldo.
+    """
+    methods = {m for m in methods if m}
+    if len(methods) > 1:
+        return ("Método de cálculo: mixto — estas líneas se generaron con ambos métodos "
+                "(costo/hora × horas × cantidad, y precio unitario × cantidad × %).")
+    if 'percent' in methods:
+        return "Método de cálculo: porcentaje — precio unitario × cantidad × % del mecánico."
+    if 'hours_cost' in methods:
+        return "Método de cálculo: costo por hora — costo/hora × horas requeridas × cantidad."
+    return ""
+
+
 class MechanicCommissionWizard(models.TransientModel):
     _name = "mechanic.commission.wizard"
     _description = "Wizard: Comisiones de mecánicos por rango de fechas (facturas activas)"
@@ -97,6 +119,24 @@ class MechanicCommissionWizard(models.TransientModel):
         string="Filtrar para PDF",
         default='all',
     )
+
+    # Nota al pie de los KPIs: con qué método se calcularon las comisiones que
+    # se están viendo. Va como texto y no como Selection porque puede ser mixto.
+    calc_method_note = fields.Char(
+        string="Método de cálculo",
+        compute="_compute_calc_method_note",
+        store=False,
+    )
+
+    @api.depends('line_ids', 'line_ids.calc_method')
+    def _compute_calc_method_note(self):
+        for w in self:
+            # Sin líneas todavía, se anuncia el método configurado hoy: es el
+            # que se va a aplicar en cuanto se generen.
+            w.calc_method_note = (
+                _calc_method_note(w.line_ids.mapped('calc_method'))
+                or _calc_method_note([w.env.company.mechanic_commission_calc_method])
+            )
 
     # --- Validaciones de rango ---
     @api.constrains('date_from', 'date_to')
@@ -326,6 +366,12 @@ class MechanicCommissionWizard(models.TransientModel):
             "total_hours": _num(total_hours_pdf, 2),
             "amount_invoiced": _money(amount_invoiced_pdf),
             "payout_total": _money(payout_total_pdf),
+            # Se calcula sobre line_records (ya filtradas) para que la nota
+            # describa exactamente lo que se imprime, no lo que hay en pantalla.
+            "calc_method_note": (
+                _calc_method_note(line_records.mapped('calc_method'))
+                or _calc_method_note([self.env.company.mechanic_commission_calc_method])
+            ),
             "lines": lines,
         }
         return self.env.ref('crm_commission.action_mechanic_commission_report').report_action(self, data=data)
@@ -607,6 +653,12 @@ class MechanicCommissionWizardLine(models.TransientModel):
         related='commission_entry_id.porcentaje_comision',
         readonly=True,
         digits=(5, 2)
+    )
+
+    calc_method = fields.Selection(
+        string='Método de cálculo',
+        related='commission_entry_id.calc_method',
+        readonly=True,
     )
 
     # Estado de pago (editable)

@@ -25,6 +25,70 @@
                            attrs="{'invisible': [('mechanic_commission_calc_method','=','percent')]}"/>
                     <field name="porcentaje_comision_mecanico"
                            attrs="{'invisible': [('mechanic_commission_calc_method','=','hours_cost')]}"/>
+
+                    <!--
+                    Explicación de los campos de arriba. Solo la ve quien puede
+                    ver comisiones de mecánicos (group_mechanic_commission_view),
+                    porque habla de cuánto se le paga al mecánico.
+
+                    Se muestra el bloque del método activo: enseñar los dos a la
+                    vez confunde, ya que con cada método los otros campos ni
+                    siquiera intervienen en el cálculo.
+                    -->
+                    <div colspan="2"
+                         class="alert alert-info mt-2 mb-0" role="status"
+                         groups="crm_commission.group_mechanic_commission_view"
+                         attrs="{'invisible': [('mechanic_commission_calc_method','!=','hours_cost')]}">
+                        <p class="mb-1">
+                            <b>Cómo se calcula la comisión de este servicio</b>
+                            <span class="text-muted"> — ajuste activo: <i>Comisión costo por hora</i>.</span>
+                        </p>
+                        <ul class="mb-1 ps-4">
+                            <li>
+                                <b>Horas requeridas:</b> cuántas horas de trabajo lleva el
+                                servicio <b>por cada unidad vendida</b>. No es lo que se le
+                                cobra al cliente: solo mide el trabajo del mecánico.
+                            </li>
+                            <li>
+                                <b>Costo por hora (mecánico):</b> cuánto se le paga al
+                                mecánico por cada una de esas horas.
+                            </li>
+                        </ul>
+                        <p class="mb-1">
+                            <b>Comisión = Costo por hora × Horas requeridas × Cantidad</b>
+                        </p>
+                        <p class="mb-0 text-muted">
+                            Ejemplo: 2 h × $150 por hora × 3 unidades = $900 de comisión.
+                            Con este método el precio de venta al cliente no influye.
+                            El método se elige en Ajustes → Comisiones → Comisión de mecánico.
+                        </p>
+                    </div>
+
+                    <div colspan="2"
+                         class="alert alert-info mt-2 mb-0" role="status"
+                         groups="crm_commission.group_mechanic_commission_view"
+                         attrs="{'invisible': [('mechanic_commission_calc_method','!=','percent')]}">
+                        <p class="mb-1">
+                            <b>Cómo se calcula la comisión de este servicio</b>
+                            <span class="text-muted"> — ajuste activo: <i>Comisión por porcentaje</i>.</span>
+                        </p>
+                        <ul class="mb-1 ps-4">
+                            <li>
+                                <b>Porcentaje mecánico (%):</b> qué parte del precio unitario
+                                se lleva el mecánico. Lo que se captura aquí es el valor por
+                                defecto: se puede cambiar línea por línea en la cotización.
+                            </li>
+                        </ul>
+                        <p class="mb-1">
+                            <b>Comisión = Precio unitario × Cantidad × % ÷ 100</b>
+                        </p>
+                        <p class="mb-0 text-muted">
+                            Ejemplo: $500 × 2 unidades × 10% = $100 de comisión.
+                            Con este método <b>Horas requeridas</b> y <b>Costo por hora</b> no
+                            intervienen en el cálculo, por eso están ocultos.
+                            El método se elige en Ajustes → Comisiones → Comisión de mecánico.
+                        </p>
+                    </div>
                 </group>
             </xpath>
         </field>

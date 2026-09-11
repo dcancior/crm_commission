@@ -53,6 +53,13 @@
               </div>
             </div>
 
+            <!-- Nota discreta con el método de cálculo de las comisiones impresas -->
+            <t t-if="calc_method_note">
+              <p class="text-muted" style="font-size: 8px; margin-top: -6px; margin-bottom: 6px;">
+                <t t-esc="calc_method_note"/>
+              </p>
+            </t>
+
             <table class="table table-sm table-striped o_main_table">
               <thead>
                 <tr>
