@@ -42,6 +42,16 @@ class ResCompany(models.Model):
              "unitario del servicio, editable en cada línea de la cotización.",
     )
 
+    mechanic_commission_default_percent = fields.Float(
+        string='Porcentaje mecánico general (%)',
+        digits=(16, 2),
+        default=0.0,
+        help="Porcentaje que se aplica a cualquier servicio que no traiga uno propio "
+             "en su ficha. Así no hay que capturarlo servicio por servicio: se pone "
+             "una vez aquí y cada ficha solo lo sobrescribe si es un caso especial. "
+             "Solo se usa cuando el cálculo de comisión es por porcentaje.",
+    )
+
     mechanic_commission_calc_method_since = fields.Date(
         string='Método vigente desde',
         readonly=True,

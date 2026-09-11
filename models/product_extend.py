@@ -27,12 +27,37 @@ class ProductTemplate(models.Model):
     )
     porcentaje_comision_mecanico = fields.Float(
         string="Porcentaje mecánico (%)",
-        help="Porcentaje del precio unitario que se le paga al mecánico como comisión. "
-             "Solo se usa si en Configuración el cálculo de comisión es por porcentaje. "
+        help="Porcentaje del precio unitario que se le paga al mecánico como comisión "
+             "por este servicio. Si se deja en 0 se aplica el porcentaje general de "
+             "Ajustes, así que solo hay que llenarlo cuando este servicio sea una "
+             "excepción. Solo se usa si el cálculo de comisión es por porcentaje. "
              "Es el valor por defecto; se puede editar por línea en la cotización.",
         digits=(16, 2),
-        default=0.0,
+        # Los servicios nuevos nacen con el general ya escrito: se ve el número
+        # que va a aplicar en vez de un 0 que hay que saber interpretar.
+        default=lambda self: self.env.company.mechanic_commission_default_percent,
     )
+
+    # Refleja el porcentaje general de la compañía para poder decir en la ficha
+    # qué se va a aplicar cuando el servicio no trae uno propio.
+    mechanic_commission_default_percent = fields.Float(
+        string="Porcentaje mecánico general (%)",
+        compute='_compute_mechanic_commission_defaults',
+        digits=(16, 2),
+    )
+
+    # True cuando este servicio no tiene porcentaje propio y por tanto hereda el
+    # general. Se usa solo para mostrar el aviso correcto en la ficha.
+    mechanic_usa_porcentaje_general = fields.Boolean(
+        compute='_compute_mechanic_commission_defaults',
+    )
+
+    @api.depends('porcentaje_comision_mecanico')
+    def _compute_mechanic_commission_defaults(self):
+        general = self.env.company.mechanic_commission_default_percent or 0.0
+        for tmpl in self:
+            tmpl.mechanic_commission_default_percent = general
+            tmpl.mechanic_usa_porcentaje_general = not tmpl.porcentaje_comision_mecanico
 
     # Refleja el método configurado en la compañía activa; la ficha del producto
     # lo usa para mostrar horas/costo por hora o el porcentaje según corresponda.

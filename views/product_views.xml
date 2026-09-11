@@ -25,6 +25,8 @@
                        groups="crm_commission.group_mechanic_commission_view"
                        attrs="{'invisible': [('type','!=','service')]}">
                     <field name="mechanic_commission_calc_method" invisible="1"/>
+                    <field name="mechanic_commission_default_percent" invisible="1"/>
+                    <field name="mechanic_usa_porcentaje_general" invisible="1"/>
                     <field name="service_hours_required"
                            attrs="{'invisible': [('mechanic_commission_calc_method','=','percent')]}"/>
                     <field name="service_cost_per_hour"
@@ -79,10 +81,28 @@
                         <ul class="mb-1 ps-4">
                             <li>
                                 <b>Porcentaje mecánico (%):</b> qué parte del precio unitario
-                                se lleva el mecánico. Lo que se captura aquí es el valor por
-                                defecto: se puede cambiar línea por línea en la cotización.
+                                se lleva el mecánico en este servicio. Lo que se captura aquí es
+                                el valor por defecto: se puede cambiar línea por línea en la
+                                cotización.
+                            </li>
+                            <li>
+                                <b>Déjalo en 0 y se aplica el porcentaje general</b> de
+                                Ajustes → Comisiones. Solo hay que llenarlo cuando este servicio
+                                sea una excepción y deba pagar distinto al resto.
                             </li>
                         </ul>
+
+                        <!-- Qué porcentaje se va a aplicar realmente a ESTE servicio -->
+                        <p class="mb-1" attrs="{'invisible': [('mechanic_usa_porcentaje_general','=',False)]}">
+                            <b>En este servicio se aplica el porcentaje general:</b>
+                            <field name="mechanic_commission_default_percent" readonly="1"
+                                   nolabel="1" class="oe_inline"/> %
+                        </p>
+                        <p class="mb-1" attrs="{'invisible': [('mechanic_usa_porcentaje_general','=',True)]}">
+                            <b>Este servicio es una excepción:</b> usa su propio porcentaje, no el
+                            general (<field name="mechanic_commission_default_percent" readonly="1"
+                                            nolabel="1" class="oe_inline"/>%).
+                        </p>
                         <p class="mb-1">
                             <b>Comisión = Precio unitario × Cantidad × % ÷ 100</b>
                         </p>

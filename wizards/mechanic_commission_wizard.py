@@ -485,8 +485,12 @@ class MechanicCommissionWizard(models.TransientModel):
                 # - percent: % del precio unitario × cantidad (el % viene de la
                 #   línea de cotización; si no, del producto)
                 if calc_method == 'percent':
+                    # Línea > ficha del servicio > porcentaje general de la compañía.
+                    # Se mantiene el encadenado con 'or' que ya usaba el módulo: un 0
+                    # significa "no tiene uno propio", así que pasa al siguiente nivel.
                     porcentaje = (getattr(line, 'porcentaje_comision_mecanico', 0.0)
-                                  or getattr(tmpl, 'porcentaje_comision_mecanico', 0.0) or 0.0)
+                                  or getattr(tmpl, 'porcentaje_comision_mecanico', 0.0)
+                                  or w.env.company.mechanic_commission_default_percent or 0.0)
                     payout = (line.price_unit or 0.0) * qty * (porcentaje / 100.0)
                 else:
                     porcentaje = getattr(tmpl, 'porcentaje_comision_mecanico', 0.0) or 0.0

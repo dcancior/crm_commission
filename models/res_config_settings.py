@@ -26,6 +26,12 @@ class ResConfigSettings(models.TransientModel):
         readonly=False,
     )
 
+    mechanic_commission_default_percent = fields.Float(
+        related='company_id.mechanic_commission_default_percent',
+        string='Porcentaje mecánico general (%)',
+        readonly=False,
+    )
+
     # Solo lectura: la estampa res.company al detectar el cambio de método.
     mechanic_commission_calc_method_since = fields.Date(
         related='company_id.mechanic_commission_calc_method_since',

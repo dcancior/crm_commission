@@ -169,6 +169,41 @@
                                     defecto: en cada cotización se puede subir o bajar por línea.
                                 </div>
 
+                                <!-- Porcentaje general: solo tiene sentido con el método por % -->
+                                <div class="mt-3" role="status"
+                                     attrs="{'invisible': [('mechanic_commission_calc_method','!=','percent')]}">
+                                    <label for="mechanic_commission_default_percent"/>
+                                    <div class="text-muted">
+                                        El porcentaje que se aplica a <b>cualquier servicio</b> que no
+                                        tenga uno propio. Se pone una vez aquí y no hay que capturarlo
+                                        servicio por servicio.
+                                    </div>
+                                    <div class="mt8">
+                                        <field name="mechanic_commission_default_percent"
+                                               class="oe_inline"/> %
+                                    </div>
+                                    <div class="alert alert-info mt-2 mb-0" role="status">
+                                        <p class="mb-1"><b>Cómo se decide el porcentaje de cada servicio</b></p>
+                                        <p class="mb-1">
+                                            Se toma el primero que tenga valor, en este orden:
+                                        </p>
+                                        <ol class="mb-1 ps-4">
+                                            <li>El que se haya escrito <b>en la línea de la cotización</b>
+                                                (para un trabajo puntual).</li>
+                                            <li>El <b>Porcentaje mecánico</b> de la ficha del servicio
+                                                (para servicios que son la excepción).</li>
+                                            <li>Este <b>porcentaje general</b>, para todo lo demás.</li>
+                                        </ol>
+                                        <p class="mb-0 text-muted">
+                                            Ejemplo: con el general en 15%, un servicio de $1,000 paga $150
+                                            sin tocar nada. Si a un servicio le pones 20% en su ficha, ese
+                                            paga $200 y los demás siguen en 15%.
+                                            Ten en cuenta que <b>dejar un servicio en 0 significa
+                                            "usa el general"</b>, no "no paga comisión".
+                                        </p>
+                                    </div>
+                                </div>
+
                                 <!-- Qué pasa exactamente al cambiar de método -->
                                 <div class="alert alert-success mt-2 mb-0" role="status">
                                     <p class="mb-1"><b>Puedes cambiar de método cuando quieras</b></p>
