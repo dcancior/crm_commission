@@ -17,7 +17,13 @@
         <field name="inherit_id" ref="product.product_template_form_view"/>
         <field name="arch" type="xml">
             <xpath expr="//field[@name='type']" position="after">
-                <group string="Parámetros de servicio (mecánico)" attrs="{'invisible': [('type','!=','service')]}">
+                <!--
+                Todo el bloque (campos y explicación) es solo para quien puede ver
+                comisiones de mecánicos: habla de cuánto se le paga al mecánico.
+                -->
+                <group string="Parámetros de servicio (mecánico)"
+                       groups="crm_commission.group_mechanic_commission_view"
+                       attrs="{'invisible': [('type','!=','service')]}">
                     <field name="mechanic_commission_calc_method" invisible="1"/>
                     <field name="service_hours_required"
                            attrs="{'invisible': [('mechanic_commission_calc_method','=','percent')]}"/>
@@ -27,17 +33,12 @@
                            attrs="{'invisible': [('mechanic_commission_calc_method','=','hours_cost')]}"/>
 
                     <!--
-                    Explicación de los campos de arriba. Solo la ve quien puede
-                    ver comisiones de mecánicos (group_mechanic_commission_view),
-                    porque habla de cuánto se le paga al mecánico.
-
-                    Se muestra el bloque del método activo: enseñar los dos a la
-                    vez confunde, ya que con cada método los otros campos ni
+                    Se muestra solo el bloque del método activo: enseñar los dos a
+                    la vez confunde, ya que con cada método los campos del otro ni
                     siquiera intervienen en el cálculo.
                     -->
                     <div colspan="2"
                          class="alert alert-info mt-2 mb-0" role="status"
-                         groups="crm_commission.group_mechanic_commission_view"
                          attrs="{'invisible': [('mechanic_commission_calc_method','!=','hours_cost')]}">
                         <p class="mb-1">
                             <b>Cómo se calcula la comisión de este servicio</b>
@@ -60,13 +61,16 @@
                         <p class="mb-0 text-muted">
                             Ejemplo: 2 h × $150 por hora × 3 unidades = $900 de comisión.
                             Con este método el precio de venta al cliente no influye.
+                        </p>
+                        <p class="mb-0 text-muted">
                             El método se elige en Ajustes → Comisiones → Comisión de mecánico.
+                            Si se cambia, aplica a las órdenes nuevas: las comisiones ya
+                            generadas conservan su método, y las ya pagadas no se tocan.
                         </p>
                     </div>
 
                     <div colspan="2"
                          class="alert alert-info mt-2 mb-0" role="status"
-                         groups="crm_commission.group_mechanic_commission_view"
                          attrs="{'invisible': [('mechanic_commission_calc_method','!=','percent')]}">
                         <p class="mb-1">
                             <b>Cómo se calcula la comisión de este servicio</b>
@@ -86,7 +90,11 @@
                             Ejemplo: $500 × 2 unidades × 10% = $100 de comisión.
                             Con este método <b>Horas requeridas</b> y <b>Costo por hora</b> no
                             intervienen en el cálculo, por eso están ocultos.
+                        </p>
+                        <p class="mb-0 text-muted">
                             El método se elige en Ajustes → Comisiones → Comisión de mecánico.
+                            Si se cambia, aplica a las órdenes nuevas: las comisiones ya
+                            generadas conservan su método, y las ya pagadas no se tocan.
                         </p>
                     </div>
                 </group>

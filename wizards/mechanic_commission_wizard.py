@@ -15,6 +15,23 @@ import calendar
 import re  # para _get_report_base_filename
 
 
+# Campos que definen CUÁNTO se pagó. Una vez la comisión está marcada como
+# pagada dejan de recalcularse: el reporte tiene que seguir cuadrando con el
+# dinero que ya salió del taller, aunque después cambie el método de cálculo,
+# el precio del servicio o las horas de la ficha del producto.
+# El resto de campos (nombres, vehículo, fechas) sí se refrescan: son
+# descriptivos y no alteran el importe pagado.
+_CAMPOS_CONGELADOS_AL_PAGAR = (
+    'payout',
+    'calc_method',
+    'cost_per_hour',
+    'porcentaje_comision',
+    'hours',
+    'quantity',
+    'subtotal_customer',
+)
+
+
 def _calc_method_note(methods):
     """Texto corto que dice con qué método se calculó la comisión mostrada.
 
@@ -451,11 +468,22 @@ class MechanicCommissionWizard(models.TransientModel):
                 qty = line.product_uom_qty or 0.0
                 hrs = hrs_req * qty
 
-                # Cálculo según el método configurado en la compañía:
+                # ¿Esta línea ya tiene comisión generada?
+                entry = Entry.search([
+                    ('employee_id', '=', line.mechanic_id.id),  # Buscar por el mecánico real
+                    ('order_line_id', '=', line.id)
+                ], limit=1)
+
+                # El método de la compañía manda SOLO para comisiones nuevas.
+                # Una comisión que ya existe conserva el método con el que nació,
+                # así cambiar el ajuste afecta a las órdenes de ahí en adelante y
+                # no reescribe lo que ya se calculó (y quizá ya se pagó).
+                metodo_actual = w.env.company.mechanic_commission_calc_method or 'hours_cost'
+                calc_method = (entry.calc_method or metodo_actual) if entry else metodo_actual
+
                 # - hours_cost: costo por hora × horas (comportamiento original)
                 # - percent: % del precio unitario × cantidad (el % viene de la
                 #   línea de cotización; si no, del producto)
-                calc_method = w.env.company.mechanic_commission_calc_method or 'hours_cost'
                 if calc_method == 'percent':
                     porcentaje = (getattr(line, 'porcentaje_comision_mecanico', 0.0)
                                   or getattr(tmpl, 'porcentaje_comision_mecanico', 0.0) or 0.0)
@@ -507,11 +535,12 @@ class MechanicCommissionWizard(models.TransientModel):
                     'year': year_text,
                 }
 
-                entry = Entry.search([
-                    ('employee_id', '=', line.mechanic_id.id),  # Buscar por el mecánico real
-                    ('order_line_id', '=', line.id)
-                ], limit=1)
                 if entry:
+                    if entry.is_paid:
+                        # Ya pagada: se actualiza solo lo descriptivo. El importe,
+                        # el método y sus insumos quedan como estaban.
+                        vals_base = {k: v for k, v in vals_base.items()
+                                     if k not in _CAMPOS_CONGELADOS_AL_PAGAR}
                     entry.write(vals_base)
                 else:
                     entry = Entry.create(vals_base)

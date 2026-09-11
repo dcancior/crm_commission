@@ -26,6 +26,13 @@ class ResConfigSettings(models.TransientModel):
         readonly=False,
     )
 
+    # Solo lectura: la estampa res.company al detectar el cambio de método.
+    mechanic_commission_calc_method_since = fields.Date(
+        related='company_id.mechanic_commission_calc_method_since',
+        string='Método vigente desde',
+        readonly=True,
+    )
+
     # Activan/desactivan de forma independiente el menú y acceso a cada reporte
     # de comisiones para los usuarios internos (grupos definidos en
     # security/mechanic_commission_groups.xml).
