@@ -190,16 +190,20 @@
                                         <ol class="mb-1 ps-4">
                                             <li>El que se haya escrito <b>en la línea de la cotización</b>
                                                 (para un trabajo puntual).</li>
-                                            <li>El <b>Porcentaje mecánico</b> de la ficha del servicio
-                                                (para servicios que son la excepción).</li>
+                                            <li>Si la ficha del servicio está marcada como
+                                                <b>"Porcentaje propio"</b>, el de esa ficha.</li>
                                             <li>Este <b>porcentaje general</b>, para todo lo demás.</li>
                                         </ol>
-                                        <p class="mb-0 text-muted">
+                                        <p class="mb-1 text-muted">
                                             Ejemplo: con el general en 15%, un servicio de $1,000 paga $150
-                                            sin tocar nada. Si a un servicio le pones 20% en su ficha, ese
-                                            paga $200 y los demás siguen en 15%.
-                                            Ten en cuenta que <b>dejar un servicio en 0 significa
-                                            "usa el general"</b>, no "no paga comisión".
+                                            sin tocar nada. Si a un servicio le marcas porcentaje propio de
+                                            20%, ese paga $200 y los demás siguen en 15%.
+                                        </p>
+                                        <p class="mb-0 text-muted">
+                                            Un servicio con <b>porcentaje propio de 0% paga 0</b>: es la
+                                            forma de marcar los trabajos que se pagan a un mecánico externo
+                                            y no comisionan a los mecánicos del taller. Los servicios que
+                                            siguen al general nunca se quedan sin porcentaje.
                                         </p>
                                     </div>
                                 </div>

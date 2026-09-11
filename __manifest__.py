@@ -11,7 +11,7 @@
 # ╚══════════════════════════════════════════════════════════════════╝
 {
     'name': 'CRM Commission',
-    'version': '16.0.1.0.2',
+    'version': '16.0.1.0.3',
     'summary': 'Permite asignar comisión a los vendedores del CRM',
     'depends': ['web', 'board', 'mail', 'crm', 'sale', 'sale_stock', 'hr', 'workshop_mechanic', 'base_setup'],
     'data': [

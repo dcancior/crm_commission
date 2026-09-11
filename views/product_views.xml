@@ -26,13 +26,17 @@
                        attrs="{'invisible': [('type','!=','service')]}">
                     <field name="mechanic_commission_calc_method" invisible="1"/>
                     <field name="mechanic_commission_default_percent" invisible="1"/>
-                    <field name="mechanic_usa_porcentaje_general" invisible="1"/>
+                    <field name="mechanic_percent_efectivo" invisible="1"/>
                     <field name="service_hours_required"
                            attrs="{'invisible': [('mechanic_commission_calc_method','=','percent')]}"/>
                     <field name="service_cost_per_hour"
                            attrs="{'invisible': [('mechanic_commission_calc_method','=','percent')]}"/>
-                    <field name="porcentaje_comision_mecanico"
+                    <field name="mechanic_percent_source" widget="radio"
                            attrs="{'invisible': [('mechanic_commission_calc_method','=','hours_cost')]}"/>
+                    <field name="porcentaje_comision_mecanico"
+                           attrs="{'invisible': ['|',
+                                       ('mechanic_commission_calc_method','=','hours_cost'),
+                                       ('mechanic_percent_source','!=','propio')]}"/>
 
                     <!--
                     Se muestra solo el bloque del método activo: enseñar los dos a
@@ -80,28 +84,44 @@
                         </p>
                         <ul class="mb-1 ps-4">
                             <li>
-                                <b>Porcentaje mecánico (%):</b> qué parte del precio unitario
-                                se lleva el mecánico en este servicio. Lo que se captura aquí es
-                                el valor por defecto: se puede cambiar línea por línea en la
-                                cotización.
+                                <b>Usar el porcentaje general:</b> este servicio sigue el
+                                porcentaje definido en Ajustes → Comisiones. Si mañana cambias
+                                ese número, este servicio cambia con él. Es lo normal.
                             </li>
                             <li>
-                                <b>Déjalo en 0 y se aplica el porcentaje general</b> de
-                                Ajustes → Comisiones. Solo hay que llenarlo cuando este servicio
-                                sea una excepción y deba pagar distinto al resto.
+                                <b>Porcentaje propio de este servicio:</b> para las excepciones.
+                                Se usa el número que escribas abajo y deja de seguir al general.
+                            </li>
+                            <li>
+                                <b>Un porcentaje propio de 0 sí paga 0.</b> Sirve para los
+                                trabajos que el taller paga a un mecánico externo: no deben
+                                generar comisión a los mecánicos internos.
                             </li>
                         </ul>
 
                         <!-- Qué porcentaje se va a aplicar realmente a ESTE servicio -->
-                        <p class="mb-1" attrs="{'invisible': [('mechanic_usa_porcentaje_general','=',False)]}">
-                            <b>En este servicio se aplica el porcentaje general:</b>
+                        <p class="mb-1" attrs="{'invisible': [('mechanic_percent_source','!=','general')]}">
+                            <b>A este servicio se le aplica el porcentaje general:</b>
                             <field name="mechanic_commission_default_percent" readonly="1"
                                    nolabel="1" class="oe_inline"/> %
                         </p>
-                        <p class="mb-1" attrs="{'invisible': [('mechanic_usa_porcentaje_general','=',True)]}">
-                            <b>Este servicio es una excepción:</b> usa su propio porcentaje, no el
-                            general (<field name="mechanic_commission_default_percent" readonly="1"
-                                            nolabel="1" class="oe_inline"/>%).
+                        <p class="mb-1" attrs="{'invisible': ['|',
+                                    ('mechanic_percent_source','!=','propio'),
+                                    ('mechanic_percent_efectivo','=',0.0)]}">
+                            <b>Este servicio es una excepción:</b> se le aplica
+                            <field name="mechanic_percent_efectivo" readonly="1"
+                                   nolabel="1" class="oe_inline"/>% en vez del general
+                            (<field name="mechanic_commission_default_percent" readonly="1"
+                                    nolabel="1" class="oe_inline"/>%).
+                        </p>
+                        <p class="mb-1" attrs="{'invisible': ['|',
+                                    ('mechanic_percent_source','!=','propio'),
+                                    ('mechanic_percent_efectivo','!=',0.0)]}">
+                            <b>Este servicio no paga comisión al mecánico interno.</b>
+                            Está en 0% a propósito, así que no entra en el reporte de
+                            comisiones aunque el general sea
+                            <field name="mechanic_commission_default_percent" readonly="1"
+                                   nolabel="1" class="oe_inline"/>%.
                         </p>
                         <p class="mb-1">
                             <b>Comisión = Precio unitario × Cantidad × % ÷ 100</b>

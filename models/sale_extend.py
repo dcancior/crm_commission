@@ -94,16 +94,14 @@ class SaleOrderLine(models.Model):
     def _onchange_porcentaje_comision_mecanico(self):
         """Precarga el % de comisión del mecánico para la línea.
 
-        Prioridad: el de la ficha del servicio y, si no tiene uno propio, el
-        porcentaje general de la compañía. Así la línea muestra desde el
-        principio el número que realmente se va a pagar, en vez de un 0 que
-        obliga a adivinar de dónde sale la comisión.
+        Sale de product.template._mechanic_effective_percent(), que ya decide
+        entre el porcentaje general y el propio del servicio. Así la línea
+        muestra desde el principio el número que realmente se va a pagar.
         """
-        general = self.env.company.mechanic_commission_default_percent or 0.0
         for line in self:
             tmpl = line.product_id.product_tmpl_id if line.product_id else False
-            propio = tmpl.porcentaje_comision_mecanico if tmpl else 0.0
-            line.porcentaje_comision_mecanico = propio or general
+            line.porcentaje_comision_mecanico = (
+                tmpl._mechanic_effective_percent() if tmpl else 0.0)
 
     product_type = fields.Selection(
         related="product_id.type",
