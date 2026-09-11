@@ -46,27 +46,149 @@
 
                     <h2>Comisión de mecánico</h2>
                     <div class="row mt16 o_settings_container">
-                        <div class="col-12 col-lg-8 o_setting_box">
+
+                        <!-- ============ CUÁNDO se genera la comisión ============ -->
+                        <div class="col-12 o_setting_box">
                             <div class="o_setting_right_pane">
                                 <label for="mechanic_commission_trigger"/>
                                 <div class="text-muted">
-                                    Define en qué momento se genera/hace efectiva la comisión del mecánico.
+                                    En qué momento nace la comisión del mecánico.
                                 </div>
                                 <div class="mt8">
                                     <field name="mechanic_commission_trigger" widget="radio"/>
                                 </div>
+
+                                <div class="alert alert-light border mt-2 mb-0" role="status"
+                                     attrs="{'invisible': [('mechanic_commission_trigger','!=','confirm')]}">
+                                    <b>Ahora mismo:</b> la comisión se genera <b>al confirmar la cotización</b>.
+                                    El mecánico la gana en cuanto el cliente acepta el trabajo, aunque el
+                                    taller todavía no haya cobrado. Es lo más rápido para el mecánico, pero
+                                    puedes acabar pagando comisión de un trabajo que el cliente no pague.
+                                </div>
+                                <div class="alert alert-light border mt-2 mb-0" role="status"
+                                     attrs="{'invisible': [('mechanic_commission_trigger','!=','paid')]}">
+                                    <b>Ahora mismo:</b> la comisión se genera <b>cuando se paga la factura</b>.
+                                    El taller solo paga comisión de trabajos ya cobrados. El mecánico cobra
+                                    más tarde, pero el riesgo de impago no lo asume el taller.
+                                </div>
                             </div>
                         </div>
-                        <div class="col-12 col-lg-8 o_setting_box">
+
+                        <!-- ============ CÓMO se calcula la comisión ============ -->
+                        <div class="col-12 o_setting_box">
                             <div class="o_setting_right_pane">
                                 <label for="mechanic_commission_calc_method"/>
                                 <div class="text-muted">
-                                    Define cómo se calcula el monto de la comisión del mecánico:
-                                    costo por hora × horas del servicio, o un porcentaje del
-                                    precio unitario editable en cada línea de la cotización.
+                                    Con qué fórmula se convierte un servicio en dinero para el mecánico.
+                                    Puedes cambiar de método cuando quieras (lee el aviso del final).
                                 </div>
                                 <div class="mt8">
                                     <field name="mechanic_commission_calc_method" widget="radio"/>
+                                </div>
+
+                                <!-- Comparación de los dos métodos con un ejemplo común -->
+                                <div class="alert alert-info mt-2 mb-0" role="status">
+                                    <p class="mb-2">
+                                        <b>Los dos métodos, con el mismo ejemplo</b><br/>
+                                        <span class="text-muted">
+                                            Servicio que se le vende al cliente en <b>$1,000</b>, lleva
+                                            <b>2 horas</b> de trabajo, el taller paga <b>$150 por hora</b>
+                                            y tiene asignado un <b>15%</b> de comisión. Cantidad: 1.
+                                        </span>
+                                    </p>
+                                    <table class="table table-sm table-bordered mb-2 bg-white">
+                                        <thead>
+                                            <tr>
+                                                <th style="width:22%;"/>
+                                                <th>Comisión costo por hora</th>
+                                                <th>Comisión por porcentaje</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td><b>Qué le pagas</b></td>
+                                                <td>El tiempo de trabajo</td>
+                                                <td>Una parte de la venta</td>
+                                            </tr>
+                                            <tr>
+                                                <td><b>Fórmula</b></td>
+                                                <td>Costo por hora × Horas requeridas × Cantidad</td>
+                                                <td>Precio unitario × Cantidad × % ÷ 100</td>
+                                            </tr>
+                                            <tr>
+                                                <td><b>En el ejemplo</b></td>
+                                                <td>$150 × 2 h × 1 = <b>$300</b></td>
+                                                <td>$1,000 × 1 × 15% = <b>$150</b></td>
+                                            </tr>
+                                            <tr>
+                                                <td><b>Si mañana subes el precio a $1,200</b></td>
+                                                <td>Sigue pagando <b>$300</b>: el precio no influye</td>
+                                                <td>Sube a <b>$180</b>: acompaña a la venta</td>
+                                            </tr>
+                                            <tr>
+                                                <td><b>Si el trabajo se alarga a 3 h</b></td>
+                                                <td>Sube a <b>$450</b> (si corriges las horas del servicio)</td>
+                                                <td>Sigue en <b>$150</b>: las horas no influyen</td>
+                                            </tr>
+                                            <tr>
+                                                <td><b>Dónde se captura</b></td>
+                                                <td>
+                                                    Ficha del servicio → <i>Horas requeridas</i> y
+                                                    <i>Costo por hora (mecánico)</i>
+                                                </td>
+                                                <td>
+                                                    Ficha del servicio → <i>Porcentaje mecánico (%)</i>,
+                                                    y se puede ajustar línea por línea en la cotización
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                    <p class="mb-0 text-muted">
+                                        En resumen: <b>costo por hora</b> premia el tiempo y protege tu margen
+                                        cuando subes precios; <b>porcentaje</b> premia el valor vendido y se
+                                        ajusta solo, pero te cuesta más cuando el servicio es caro.
+                                    </p>
+                                </div>
+
+                                <!-- Qué implica la opción elegida, en concreto -->
+                                <div class="alert alert-light border mt-2 mb-0" role="status"
+                                     attrs="{'invisible': [('mechanic_commission_calc_method','!=','hours_cost')]}">
+                                    <b>Ahora mismo estás pagando por horas.</b>
+                                    Para que un servicio genere comisión, su ficha necesita
+                                    <i>Horas requeridas</i> y <i>Costo por hora (mecánico)</i>.
+                                    Si alguno está en cero, ese servicio paga $0 al mecánico.
+                                    El <i>Porcentaje mecánico</i> se ignora con este método.
+                                </div>
+                                <div class="alert alert-light border mt-2 mb-0" role="status"
+                                     attrs="{'invisible': [('mechanic_commission_calc_method','!=','percent')]}">
+                                    <b>Ahora mismo estás pagando por porcentaje.</b>
+                                    Para que un servicio genere comisión, su ficha necesita
+                                    <i>Porcentaje mecánico (%)</i>. Si está en cero, ese servicio paga $0
+                                    al mecánico. <i>Horas requeridas</i> y <i>Costo por hora</i> se ignoran
+                                    con este método. El porcentaje de la ficha es solo el valor por
+                                    defecto: en cada cotización se puede subir o bajar por línea.
+                                </div>
+
+                                <!-- Aviso: el cambio de método SÍ toca comisiones ya generadas -->
+                                <div class="alert alert-warning mt-2 mb-0" role="status">
+                                    <p class="mb-1"><b>Antes de cambiar de método, lee esto</b></p>
+                                    <p class="mb-1">
+                                        Cambiar esta opción no reescribe nada por sí solo. Pero al abrir el
+                                        <b>Reporte mensual</b> de mecánicos, las comisiones de ese periodo se
+                                        vuelven a calcular con el método que esté vigente en ese momento,
+                                        <b>incluidas las que ya marcaste como pagadas</b>. Se conserva la marca
+                                        de pagado y la forma de pago, pero <b>el importe cambia</b>.
+                                    </p>
+                                    <p class="mb-1 text-muted">
+                                        Ejemplo real: una comisión generada por horas en $300 y ya marcada
+                                        como pagada pasa a $150 al reabrir el reporte del mismo mes si entre
+                                        tanto cambiaste a porcentaje.
+                                    </p>
+                                    <p class="mb-0">
+                                        <b>Recomendación:</b> cambia el método al cierre de mes, cuando ya
+                                        pagaste a los mecánicos y descargaste el PDF del periodo como
+                                        respaldo. Así el cambio aplica al mes siguiente y no toca lo ya pagado.
+                                    </p>
                                 </div>
                             </div>
                         </div>
