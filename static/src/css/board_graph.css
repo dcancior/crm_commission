@@ -1,0 +1,35 @@
+/*
+ * Evita que las graficas del tablero crezcan sin parar.
+ *
+ * Chart.js mide el alto de su contenedor para dibujar el canvas. Dentro de un
+ * tablero (board) el panel no tiene alto propio: lo toma de su contenido, es
+ * decir del canvas. Asi se forma un bucle (canvas -> contenedor -> canvas) y la
+ * grafica se estira en cada redibujado hasta dejar la pagina inservible.
+ *
+ * Se corta el bucle dandole un alto fijo al panel y sacando el canvas del flujo
+ * (position: absolute), para que su tamano ya no pueda empujar al contenedor.
+ */
+
+.o_dashboard .o_graph_renderer {
+  position: relative;
+  height: 22rem;
+  min-height: 22rem;
+  max-height: 22rem;
+  flex: 0 0 auto;
+}
+
+.o_dashboard .o_graph_renderer > .o_graph_canvas_container {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: auto;
+  min-height: 0;
+}
+
+/* Red de seguridad: si el tema o una version distinta de Odoo cambia las clases
+   de arriba, el tope del canvas igualmente hace que el bucle converja. */
+.o_dashboard canvas {
+  max-height: 22rem !important;
+}

@@ -5,6 +5,31 @@ Pensado también como apoyo para presentaciones/diapositivas.
 
 ---
 
+## [2026-09-11] Las gráficas del tablero ya no crecen sin parar
+
+### 🐞 Corrección
+**Dónde:** Comisiones de Ventas → **Tablero** (y Comisiones Mecánicos → Tablero).
+
+Al abrir el tablero, la gráfica de **"Ventas cobradas por vendedor (12 meses)"**
+se estiraba hacia abajo sin detenerse hasta dejar la página inservible.
+
+**Por qué pasaba:** la librería de gráficas mide el alto de su contenedor para
+dibujarse. Dentro de un tablero el panel no tiene alto propio: lo toma de su
+contenido, o sea de la gráfica. Eso forma un círculo (gráfica → panel → gráfica)
+y en cada redibujado crecía un poco más.
+
+**Cómo se arregló:** se agregó `static/src/css/board_graph.css`, que le fija un
+alto al panel de la gráfica y saca el lienzo del flujo de la página, de modo que
+su tamaño ya no pueda empujar al contenedor. Aplica a todas las gráficas de los
+dos tableros.
+
+### ⚠️ Notas de actualización
+- Requiere actualizar el módulo: `-u crm_commission`.
+- Conviene recargar el navegador con caché limpia (Ctrl+Shift+R) para que tome el
+  nuevo CSS.
+
+---
+
 ## [2026-07-06] Configuración de comisiones de mecánicos
 
 ### ✨ Nuevo: Panel de configuración

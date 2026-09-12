@@ -11,7 +11,7 @@
 # ╚══════════════════════════════════════════════════════════════════╝
 {
     'name': 'CRM Commission',
-    'version': '16.0.1.0.3',
+    'version': '16.0.1.0.4',
     'summary': 'Permite asignar comisión a los vendedores del CRM',
     'depends': ['web', 'board', 'mail', 'crm', 'sale', 'sale_stock', 'hr', 'workshop_mechanic', 'base_setup'],
     'data': [
@@ -38,6 +38,7 @@
     'assets': {
         'web.assets_backend': [
             'crm_commission/static/src/css/mechanic_highlight.css',
+            'crm_commission/static/src/css/board_graph.css',
             # 'crm_commission/static/src/js/mechanic_notify.js',
             'crm_commission/static/src/js/board_first_save.js',
         ],
