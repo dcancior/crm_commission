@@ -381,7 +381,15 @@ class MechanicCommissionWizard(models.TransientModel):
         date_to_txt = fields.Date.to_string(self.date_to) if self.date_to else ""
         period_label = f"{date_from_txt} → {date_to_txt}".strip()
 
+        # Interruptor: mostrar Costo/Hr, Pago Mecánico y Total a Pagar en el PDF.
+        # Se calcula siempre; solo se oculta. Para volver a mostrarlo, en Ajustes >
+        # Técnico > Parámetros del sistema poner crm_commission.pdf_show_mechanic_pay = True
+        show_param = self.env['ir.config_parameter'].sudo().get_param(
+            'crm_commission.pdf_show_mechanic_pay', 'False')
+        show_mechanic_pay = str(show_param).strip().lower() in ('1', 'true', 'yes', 'si', 'sí')
+
         data = {
+            "show_mechanic_pay": show_mechanic_pay,
             "employee_name": "Todos los mecánicos" if self.employee_selection == 'all' else (self.employee_id.name or ""),
             # Compatibilidad previa: dejamos claves antiguas vacías por si el QWeb aún las referencia
             "month": "",

@@ -69,9 +69,9 @@
                   <th class="align-middle">Modelo</th>
                   <th class="align-middle">Color</th>
                   <th class="text-right align-middle">Cant.</th>
-                  <th class="text-right align-middle">Costo/Hr</th>
+                  <th t-if="show_mechanic_pay" class="text-right align-middle">Costo/Hr</th>
                   <th class="text-right align-middle">Horas</th>
-                  <th class="text-right align-middle" style="min-width: 100px;">Pago Mecánico</th>
+                  <th t-if="show_mechanic_pay" class="text-right align-middle" style="min-width: 100px;">Pago Mecánico</th>
                   <th class="text-center align-middle">Fecha pago</th>
                 </tr>
               </thead>
@@ -94,7 +94,7 @@
 
                     <t t-set="cph_raw" t-value="l.get('cost_per_hour') or 0.0"/>
                     <t t-set="cph_val" t-value="float(cph_raw) if not isinstance(cph_raw, str) else float((cph_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
-                    <td class="text-right align-middle"><t t-esc="'%.2f' % cph_val"/></td>
+                    <td t-if="show_mechanic_pay" class="text-right align-middle"><t t-esc="'%.2f' % cph_val"/></td>
 
                     <t t-set="hrs_raw" t-value="l.get('hours') or 0.0"/>
                     <t t-set="hrs_val" t-value="float(hrs_raw) if not isinstance(hrs_raw, str) else float((hrs_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
@@ -102,7 +102,7 @@
 
                     <t t-set="payout_raw" t-value="l.get('payout') or 0.0"/>
                     <t t-set="payout_val" t-value="float(payout_raw) if not isinstance(payout_raw, str) else float((payout_raw or '0').replace('$','').replace(',','').replace(' ',''))"/>
-                    <td class="text-right align-middle">
+                    <td t-if="show_mechanic_pay" class="text-right align-middle">
                       <t t-if="currency_id">
                         <t t-esc="format_amount(payout_val, currency_id)"/>
                       </t>
@@ -115,7 +115,7 @@
                 </t>
                 <t t-if="not (lines and len(lines))">
                   <tr>
-                    <td colspan="10" class="text-center text-muted py-3">Sin registros para este periodo</td>
+                    <td t-att-colspan="10 if show_mechanic_pay else 8" class="text-center text-muted py-3">Sin registros para este periodo</td>
                   </tr>
                 </t>
               </tbody>
@@ -155,7 +155,7 @@
                       </t>
                     </td>
                   </tr>
-                  <tr style="background-color: #f8f9fa; font-size: 16px; border-top: 2px solid #333;">
+                  <tr t-if="show_mechanic_pay" style="background-color: #f8f9fa; font-size: 16px; border-top: 2px solid #333;">
                     <td class="py-2"><strong>Total a Pagar al Mecánico</strong></td>
                     <td class="text-right py-2">
                       <strong>
