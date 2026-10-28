@@ -10,7 +10,7 @@
 """Reportes de comisión de periodos extensos, generados en segundo plano.
 
 Cuando el usuario pide en el "Reporte de Comisión de Ventas" un periodo más
-grande que un trimestre (o más antiguo que el límite de pantalla), no se
+grande que REPORT_MAX_RANGE_DAYS días (más de un trimestre), no se
 consulta en pantalla: se crea una solicitud aquí y un cron la procesa cuando
 el servidor no está ocupado, de una en una. El PDF se envía al correo del
 usuario que la pidió.

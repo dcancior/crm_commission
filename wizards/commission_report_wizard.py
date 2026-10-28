@@ -28,8 +28,9 @@ COMMISSION_PAYMENT_TERM_MONTHS = 3
 # Límites de la consulta en pantalla. Un periodo fuera de estos límites no se
 # consulta en pantalla: se encola y se genera en segundo plano como PDF que se
 # envía al correo del usuario (ver commission.report.request).
-REPORT_MAX_RANGE_MONTHS = 3     # tamaño máximo del bloque consultado
-REPORT_MAX_HISTORY_MONTHS = 6   # qué tan atrás se puede consultar
+# Se mide en días para que ningún trimestre (90 a 92 días, con bisiestos) se
+# pase; no importa qué tan atrás esté el periodo, solo su tamaño.
+REPORT_MAX_RANGE_DAYS = 100     # tamaño máximo del periodo consultado en pantalla
 
 # Trimestres que el usuario elige en el reporte: (clave, nombre, primer mes)
 QUARTERS = [
@@ -61,11 +62,6 @@ SORT_COLUMN_LABELS = {
 
 def current_quarter_key(today):
     return f"q{(today.month - 1) // 3 + 1}"
-
-
-def quarter_start(day):
-    """Primer día del trimestre al que pertenece la fecha."""
-    return date(day.year, 3 * ((day.month - 1) // 3) + 1, 1)
 
 
 def get_quarter_range(key, today):
@@ -192,20 +188,13 @@ class CommissionReportWizard(models.TransientModel):
             if rec.date_start and rec.date_end and rec.date_end < rec.date_start:
                 raise ValidationError("La fecha final no puede ser menor que la fecha inicial.")
 
-    def _oldest_interactive_date(self):
-        """Primer día consultable en pantalla. Se cuenta por trimestres completos:
-        se permite todo el trimestre que toca el límite de 6 meses."""
-        return quarter_start(
-            fields.Date.context_today(self) - relativedelta(months=REPORT_MAX_HISTORY_MONTHS))
-
     def _is_large_period(self):
-        """True si el periodo es más grande que un trimestre o más antiguo que el
-        límite: no se consulta en pantalla para no saturar el servidor."""
+        """True si el periodo abarca más de REPORT_MAX_RANGE_DAYS días (contando
+        ambos extremos): no se consulta en pantalla para no saturar el servidor."""
         self.ensure_one()
         if not (self.date_start and self.date_end) or self.date_end < self.date_start:
             return False
-        return (self.date_end > self.date_start + relativedelta(months=REPORT_MAX_RANGE_MONTHS)
-                or self.date_start < self._oldest_interactive_date())
+        return (self.date_end - self.date_start).days + 1 > REPORT_MAX_RANGE_DAYS
 
     def _ensure_interactive(self):
         if self._is_large_period():
@@ -226,8 +215,7 @@ class CommissionReportWizard(models.TransientModel):
             rec.large_period_msg = False
             if rec.is_large_period:
                 rec.large_period_msg = (
-                    f"Como el reporte abarca fechas extensas (más de {REPORT_MAX_RANGE_MONTHS} meses "
-                    f"o anteriores al {rec._oldest_interactive_date().strftime('%d/%m/%Y')}), "
+                    f"Como el reporte abarca fechas extensas (más de {REPORT_MAX_RANGE_DAYS} días), "
                     f"se generará en segundo plano en el servidor y se enviará en PDF a tu correo "
                     f"de inicio de sesión: {rec.env.user.email or rec.env.user.login}. "
                     f"Aquí no aparecerá nada."
