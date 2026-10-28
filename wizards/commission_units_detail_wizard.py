@@ -40,6 +40,9 @@ class CommissionUnitsDetailWizard(models.TransientModel):
     date_end = fields.Date(string='Hasta', readonly=True)
     currency_id = fields.Many2one('res.currency', string='Moneda',
                                   default=lambda self: self.env.company.currency_id)
+    # Reporte desde el que se abrió, para el botón "Regresar"
+    report_wizard_id = fields.Many2one('commission.report.wizard', string='Reporte',
+                                       readonly=True, ondelete='cascade')
 
     line_ids = fields.One2many('commission.units.detail.line', 'wizard_id', string='Detalle')
 
@@ -164,6 +167,13 @@ class CommissionUnitsDetailWizard(models.TransientModel):
     def action_print_pdf(self):
         self.ensure_one()
         return self.env.ref('crm_commission.action_commission_units_detail_pdf').report_action(self)
+
+    def action_back_to_report(self):
+        """Botón "Regresar": vuelve al Reporte de Comisión de Ventas de origen."""
+        self.ensure_one()
+        if not self.report_wizard_id:
+            return {'type': 'ir.actions.act_window_close'}
+        return self.report_wizard_id.action_back_to_report()
 
 
 class CommissionUnitsDetailLine(models.TransientModel):

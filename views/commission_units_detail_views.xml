@@ -61,6 +61,11 @@
         </sheet>
 
         <footer>
+          <field name="report_wizard_id" invisible="1"/>
+          <button name="action_back_to_report" type="object" string="Regresar"
+                  class="btn-secondary" icon="fa-arrow-left"
+                  attrs="{'invisible': [('report_wizard_id', '=', False)]}"
+                  help="Regresar al Reporte de Comisión de Ventas"/>
           <button name="action_print_pdf" type="object" string="Descargar PDF" class="btn-primary"/>
           <button string="Cerrar" class="btn-secondary" special="cancel"/>
         </footer>

@@ -9,20 +9,33 @@
 # ╚══════════════════════════════════════════════════════════════════╝
 
 from odoo import models, fields, api
-from odoo.exceptions import ValidationError
+from odoo.exceptions import ValidationError, UserError
 import base64
-import json  # ← NUEVO
 from datetime import datetime, date  # ← NUEVO
+from dateutil.relativedelta import relativedelta
 
 PAYMENT_METHODS = [
     ('efectivo', 'Efectivo'),
     ('transferencia', 'Transferencia'),
 ]
 
+# Plazo (en meses desde la fecha de factura) que tiene el cliente para pagar la
+# factura COMPLETA. Si no la liquida dentro del plazo, la comisión no es pagadera
+# al vendedor: la factura sigue saliendo en el reporte, pero no suma a pagar.
+COMMISSION_PAYMENT_TERM_MONTHS = 3
+
+# Límites de consulta para no saturar el servidor. Los administradores de
+# sistemas (base.group_system) no tienen estos límites.
+REPORT_MAX_RANGE_MONTHS = 3     # tamaño máximo del bloque consultado
+REPORT_MAX_HISTORY_MONTHS = 6   # qué tan atrás se puede consultar
+
 # Etiquetas tal y como se ven en los encabezados de la tabla, para el aviso de
 # orden en pantalla. Las claves son los name= de las columnas del tree.
 SORT_COLUMN_LABELS = {
     'commission_paid': 'Comisión pagada',
+    'commission_payable': 'Pagadera',
+    'not_payable_reason': 'Motivo',
+    'commission_payable_amount': 'Comisión a pagar',
     'move_id': 'Factura',
     'invoice_date': 'Fecha Factura',
     'invoice_payment_date': 'Fecha de pago',
@@ -45,52 +58,62 @@ def _default_date_end(self):
 
 
 # ===================== Helper: fecha de pago del cliente =====================
-def get_invoice_payment_date(move):
+def get_invoice_payment_dates(moves):
     """
-    Devuelve la fecha (date) en la que la factura quedó pagada por el cliente.
-    Estrategia:
-      1) Intenta leer del invoice_payments_widget (JSON).
-      2) Si no hay datos, recorre las conciliaciones parciales de las líneas
-         por cobrar/pagar y toma la fecha del asiento 'del otro lado'.
-    Retorna:
-      - date (objeto) si encuentra fechas
-      - False en caso contrario
-    """
-    # 1) Leer del widget de pagos (si existe y tiene contenido)
-    try:
-        widget = move.invoice_payments_widget
-        if widget:
-            info = json.loads(widget)
-            dates = []
-            for it in (info.get('content') or []):
-                ds = it.get('date')
-                if ds:
-                    # Normalmente viene como 'YYYY-MM-DD'
-                    try:
-                        dates.append(datetime.strptime(ds, "%Y-%m-%d").date())
-                    except Exception:
-                        # Si por alguna razón cambia el formato, ignoramos ese item
-                        pass
-            if dates:
-                return max(dates)
-    except Exception:
-        # Continuamos con el fallback
-        pass
+    Devuelve {move_id: date} con la fecha en la que cada factura quedó pagada
+    por el cliente (la más reciente si hubo pagos parciales), o False si no
+    tiene pagos.
 
-    # 2) Fallback: usar conciliaciones de líneas por cobrar/pagar
-    dates = []
-    receivable_lines = move.line_ids.filtered(
-        lambda l: getattr(l.account_id, 'internal_type', '') in ('receivable', 'payable')
-                  or getattr(l.account_id, 'account_type', '') in ('asset_receivable', 'liability_payable')
+    Recorre las conciliaciones de las líneas por cobrar/pagar y toma la fecha
+    del asiento 'del otro lado' (pago, nota de crédito...). Trabaja sobre todo
+    el recordset a la vez para que el ORM lea en bloque y no factura por
+    factura. No usa invoice_payments_widget: en Odoo 16 ya no es JSON y
+    calcularlo por factura es mucho más caro.
+    """
+    result = {m.id: False for m in moves}
+    receivable_lines = moves.line_ids.filtered(
+        lambda l: l.account_id.account_type in ('asset_receivable', 'liability_payable')
     )
-    for line in receivable_lines:
-        # matched_debit_ids / matched_credit_ids están en account.move.line (partial reconcile)
-        partials = line.matched_debit_ids | line.matched_credit_ids
-        for pr in partials:
-            other_ml = pr.credit_move_id if pr.debit_move_id == line else pr.debit_move_id
-            if other_ml and other_ml.move_id and other_ml.move_id.date:
-                dates.append(other_ml.move_id.date)
-    return max(dates) if dates else False
+    partials = receivable_lines.matched_debit_ids | receivable_lines.matched_credit_ids
+    for pr in partials:
+        for line, other_ml in ((pr.debit_move_id, pr.credit_move_id),
+                               (pr.credit_move_id, pr.debit_move_id)):
+            if line.move_id.id not in result or not other_ml.move_id.date:
+                continue
+            current = result[line.move_id.id]
+            if not current or other_ml.move_id.date > current:
+                result[line.move_id.id] = other_ml.move_id.date
+    return result
+
+
+def get_commission_status(move, payment_date):
+    """
+    Regla de pago de comisión: la factura debe estar pagada COMPLETA por el
+    cliente dentro de COMMISSION_PAYMENT_TERM_MONTHS meses desde su fecha.
+    Retorna (pagadera: bool, motivo: str). El motivo va vacío si es pagadera.
+    """
+    if not move.invoice_date:
+        return True, ''
+    deadline = move.invoice_date + relativedelta(months=COMMISSION_PAYMENT_TERM_MONTHS)
+    deadline_str = deadline.strftime('%d/%m/%Y')
+    term = f"{COMMISSION_PAYMENT_TERM_MONTHS} meses"
+    if move.payment_state == 'paid':
+        if payment_date and payment_date > deadline:
+            return False, (f"Pagada completa el {payment_date.strftime('%d/%m/%Y')}, "
+                           f"fuera del plazo de {term} (vencía el {deadline_str})")
+        return True, ''
+    if move.payment_state == 'partial':
+        return False, f"Pagada solo parcialmente; el plazo de {term} venció el {deadline_str}"
+    return False, f"Sin pagar; el plazo de {term} venció el {deadline_str}"
+
+
+def get_display_reason(reason, entry):
+    """Motivo a mostrar en la línea: si la comisión no es pagadera pero ya se le
+    pagó al vendedor, se agrega la nota (sigue sin contar para pagar)."""
+    if reason and entry.commission_paid:
+        return (f"{reason}. Nota: se pagó la comisión y el plazo de los "
+                f"{COMMISSION_PAYMENT_TERM_MONTHS} meses ya había vencido")
+    return reason
 # ============================================================================
 
 
@@ -108,10 +131,44 @@ class CommissionReportWizard(models.TransientModel):
         for rec in self:
             if rec.date_start and rec.date_end and rec.date_end < rec.date_start:
                 raise ValidationError("La fecha final no puede ser menor que la fecha inicial.")
+            error = rec._range_error()
+            if error:
+                raise ValidationError(error)
+
+    def _range_error(self):
+        """Mensaje si el periodo excede los límites de consulta; False si es válido.
+
+        Evita que un usuario pida un periodo enorme y sature el servidor:
+        bloques de máximo REPORT_MAX_RANGE_MONTHS meses y solo dentro de los
+        últimos REPORT_MAX_HISTORY_MONTHS meses. Los administradores de
+        sistemas no tienen límite (son quienes generan los reportes generales).
+        """
+        self.ensure_one()
+        if not (self.date_start and self.date_end) or self.date_end < self.date_start:
+            return False
+        if self.env.user.has_group('base.group_system'):
+            return False
+        ask_admin = "Si necesita un reporte general, solicítelo a su administrador de sistemas."
+        if self.date_end > self.date_start + relativedelta(months=REPORT_MAX_RANGE_MONTHS):
+            return (f"El periodo seleccionado es demasiado grande: el máximo son "
+                    f"{REPORT_MAX_RANGE_MONTHS} meses por consulta. {ask_admin}")
+        oldest = fields.Date.context_today(self) - relativedelta(months=REPORT_MAX_HISTORY_MONTHS)
+        if self.date_start < oldest:
+            return (f"Solo se pueden consultar los últimos {REPORT_MAX_HISTORY_MONTHS} meses "
+                    f"(desde el {oldest.strftime('%d/%m/%Y')}). {ask_admin}")
+        return False
+
+    # Aviso en pantalla cuando el periodo excede los límites (ver _range_error)
+    range_error_msg = fields.Char(string='Periodo no permitido', compute='_compute_range_error_msg')
 
     filter_payment = fields.Selection(
-        [('all', 'Todas'), ('paid', 'Pagadas'), ('unpaid', 'No pagadas')],
-        string='Filtro pago comisión', default='all'
+        [('all', 'Todas'), ('paid', 'Pagadas'), ('unpaid', 'No pagadas'),
+         ('not_payable', 'No pagaderas')],
+        string='Filtro pago comisión', default='all',
+        help="Pagadas / No pagadas: estado del pago de la comisión al vendedor "
+             "(No pagadas = pendientes de pagar, solo comisiones pagaderas).\n"
+             "No pagaderas: facturas que el cliente no pagó completas dentro de "
+             f"{COMMISSION_PAYMENT_TERM_MONTHS} meses."
     )
 
     # ========= Ordenación de la tabla (se sincroniza al pulsar un encabezado) =========
@@ -130,6 +187,10 @@ class CommissionReportWizard(models.TransientModel):
                                 currency_field='currency_id', compute='_compute_totals')
     commission_total = fields.Float(string='Total Comisión', digits=(16, 2),
                                     currency_field='currency_id', compute='_compute_totals')
+    # Facturas que salen en el reporte pero cuya comisión no se paga
+    not_payable_count = fields.Integer(string='Facturas no pagaderas', compute='_compute_totals')
+    commission_not_payable_total = fields.Float(string='Comisión no pagadera', digits=(16, 2),
+                                                compute='_compute_totals')
 
     currency_id = fields.Many2one('res.currency', string='Moneda',
                                   default=lambda self: self.env.company.currency_id)
@@ -154,6 +215,7 @@ class CommissionReportWizard(models.TransientModel):
     # ----------------- UTILIDADES PRIVADAS -----------------
 
     def _moves_domain(self):
+        """Facturas pagadas completas del vendedor en el rango (meta de venta y unidades vendidas)."""
         self.ensure_one()
         return [
             ('move_type', '=', 'out_invoice'),
@@ -164,17 +226,47 @@ class CommissionReportWizard(models.TransientModel):
             ('invoice_date', '<=', self.date_end),
         ]
 
+    def _report_moves_domain(self):
+        """Facturas de la tabla de comisiones: las pagadas completas más las que
+        ya rebasaron el plazo de pago sin liquidarse (salen como no pagaderas).
+        Las que aún están dentro del plazo sin pagar no se muestran todavía.
+        """
+        self.ensure_one()
+        cutoff = fields.Date.context_today(self) - relativedelta(months=COMMISSION_PAYMENT_TERM_MONTHS)
+        return [
+            ('move_type', '=', 'out_invoice'),
+            ('state', '=', 'posted'),
+            ('invoice_user_id', '=', self.user_id.id),
+            ('invoice_date', '>=', self.date_start),
+            ('invoice_date', '<=', self.date_end),
+            '|',
+            ('payment_state', '=', 'paid'),
+            '&',
+            ('payment_state', 'in', ('not_paid', 'partial')),
+            ('invoice_date', '<', cutoff),
+        ]
+
+    def _commission_info(self, moves):
+        """{move_id: (fecha de pago del cliente, pagadera, motivo)} calculado una sola vez."""
+        payment_dates = get_invoice_payment_dates(moves)
+        info = {}
+        for m in moves:
+            payable, reason = get_commission_status(m, payment_dates[m.id])
+            info[m.id] = (payment_dates[m.id], payable, reason)
+        return info
+
     def _iter_moves_with_entries(self, create_missing=True):
         """Devuelve pares (move, entry) de forma eficiente.
         - create_missing=True  -> crea entries faltantes (para UI)
-        - create_missing=False -> NO crea (para PDF), evita escrituras en reporte
+        - create_missing=False -> NO crea (para PDF), evita escrituras en reporte;
+          las facturas sin entry salen con un entry vacío.
         """
         self.ensure_one()
         Move = self.env['account.move']
         Entry = self.env['commission.payment.entry']
 
         # 1) Trae todas las facturas del rango
-        moves = Move.search(self._moves_domain(), order='invoice_date asc, name asc')
+        moves = Move.search(self._report_moves_domain(), order='invoice_date asc, name asc')
         if not moves:
             return []
 
@@ -187,10 +279,10 @@ class CommissionReportWizard(models.TransientModel):
 
         # 3) Normaliza legacy en lote (si aplica)
         legacy_map = {'efect': 'efectivo', 'trans': 'transferencia'}
-        legacy_to_fix = entries.filtered(lambda e: e.payment_method in legacy_map)
-        if legacy_to_fix:
-            for e in legacy_to_fix:
-                e.payment_method = legacy_map[e.payment_method]
+        for legacy, new in legacy_map.items():
+            legacy_to_fix = entries.filtered(lambda e: e.payment_method == legacy)
+            if legacy_to_fix:
+                legacy_to_fix.write({'payment_method': new})
 
         # 4) Crea en bloque SOLO si se pide (UI); nunca en el PDF
         if create_missing:
@@ -203,7 +295,7 @@ class CommissionReportWizard(models.TransientModel):
                 entry_by_move.update({e.move_id.id: e for e in new_entries})
 
         # 5) Ensambla pares en el mismo orden de 'moves'
-        return [(m, entry_by_move.get(m.id)) for m in moves if entry_by_move.get(m.id)]
+        return [(m, entry_by_move.get(m.id, Entry)) for m in moves]
 
     @api.depends('sort_field', 'sort_direction')
     def _compute_sort_label(self):
@@ -223,17 +315,21 @@ class CommissionReportWizard(models.TransientModel):
                 f"Se muestra ordenado de manera {sentido} por la columna «{label}»"
             )
 
-    def _sort_key_funcs(self):
+    def _sort_key_funcs(self, info):
         """Mapa columna de la tabla -> función clave de ordenación sobre (move, entry).
 
         Las claves coinciden con los name= de las columnas del tree para poder
         reutilizar directamente lo que envía el clic en el encabezado.
+        info es el resultado de _commission_info().
         """
         return {
             'commission_paid': lambda m, e: bool(e and e.commission_paid),
+            'commission_payable': lambda m, e: info[m.id][1],
+            'not_payable_reason': lambda m, e: info[m.id][2],
+            'commission_payable_amount': lambda m, e: (m.commission_amount or 0.0) if info[m.id][1] else 0.0,
             'move_id': lambda m, e: (m.name or ''),
             'invoice_date': lambda m, e: m.invoice_date or date.min,
-            'invoice_payment_date': lambda m, e: get_invoice_payment_date(m) or date.min,
+            'invoice_payment_date': lambda m, e: info[m.id][0] or date.min,
             'partner_id': lambda m, e: (m.partner_id.display_name or '').lower(),
             'payment_method': lambda m, e: (e.payment_method or '') if e else '',
             'payment_datetime': lambda m, e: (e.payment_datetime if e and e.payment_datetime else datetime.min),
@@ -243,51 +339,67 @@ class CommissionReportWizard(models.TransientModel):
             'commission_amount': lambda m, e: m.commission_amount or 0.0,
         }
 
-    def _sort_pairs(self, pairs):
+    def _sort_pairs(self, pairs, info):
         """Ordena los pares (move, entry) según sort_field / sort_direction.
 
         Si el campo no es ordenable (o no hay ninguno elegido) se respeta el
         orden por defecto de _iter_moves_with_entries: invoice_date asc, name asc.
         """
         self.ensure_one()
-        key_func = self._sort_key_funcs().get(self.sort_field or '')
+        key_func = self._sort_key_funcs(info).get(self.sort_field or '')
         if not key_func:
             return pairs
         reverse = (self.sort_direction or 'asc') == 'desc'
         # Desempate estable por número de factura
         return sorted(pairs, key=lambda p: (key_func(p[0], p[1]), p[0].name or ''), reverse=reverse)
 
-    def _filter_pair_by_selection(self, pair):
-        """Aplica el filtro (all/paid/unpaid) sobre (move, entry)."""
+    def _filter_pair_by_selection(self, pair, info):
+        """Aplica el filtro (all/paid/unpaid/not_payable) sobre (move, entry)."""
         self.ensure_one()
-        _m, entry = pair
+        m, entry = pair
+        payable = info[m.id][1]
         if self.filter_payment == 'paid':
             return bool(entry.commission_paid)
         if self.filter_payment == 'unpaid':
-            return not bool(entry.commission_paid)
+            # Pendientes de pagar al vendedor: solo las pagaderas
+            return payable and not bool(entry.commission_paid)
+        if self.filter_payment == 'not_payable':
+            return not payable
         return True  # all
+
+    def _report_pairs(self, create_missing=True):
+        """Pares (move, entry) filtrados y ordenados como en pantalla, más su info de comisión."""
+        self.ensure_one()
+        pairs = self._iter_moves_with_entries(create_missing=create_missing)
+        info = self._commission_info(self.env['account.move'].concat(*[m for m, _e in pairs]))
+        # Aplica el filtro actual del wizard
+        pairs = [p for p in pairs if self._filter_pair_by_selection(p, info)]
+        # Aplica el orden elegido en la tabla (mismo que usará el PDF)
+        return self._sort_pairs(pairs, info), info
 
     # ----------------- CARGA DE LÍNEAS (UI) -----------------
 
     def _load_lines(self):
         """Reconstruye la tabla en UI respetando el filtro y creando entries faltantes."""
         for rec in self:
-            if not (rec.user_id and rec.date_start and rec.date_end):
+            if not (rec.user_id and rec.date_start and rec.date_end) or rec._range_error():
+                rec.line_ids = [(5, 0, 0)]
                 continue
 
-            pairs = rec._iter_moves_with_entries(create_missing=True)
-            # Aplica el filtro actual del wizard
-            pairs = [p for p in pairs if rec._filter_pair_by_selection(p)]
-            # Aplica el orden elegido en la tabla (mismo que usará el PDF)
-            pairs = rec._sort_pairs(pairs)
+            pairs, info = rec._report_pairs(create_missing=True)
 
-            rec.line_ids = [(5, 0, 0)] + [
-                (0, 0, {
+            lines = []
+            for m, entry in pairs:
+                payment_date, payable, reason = info[m.id]
+                lines.append((0, 0, {
                     'move_id': m.id,
                     'payment_entry_id': entry.id,
-                })
-                for (m, entry) in pairs
-            ]
+                    'invoice_payment_date': payment_date,
+                    'commission_payable': payable,
+                    'not_payable_reason': get_display_reason(reason, entry),
+                    'commission_payable_amount': m.commission_amount if payable else 0.0,
+                }))
+            rec.line_ids = [(5, 0, 0)] + lines
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -306,17 +418,32 @@ class CommissionReportWizard(models.TransientModel):
     # ediciones sin guardar (p. ej. la forma de pago de comisión).
     @api.onchange('user_id', 'date_start', 'date_end', 'filter_payment')
     def _onchange_any_filter(self):
+        # Con un periodo fuera de límites _load_lines no consulta nada (deja la
+        # tabla vacía) y el formulario muestra range_error_msg. No se usa un
+        # aviso emergente porque saltaría a mitad de la edición (p. ej. al mover
+        # la fecha inicial antes que la final).
         self._load_lines()
+
+    @api.depends('date_start', 'date_end')
+    def _compute_range_error_msg(self):
+        for rec in self:
+            rec.range_error_msg = rec._range_error() or False
 
     # ----------------- TOTALES / KPIs -----------------
 
-    @api.depends('user_id', 'line_ids', 'line_ids.amount_untaxed', 'line_ids.commission_amount')
+    @api.depends('user_id', 'line_ids', 'line_ids.amount_untaxed', 'line_ids.commission_amount',
+                 'line_ids.commission_payable')
     def _compute_totals(self):
+        """Solo las comisiones pagaderas cuentan para pagar al vendedor."""
         for rec in self:
             rec.commission_percent = rec.user_id.sale_team_id.commission_percent if rec.user_id and rec.user_id.sale_team_id else 0.0
+            payable_lines = rec.line_ids.filtered('commission_payable')
+            not_payable_lines = rec.line_ids - payable_lines
             rec.lines_count = len(rec.line_ids)
-            rec.amount_total = sum(rec.line_ids.mapped('amount_untaxed')) if rec.line_ids else 0.0
-            rec.commission_total = sum(rec.line_ids.mapped('commission_amount')) if rec.line_ids else 0.0
+            rec.amount_total = sum(payable_lines.mapped('amount_untaxed'))
+            rec.commission_total = sum(payable_lines.mapped('commission_amount'))
+            rec.not_payable_count = len(not_payable_lines)
+            rec.commission_not_payable_total = sum(not_payable_lines.mapped('commission_amount'))
 
     @staticmethod
     def _months_in_range(date_start, date_end):
@@ -341,7 +468,7 @@ class CommissionReportWizard(models.TransientModel):
         """
         self.ensure_one()
         AML = self.env['account.move.line']
-        if not (self.user_id and self.date_start and self.date_end):
+        if not (self.user_id and self.date_start and self.date_end) or self._range_error():
             return AML, AML
 
         if moves is None:
@@ -372,7 +499,7 @@ class CommissionReportWizard(models.TransientModel):
             rec.qty_products_sold = 0.0
             rec.qty_services_sold = 0.0
 
-            if not (rec.user_id and rec.date_start and rec.date_end):
+            if not (rec.user_id and rec.date_start and rec.date_end) or rec._range_error():
                 continue
 
             periods = rec._months_in_range(rec.date_start, rec.date_end)
@@ -408,9 +535,16 @@ class CommissionReportWizard(models.TransientModel):
             'target': 'new',
         }
 
+    def action_back_to_report(self):
+        """Botón "Regresar" de la pestaña Meta de Venta: reabre el reporte, que
+        siempre abre en la primera pestaña (Facturas Comisionadas)."""
+        action = self.action_refresh()
+        action['name'] = 'Reporte de Comisión de Ventas'
+        return action
+
     def action_save(self):
         self.ensure_one()
-        self.flush()
+        self.env.flush_all()
         # Mantiene filtro y líneas
         self._load_lines()
         return {
@@ -439,6 +573,7 @@ class CommissionReportWizard(models.TransientModel):
             'date_start': self.date_start,
             'date_end': self.date_end,
             'currency_id': (self.currency_id or self.env.company.currency_id).id,
+            'report_wizard_id': self.id,
         })
         detail._build_lines_from(self)
         return {
@@ -455,11 +590,15 @@ class CommissionReportWizard(models.TransientModel):
         """Renderiza el PDF en servidor (sin /report/pdf) y dispara descarga directa."""
         self.ensure_one()
 
-        # Solo entradas existentes (no crear al generar PDF)
-        pairs = self._iter_moves_with_entries(create_missing=False)
-        pairs = [p for p in pairs if self._filter_pair_by_selection(p)]
-        # Respeta el orden con el que el usuario dejó la tabla en pantalla
-        pairs = self._sort_pairs(pairs)
+        # El wizard ya se guardó al pulsar el botón (y pasó _check_dates); esto es
+        # solo por si se llama desde código con un periodo fuera de límites.
+        error = self._range_error()
+        if error:
+            raise UserError(error)
+
+        # Solo entradas existentes (no crear al generar PDF); respeta el filtro y
+        # el orden con el que el usuario dejó la tabla en pantalla
+        pairs, info = self._report_pairs(create_missing=False)
         if not pairs:
             return {
                 'type': 'ir.actions.client',
@@ -483,13 +622,20 @@ class CommissionReportWizard(models.TransientModel):
         invoice_lines = []
         amount_total = 0.0
         commission_total = 0.0
+        not_payable_count = 0
+        commission_not_payable_total = 0.0
 
         for m, entry in pairs:
-            amount_total += (m.amount_untaxed or 0.0)
-            commission_total += (m.commission_amount or 0.0)
+            inv_paid_date, payable, reason = info[m.id]
+            # Solo las comisiones pagaderas suman para pagar al vendedor
+            if payable:
+                amount_total += (m.amount_untaxed or 0.0)
+                commission_total += (m.commission_amount or 0.0)
+            else:
+                not_payable_count += 1
+                commission_not_payable_total += (m.commission_amount or 0.0)
 
             # Fecha de pago del cliente (NUEVO)
-            inv_paid_date = get_invoice_payment_date(m)
             inv_paid_date_str = inv_paid_date.strftime('%d/%m/%Y') if inv_paid_date else ''
 
             # Fecha/hora del registro de pago de comisión (ya existente)
@@ -516,6 +662,10 @@ class CommissionReportWizard(models.TransientModel):
 
                 # NUEVO: fecha de pago por el cliente
                 'invoice_payment_date': inv_paid_date_str,
+
+                # Comisión no pagadera (factura no liquidada en plazo) y su motivo
+                'payable': payable,
+                'not_payable_reason': get_display_reason(reason, entry),
             })
 
         ds = self.date_start.strftime('%d/%m/%Y') if self.date_start else ''
@@ -530,6 +680,9 @@ class CommissionReportWizard(models.TransientModel):
             'commission_total_str': money_str(commission_total),
             'amount_total': amount_total,
             'amount_total_str': money_str(amount_total),
+            'not_payable_count': not_payable_count,
+            'commission_not_payable_total_str': money_str(commission_not_payable_total),
+            'payment_term_months': COMMISSION_PAYMENT_TERM_MONTHS,
             'commission_percent': self.commission_percent,
             'commission_percent_str': f"{(self.commission_percent or 0.0):.2f}",
             'invoice_lines': invoice_lines,
@@ -569,9 +722,11 @@ class CommissionReportWizard(models.TransientModel):
         self.ensure_one()
 
         pairs = self._iter_moves_with_entries()
-        # Sin importar el filtro visual, nos quedamos con las NO pagadas (las que interesa marcar)
+        info = self._commission_info(self.env['account.move'].concat(*[m for m, _e in pairs]))
+        # Sin importar el filtro visual, nos quedamos con las NO pagadas (las que
+        # interesa marcar) y solo si la comisión es pagadera
         unpaid_entries = self.env['commission.payment.entry'].browse([
-            e.id for (_m, e) in pairs if not e.commission_paid
+            e.id for (m, e) in pairs if info[m.id][1] and not e.commission_paid
         ])
 
         if not unpaid_entries:
@@ -631,13 +786,17 @@ class CommissionReportWizardLine(models.TransientModel):
     payment_state = fields.Selection(related='move_id.payment_state', string='Estado Pago', store=False)
 
     # NUEVO: fecha en que el cliente pagó la factura (la más reciente si hubo pagos parciales)
-    # store=True para que la columna se pueda ordenar (clic en el encabezado);
-    # se recalcula cada vez que se reconstruyen las líneas (_load_lines).
-    invoice_payment_date = fields.Date(
-        string='Fecha de pago (cliente)',
-        compute='_compute_invoice_payment_date',
-        store=True,
-    )
+    # Campo almacenado para que la columna se pueda ordenar (clic en el encabezado);
+    # lo rellena _load_lines en bloque cada vez que se reconstruyen las líneas.
+    invoice_payment_date = fields.Date(string='Fecha de pago (cliente)', readonly=True)
+
+    # Regla de pago: la factura debe pagarse completa dentro del plazo. Las que
+    # no, salen en la tabla pero no suman para pagar al vendedor. Los rellena
+    # _load_lines (ver get_commission_status).
+    commission_payable = fields.Boolean(string='Pagadera', readonly=True, default=True)
+    not_payable_reason = fields.Char(string='Motivo no pagadera', readonly=True)
+    commission_payable_amount = fields.Monetary(string='Comisión a pagar', readonly=True,
+                                                currency_field='currency_id')
 
     # Datos de pago (RELATED al entry)
     payment_method = fields.Selection(
@@ -653,11 +812,6 @@ class CommissionReportWizardLine(models.TransientModel):
             if line.payment_entry_id and line.payment_method:
                 line.payment_entry_id.payment_datetime = fields.Datetime.now()
                 line.payment_entry_id.payment_user_id = self.env.user
-
-    @api.depends('move_id', 'move_id.payment_state')
-    def _compute_invoice_payment_date(self):
-        for r in self:
-            r.invoice_payment_date = get_invoice_payment_date(r.move_id) if r.move_id else False
 
     @api.model_create_multi
     def create(self, vals_list):
@@ -675,6 +829,9 @@ class CommissionReportWizardLine(models.TransientModel):
         return super().create(cleaned)
 
     def write(self, vals):
+        if vals.get('payment_method') and self.filtered(lambda l: not l.commission_payable):
+            raise UserError("No se puede registrar el pago de una comisión no pagadera "
+                            "(la factura no se pagó completa dentro del plazo).")
         res = super().write(vals)
         if 'payment_method' in vals:
             for line in self:

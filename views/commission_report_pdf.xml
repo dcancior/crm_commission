@@ -40,6 +40,10 @@
             .col-partner { white-space: normal; word-break: break-word; }
             /* Centrar el Sí/No de comisión pagada para mejor legibilidad */
             .col-paid { text-align: center; }
+            /* Comisión no pagadera: importe tachado y motivo en una fila debajo */
+            .not-payable { color: #b02a37; }
+            .not-payable .col-commission { text-decoration: line-through; }
+            tr.reason-row td { border-top: none; padding-top: 0; font-size: 9pt; font-style: italic; }
           </style>
 
           <h2>Reporte de Comisión</h2>
@@ -53,15 +57,23 @@
               </p>
               <p>
                 <strong>Filtro:</strong>
-                <t t-esc="{'all':'Todas','paid':'Pagadas','unpaid':'No pagadas'}.get(filter_payment or 'all', 'Todas')"/>
+                <t t-esc="{'all':'Todas','paid':'Pagadas','unpaid':'No pagadas','not_payable':'No pagaderas'}.get(filter_payment or 'all', 'Todas')"/>
               </p>
             </div>
             <div class="col-6">
               <p><strong>Porcentaje Comisión (equipo):</strong> <t t-esc="commission_percent_str"/>%</p>
               <p><strong>Total Ventas (Base):</strong> <t t-esc="amount_total_str"/></p>
               <p><strong>Total Comisión:</strong> <t t-esc="commission_total_str"/></p>
+              <p t-if="not_payable_count">
+                <strong>Comisión no pagadera:</strong> <t t-esc="commission_not_payable_total_str"/>
+                (<t t-esc="not_payable_count"/> factura(s), no suma al total)
+              </p>
             </div>
           </div>
+          <p class="text-muted" style="font-size: 9pt;">
+            Solo es pagadera la comisión de facturas pagadas al 100% por el cliente dentro de
+            <t t-esc="payment_term_months"/> meses desde la fecha de factura.
+          </p>
 
           <h3 class="mt16">Detalle de Facturas</h3>
 
@@ -97,7 +109,7 @@
               <!-- IMPORTANTE: usar 'and' (Python) en lugar de '&&' -->
               <t t-if="invoice_lines and len(invoice_lines)">
                 <t t-foreach="invoice_lines" t-as="l">
-                  <tr>
+                  <tr t-att-class="'not-payable' if not l.get('payable') else None">
                     <td class="col-paid"><t t-esc="l.get('commission_paid')"/></td>
                     <td><t t-esc="l.get('number')"/></td>
                     <td><t t-esc="l.get('date')"/></td> <!-- fecha de la factura -->
@@ -108,9 +120,12 @@
                     <td class="text-right col-amount">
                       <t t-esc="l.get('amount_untaxed_str') or l.get('amount_untaxed')"/>
                     </td>
-                    <td class="text-right col-amount">
+                    <td class="text-right col-amount col-commission">
                       <t t-esc="l.get('commission_amount_str') or l.get('commission_amount')"/>
                     </td>
+                  </tr>
+                  <tr t-if="not l.get('payable')" class="reason-row not-payable">
+                    <td colspan="9">No pagadera: <t t-esc="l.get('not_payable_reason')"/></td>
                   </tr>
                 </t>
               </t>
@@ -127,7 +142,7 @@
             <tfoot>
               <tr>
                 <!-- 9 columnas; antes de los 2 totales monetarios hay 7 -->
-                <th colspan="7" class="text-right">Totales</th>
+                <th colspan="7" class="text-right">Totales (solo comisiones pagaderas)</th>
                 <th class="text-right col-amount">
                   <t t-esc="amount_total_str or amount_total"/>
                 </th>
