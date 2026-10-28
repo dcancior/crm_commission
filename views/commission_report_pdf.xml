@@ -50,6 +50,7 @@
 
           <div class="row mt16 mb8">
             <div class="col-6">
+              <p t-if="company_name"><strong>Compañía:</strong> <t t-esc="company_name"/></p>
               <p><strong>Vendedor:</strong> <t t-esc="user_name"/></p>
               <p>
                 <strong>Periodo:</strong>

@@ -156,6 +156,10 @@ class CommissionReportWizard(models.TransientModel):
     _description = 'Wizard para reporte de comisión por rango de fechas'
 
     # ========= Filtros =========
+    # El reporte es por compañía: solo salen las facturas de la empresa en la
+    # que se abrió (la activa en el selector de empresas), nunca se mezclan.
+    company_id = fields.Many2one('res.company', string='Compañía', required=True, readonly=True,
+                                 default=lambda self: self.env.company)
     user_id = fields.Many2one('res.users', string='Vendedor', required=True)
     period_mode = fields.Selection(
         [('quarter', 'Por trimestre'), ('range', 'Desde / Hasta')],
@@ -281,6 +285,7 @@ class CommissionReportWizard(models.TransientModel):
         """Facturas pagadas completas del vendedor en el rango (meta de venta y unidades vendidas)."""
         self.ensure_one()
         return [
+            ('company_id', '=', self.company_id.id),
             ('move_type', '=', 'out_invoice'),
             ('state', '=', 'posted'),
             ('payment_state', '=', 'paid'),
@@ -297,6 +302,7 @@ class CommissionReportWizard(models.TransientModel):
         self.ensure_one()
         cutoff = fields.Date.context_today(self) - relativedelta(months=COMMISSION_PAYMENT_TERM_MONTHS)
         return [
+            ('company_id', '=', self.company_id.id),
             ('move_type', '=', 'out_invoice'),
             ('state', '=', 'posted'),
             ('invoice_user_id', '=', self.user_id.id),
@@ -588,7 +594,7 @@ class CommissionReportWizard(models.TransientModel):
             if periods:
                 goals = Goal.search([
                     ('user_id', '=', rec.user_id.id),
-                    ('company_id', '=', rec.env.company.id),
+                    ('company_id', '=', rec.company_id.id),
                 ])
                 applicable = goals.filtered(lambda g: (g.year, g.month) in periods)
                 rec.goal_total = sum(applicable.mapped('amount_goal'))
@@ -783,6 +789,7 @@ class CommissionReportWizard(models.TransientModel):
 
         data = {
             'user_name': self.user_id.name,
+            'company_name': self.company_id.name,
             'date_start_str': ds,
             'date_end_str': de,
             'filter_payment': self.filter_payment,
@@ -831,7 +838,7 @@ class CommissionReportWizard(models.TransientModel):
             'filter_payment': self.filter_payment,
             'sort_field': self.sort_field,
             'sort_direction': self.sort_direction,
-            'company_id': self.env.company.id,
+            'company_id': self.company_id.id,
         })
         return {
             'type': 'ir.actions.client',

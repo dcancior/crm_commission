@@ -65,6 +65,8 @@
 
           <!-- Filtros. Orden de captura: 1) Vendedor, 2) Periodo, 3) Filtro de pago -->
           <group string="Filtros" class="o_commission_filters">
+            <!-- Solo facturas de esta compañía (la activa en el selector de empresas) -->
+            <field name="company_id" readonly="1" options="{'no_open': True}"/>
             <field name="user_id" required="1" options="{'no_create_edit': True}" domain="[('sale_team_id.name', 'ilike', 'Ventas')]"/>
             <field name="period_mode" widget="radio" options="{'horizontal': true}"/>
 

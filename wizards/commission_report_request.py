@@ -151,6 +151,7 @@ class CommissionReportRequest(models.Model):
     def _generate_and_send(self):
         self.ensure_one()
         wizard = self._user_env_model('commission.report.wizard').create({
+            'company_id': self.company_id.id,
             'user_id': self.salesperson_id.id,
             'period_mode': 'range',
             'quarter': False,
@@ -201,6 +202,7 @@ class CommissionReportRequest(models.Model):
 
     def _selection_rows(self):
         return [
+            ('Compañía', self.company_id.name),
             ('Vendedor', self.salesperson_id.name),
             ('Periodo', f"Del {self.date_start.strftime('%d/%m/%Y')} al {self.date_end.strftime('%d/%m/%Y')}"),
             ('Filtro de pago de comisión', FILTER_PAYMENT_LABELS.get(self.filter_payment, 'Todas')),
