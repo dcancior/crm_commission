@@ -828,6 +828,46 @@ class CommissionReportWizard(models.TransientModel):
             }
         }
 
+    # --------- Botón “Habilitar pago (plazo vencido)” ----------
+    def action_open_enable_payment(self):
+        """Abre el diálogo para habilitar manualmente comisiones no pagaderas.
+
+        No es un botón por fila porque Odoo 16 no permite botones en filas de
+        una tabla que aún no está guardada (las líneas se generan en onchange).
+        Aquí el diálogo se crea ya guardado, así que sus casillas funcionan.
+        """
+        self.ensure_one()
+        pairs = self._iter_moves_with_entries()
+        info = self._commission_info(pairs)
+        not_payable = [(m, e) for (m, e) in pairs if not info[m.id][1]]
+
+        if not not_payable:
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Habilitar pago',
+                    'message': 'No hay comisiones no pagaderas en el periodo y vendedor seleccionados.',
+                    'sticky': False,
+                }
+            }
+
+        enable_wizard = self.env['commission.enable.payment.wizard'].create({
+            'report_wizard_id': self.id,
+            'line_ids': [(0, 0, {
+                'entry_id': e.id,
+                'reason': get_display_reason(info[m.id][2], e),
+            }) for (m, e) in not_payable],
+        })
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Habilitar pago de comisiones no pagaderas',
+            'res_model': 'commission.enable.payment.wizard',
+            'view_mode': 'form',
+            'res_id': enable_wizard.id,
+            'target': 'new',
+        }
+
 
 class CommissionReportWizardLine(models.TransientModel):
     _name = 'commission.report.wizard.line'
@@ -921,51 +961,6 @@ class CommissionReportWizardLine(models.TransientModel):
                     })
         return res
 
-    def action_enable_manual_payment(self):
-        """Botón "Habilitar pago" (con confirmación) de una comisión no pagadera.
-
-        Deja la comisión pagadera aunque el plazo haya vencido y registra en el
-        entry quién y cuándo la habilitó.
-
-        La factura y el reporte llegan por contexto (enable_move_id,
-        report_wizard_id) porque, si el reporte aún no estaba guardado, al
-        pulsar el botón Odoo lo guarda y create() reconstruye las líneas: el id
-        de esta línea puede ya no existir.
-        """
-        ctx = self.env.context
-        move = self.env['account.move'].browse(ctx.get('enable_move_id'))
-        if not move.exists():
-            move = self.exists().move_id[:1]
-        if not move:
-            raise UserError("No se encontró la factura de esta comisión; pulse Actualizar e intente de nuevo.")
-
-        Entry = self.env['commission.payment.entry']
-        entry = Entry.search([
-            ('move_id', '=', move.id),
-            ('salesperson_id', '=', move.invoice_user_id.id),
-        ], limit=1)
-        if not entry:
-            entry = Entry.create({'move_id': move.id, 'salesperson_id': move.invoice_user_id.id})
-        if not entry.manual_payable:
-            entry.write({
-                'manual_payable': True,
-                'manual_payable_user_id': self.env.user.id,
-                'manual_payable_datetime': fields.Datetime.now(),
-            })
-
-        # Reabre el reporte recalculado (totales incluidos)
-        wizard = self.env['commission.report.wizard'].browse(ctx.get('report_wizard_id')).exists()
-        if not wizard:
-            wizard = self.search([
-                ('payment_entry_id', '=', entry.id),
-                ('create_uid', '=', self.env.uid),
-            ], order='id desc', limit=1).wizard_id
-        if not wizard:
-            return True
-        action = wizard.action_refresh()
-        action['name'] = 'Reporte de Comisión de Ventas'
-        return action
-
 
 class CommissionPaymentEntry(models.Model):
     _name = 'commission.payment.entry'
@@ -1045,3 +1040,65 @@ class CommissionMassPayWizard(models.TransientModel):
             return parent.action_refresh()
 
         return {'type': 'ir.actions.act_window_close'}
+
+
+# --------- Wizard: habilitar pago de comisiones no pagaderas ----------
+class CommissionEnablePaymentWizard(models.TransientModel):
+    _name = 'commission.enable.payment.wizard'
+    _description = 'Habilitar pago de comisiones no pagaderas'
+
+    report_wizard_id = fields.Many2one('commission.report.wizard', string='Reporte',
+                                       readonly=True, ondelete='cascade')
+    line_ids = fields.One2many('commission.enable.payment.wizard.line', 'wizard_id',
+                               string='Comisiones no pagaderas')
+
+    def action_select_all(self):
+        self.ensure_one()
+        self.line_ids.write({'selected': True})
+        return self._reopen()
+
+    def action_confirm(self):
+        """Habilita las seleccionadas y registra quién y cuándo lo hizo."""
+        self.ensure_one()
+        entries = self.line_ids.filtered('selected').entry_id.filtered(lambda e: not e.manual_payable)
+        if not self.line_ids.filtered('selected'):
+            raise UserError("Seleccione al menos una comisión para habilitar.")
+        if entries:
+            entries.write({
+                'manual_payable': True,
+                'manual_payable_user_id': self.env.user.id,
+                'manual_payable_datetime': fields.Datetime.now(),
+            })
+        return self.action_back_to_report()
+
+    def action_back_to_report(self):
+        self.ensure_one()
+        if not self.report_wizard_id:
+            return {'type': 'ir.actions.act_window_close'}
+        return self.report_wizard_id.action_back_to_report()
+
+    def _reopen(self):
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Habilitar pago de comisiones no pagaderas',
+            'res_model': self._name,
+            'view_mode': 'form',
+            'res_id': self.id,
+            'target': 'new',
+        }
+
+
+class CommissionEnablePaymentWizardLine(models.TransientModel):
+    _name = 'commission.enable.payment.wizard.line'
+    _description = 'Comisión no pagadera a habilitar'
+
+    wizard_id = fields.Many2one('commission.enable.payment.wizard', required=True, ondelete='cascade')
+    selected = fields.Boolean(string='Habilitar')
+    entry_id = fields.Many2one('commission.payment.entry', required=True, readonly=True, ondelete='cascade')
+    move_id = fields.Many2one(related='entry_id.move_id', string='Factura')
+    invoice_date = fields.Date(related='entry_id.move_id.invoice_date', string='Fecha Factura')
+    partner_id = fields.Many2one(related='entry_id.move_id.partner_id', string='Cliente')
+    currency_id = fields.Many2one(related='entry_id.move_id.currency_id')
+    commission_amount = fields.Monetary(related='entry_id.move_id.commission_amount',
+                                        currency_field='currency_id', string='Comisión')
+    reason = fields.Char(string='Motivo', readonly=True)
