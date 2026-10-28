@@ -1,0 +1,43 @@
+/*
+ * Reporte de Comisión de Ventas: que se lea bien también en tablet y celular.
+ */
+
+/* Trimestres y modo de periodo: las opciones se acomodan en varias líneas */
+.o_commission_report .o_field_radio .o_horizontal {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.25rem;
+}
+.o_commission_report .o_field_radio .o_horizontal .o_radio_item {
+    margin-right: 0;
+}
+
+/* Desde / Hasta en una sola línea; en pantallas chicas baja de renglón */
+.o_commission_report .o_commission_dates {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 0.25rem;
+}
+
+/* Línea "Abarca: Del ... al ..." un poco más visible */
+.o_commission_report .o_field_widget[name="period_label"] {
+    font-weight: 600;
+}
+
+@media (max-width: 767.98px) {
+    /* La tabla de facturas se desplaza a lo ancho en lugar de aplastarse */
+    .o_commission_report .o_field_x2many_list .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    /* Botones del pie: uno por renglón y a todo lo ancho */
+    .modal-footer:has(button[name="action_print_pdf"]) {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .modal-footer:has(button[name="action_print_pdf"]) > .btn {
+        width: 100%;
+        margin: 0.15rem 0;
+    }
+}

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  DCR INFORMATIC SERVICES SAS DE CV                                 ║
+║  Web: https://www.dcrsoluciones.com                                ║
+║  Contacto: info@dcrsoluciones.com                                  ║
+║                                                                    ║
+║  Este módulo está bajo licencia (LGPLv3).                          ║
+║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html     ║
+╚════════════════════════════════════════════════════════════════════╝
+-->
+<odoo noupdate="1">
+  <!-- Genera en segundo plano los reportes de comisión de periodos extensos y
+       los envía por correo. Procesa de uno en uno y espera si el servidor
+       está ocupado (ver commission.report.request._cron_process_requests). -->
+  <record id="ir_cron_commission_report_requests" model="ir.cron">
+    <field name="name">Comisiones: enviar reportes extensos por correo</field>
+    <field name="model_id" ref="model_commission_report_request"/>
+    <field name="state">code</field>
+    <field name="code">model._cron_process_requests()</field>
+    <field name="interval_number">10</field>
+    <field name="interval_type">minutes</field>
+    <field name="numbercall">-1</field>
+    <field name="doall" eval="False"/>
+    <!-- Prioridad baja: si coincide con otros crons, ellos van primero -->
+    <field name="priority">20</field>
+  </record>
+</odoo>

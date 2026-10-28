@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+╔════════════════════════════════════════════════════════════════════╗
+║  DCR INFORMATIC SERVICES SAS DE CV                                 ║
+║  Web: https://www.dcrsoluciones.com                                ║
+║  Contacto: info@dcrsoluciones.com                                  ║
+║                                                                    ║
+║  Este módulo está bajo licencia (LGPLv3).                          ║
+║  Licencia completa: https://www.gnu.org/licenses/lgpl-3.0.html     ║
+╚════════════════════════════════════════════════════════════════════╝
+-->
+<odoo>
+  <!-- Cada usuario ve solo los reportes que él pidió por correo -->
+  <record id="rule_commission_report_request_own" model="ir.rule">
+    <field name="name">Reportes por correo: solo los propios</field>
+    <field name="model_id" ref="model_commission_report_request"/>
+    <field name="domain_force">[('requested_by_id', '=', user.id)]</field>
+    <field name="groups" eval="[(4, ref('crm_commission.group_commission_view'))]"/>
+  </record>
+
+  <!-- El administrador de sistemas ve todos (para revisar envíos con error) -->
+  <record id="rule_commission_report_request_admin" model="ir.rule">
+    <field name="name">Reportes por correo: todos (administrador)</field>
+    <field name="model_id" ref="model_commission_report_request"/>
+    <field name="domain_force">[(1, '=', 1)]</field>
+    <field name="groups" eval="[(4, ref('base.group_system'))]"/>
+  </record>
+</odoo>

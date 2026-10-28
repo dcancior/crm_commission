@@ -25,8 +25,9 @@ PAYMENT_METHODS = [
 # al vendedor: la factura sigue saliendo en el reporte, pero no suma a pagar.
 COMMISSION_PAYMENT_TERM_MONTHS = 3
 
-# Límites de consulta para no saturar el servidor. Los administradores de
-# sistemas (base.group_system) no tienen estos límites.
+# Límites de la consulta en pantalla. Un periodo fuera de estos límites no se
+# consulta en pantalla: se encola y se genera en segundo plano como PDF que se
+# envía al correo del usuario (ver commission.report.request).
 REPORT_MAX_RANGE_MONTHS = 3     # tamaño máximo del bloque consultado
 REPORT_MAX_HISTORY_MONTHS = 6   # qué tan atrás se puede consultar
 
@@ -160,11 +161,23 @@ class CommissionReportWizard(models.TransientModel):
 
     # ========= Filtros =========
     user_id = fields.Many2one('res.users', string='Vendedor', required=True)
-    # Al elegir un trimestre se llenan Desde/Hasta (ver _onchange_quarter)
+    period_mode = fields.Selection(
+        [('quarter', 'Por trimestre'), ('range', 'Desde / Hasta')],
+        string='Periodo', default='quarter', required=True,
+    )
+    # En modo trimestre, al elegirlo se llenan Desde/Hasta (ver _onchange_quarter)
     quarter = fields.Selection(selection='_selection_quarters', string='Trimestre',
                                default=_default_quarter)
     date_start = fields.Date(string='Desde', required=True, default=_default_date_start)
     date_end   = fields.Date(string='Hasta', required=True, default=_default_date_end)
+    # Línea informativa bajo los trimestres: "Del 01/10/2026 al 31/12/2026"
+    period_label = fields.Char(string='Rango de fechas', compute='_compute_period_label')
+
+    # Periodo fuera de los límites de pantalla: el reporte se envía por correo
+    is_large_period = fields.Boolean(compute='_compute_large_period')
+    large_period_msg = fields.Char(compute='_compute_large_period')
+    # Solicitud encolada desde este reporte (cambia el aviso a "se está generando")
+    request_id = fields.Many2one('commission.report.request', string='Solicitud enviada', readonly=True)
 
     @api.model
     def _selection_quarters(self):
@@ -178,38 +191,47 @@ class CommissionReportWizard(models.TransientModel):
         for rec in self:
             if rec.date_start and rec.date_end and rec.date_end < rec.date_start:
                 raise ValidationError("La fecha final no puede ser menor que la fecha inicial.")
-            error = rec._range_error()
-            if error:
-                raise ValidationError(error)
 
-    def _range_error(self):
-        """Mensaje si el periodo excede los límites de consulta; False si es válido.
+    def _oldest_interactive_date(self):
+        """Primer día consultable en pantalla. Se cuenta por trimestres completos:
+        se permite todo el trimestre que toca el límite de 6 meses."""
+        return quarter_start(
+            fields.Date.context_today(self) - relativedelta(months=REPORT_MAX_HISTORY_MONTHS))
 
-        Evita que un usuario pida un periodo enorme y sature el servidor:
-        bloques de máximo REPORT_MAX_RANGE_MONTHS meses y solo dentro de los
-        últimos REPORT_MAX_HISTORY_MONTHS meses. Los administradores de
-        sistemas no tienen límite (son quienes generan los reportes generales).
-        """
+    def _is_large_period(self):
+        """True si el periodo es más grande que un trimestre o más antiguo que el
+        límite: no se consulta en pantalla para no saturar el servidor."""
         self.ensure_one()
         if not (self.date_start and self.date_end) or self.date_end < self.date_start:
             return False
-        if self.env.user.has_group('base.group_system'):
-            return False
-        ask_admin = "Si necesita un reporte general, solicítelo a su administrador de sistemas."
-        if self.date_end > self.date_start + relativedelta(months=REPORT_MAX_RANGE_MONTHS):
-            return (f"El periodo seleccionado es demasiado grande: el máximo son "
-                    f"{REPORT_MAX_RANGE_MONTHS} meses (un trimestre) por consulta. {ask_admin}")
-        # Se cuenta por trimestres completos: se permite todo el trimestre que
-        # toca el límite de 6 meses, para que los trimestres no queden cortados.
-        oldest = quarter_start(
-            fields.Date.context_today(self) - relativedelta(months=REPORT_MAX_HISTORY_MONTHS))
-        if self.date_start < oldest:
-            return (f"Solo se pueden consultar los últimos {REPORT_MAX_HISTORY_MONTHS} meses "
-                    f"(desde el {oldest.strftime('%d/%m/%Y')}). {ask_admin}")
-        return False
+        return (self.date_end > self.date_start + relativedelta(months=REPORT_MAX_RANGE_MONTHS)
+                or self.date_start < self._oldest_interactive_date())
 
-    # Aviso en pantalla cuando el periodo excede los límites (ver _range_error)
-    range_error_msg = fields.Char(string='Periodo no permitido', compute='_compute_range_error_msg')
+    def _ensure_interactive(self):
+        if self._is_large_period():
+            raise UserError("Este periodo es demasiado extenso para consultarse en pantalla. "
+                            "Use el botón «Enviar reporte a mi correo».")
+
+    @api.depends('date_start', 'date_end')
+    def _compute_period_label(self):
+        for rec in self:
+            rec.period_label = (
+                f"Del {rec.date_start.strftime('%d/%m/%Y')} al {rec.date_end.strftime('%d/%m/%Y')}"
+                if rec.date_start and rec.date_end else False)
+
+    @api.depends('date_start', 'date_end')
+    def _compute_large_period(self):
+        for rec in self:
+            rec.is_large_period = rec._is_large_period()
+            rec.large_period_msg = False
+            if rec.is_large_period:
+                rec.large_period_msg = (
+                    f"Como el reporte abarca fechas extensas (más de {REPORT_MAX_RANGE_MONTHS} meses "
+                    f"o anteriores al {rec._oldest_interactive_date().strftime('%d/%m/%Y')}), "
+                    f"se generará en segundo plano en el servidor y se enviará en PDF a tu correo "
+                    f"de inicio de sesión: {rec.env.user.email or rec.env.user.login}. "
+                    f"Aquí no aparecerá nada."
+                )
 
     filter_payment = fields.Selection(
         [('all', 'Todas'), ('paid', 'Pagadas'), ('unpaid', 'No pagadas'),
@@ -446,7 +468,7 @@ class CommissionReportWizard(models.TransientModel):
     def _load_lines(self):
         """Reconstruye la tabla en UI respetando el filtro y creando entries faltantes."""
         for rec in self:
-            if not (rec.user_id and rec.date_start and rec.date_end) or rec._range_error():
+            if not (rec.user_id and rec.date_start and rec.date_end) or rec._is_large_period():
                 rec.line_ids = [(5, 0, 0)]
                 continue
 
@@ -482,28 +504,24 @@ class CommissionReportWizard(models.TransientModel):
     # ediciones sin guardar (p. ej. la forma de pago de comisión).
     @api.onchange('user_id', 'date_start', 'date_end', 'filter_payment')
     def _onchange_any_filter(self):
-        # Con un periodo fuera de límites _load_lines no consulta nada (deja la
-        # tabla vacía) y el formulario muestra range_error_msg. No se usa un
-        # aviso emergente porque saltaría a mitad de la edición (p. ej. al mover
-        # la fecha inicial antes que la final).
-        # Si el usuario edita las fechas a mano, el trimestre deja de aplicar.
-        if self.quarter and (self.date_start, self.date_end) != get_quarter_range(
-                self.quarter, fields.Date.context_today(self)):
-            self.quarter = False
+        # Con un periodo extenso _load_lines no consulta nada (deja la tabla
+        # vacía) y el formulario muestra large_period_msg con el botón para
+        # enviarlo por correo. No se usa un aviso emergente porque saltaría a
+        # mitad de la edición (p. ej. al mover la fecha inicial antes que la final).
+        # Cualquier cambio de filtro invalida la solicitud ya enviada.
+        self.request_id = False
         self._load_lines()
 
     # Odoo encadena el onchange: al cambiar Desde/Hasta aquí, se ejecuta
     # _onchange_any_filter y se recarga la tabla.
-    @api.onchange('quarter')
+    @api.onchange('quarter', 'period_mode')
     def _onchange_quarter(self):
-        if self.quarter:
-            self.date_start, self.date_end = get_quarter_range(
-                self.quarter, fields.Date.context_today(self))
-
-    @api.depends('date_start', 'date_end')
-    def _compute_range_error_msg(self):
-        for rec in self:
-            rec.range_error_msg = rec._range_error() or False
+        if self.period_mode != 'quarter':
+            return
+        today = fields.Date.context_today(self)
+        if not self.quarter:
+            self.quarter = current_quarter_key(today)
+        self.date_start, self.date_end = get_quarter_range(self.quarter, today)
 
     # ----------------- TOTALES / KPIs -----------------
 
@@ -544,7 +562,7 @@ class CommissionReportWizard(models.TransientModel):
         """
         self.ensure_one()
         AML = self.env['account.move.line']
-        if not (self.user_id and self.date_start and self.date_end) or self._range_error():
+        if not (self.user_id and self.date_start and self.date_end) or self._is_large_period():
             return AML, AML
 
         if moves is None:
@@ -575,7 +593,7 @@ class CommissionReportWizard(models.TransientModel):
             rec.qty_products_sold = 0.0
             rec.qty_services_sold = 0.0
 
-            if not (rec.user_id and rec.date_start and rec.date_end) or rec._range_error():
+            if not (rec.user_id and rec.date_start and rec.date_end) or rec._is_large_period():
                 continue
 
             periods = rec._months_in_range(rec.date_start, rec.date_end)
@@ -665,17 +683,11 @@ class CommissionReportWizard(models.TransientModel):
     def action_print_pdf(self):
         """Renderiza el PDF en servidor (sin /report/pdf) y dispara descarga directa."""
         self.ensure_one()
+        # Un periodo extenso se genera en segundo plano (action_request_by_email)
+        self._ensure_interactive()
 
-        # El wizard ya se guardó al pulsar el botón (y pasó _check_dates); esto es
-        # solo por si se llama desde código con un periodo fuera de límites.
-        error = self._range_error()
-        if error:
-            raise UserError(error)
-
-        # Solo entradas existentes (no crear al generar PDF); respeta el filtro y
-        # el orden con el que el usuario dejó la tabla en pantalla
-        pairs, info = self._report_pairs(create_missing=False)
-        if not pairs:
+        pdf_bytes, _data = self._build_report_pdf()
+        if not pdf_bytes:
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
@@ -686,6 +698,34 @@ class CommissionReportWizard(models.TransientModel):
                     'type': 'warning',
                 }
             }
+
+        # Crear attachment y devolver descarga directa
+        attachment = self.env['ir.attachment'].create({
+            'name': self._report_filename(),
+            'type': 'binary',
+            'datas': base64.b64encode(pdf_bytes),
+            'mimetype': 'application/pdf',
+            'res_model': self._name,
+            'res_id': self.id,
+        })
+        return {
+            'type': 'ir.actions.act_url',
+            'url': f"/web/content/{attachment.id}?download=true",
+            'target': 'self',
+        }
+
+    def _report_filename(self):
+        return (f"reporte_comisiones_{(self.user_id.name or '').replace(' ', '_')}_"
+                f"{fields.Datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf")
+
+    def _build_report_pdf(self):
+        """(pdf_bytes, data) del reporte con el filtro y orden actuales.
+        pdf_bytes es None si no hay facturas. Lo usan la descarga en pantalla y
+        la generación en segundo plano (commission.report.request)."""
+        self.ensure_one()
+        # Solo entradas existentes (no crear al generar PDF); respeta el filtro y
+        # el orden con el que el usuario dejó la tabla en pantalla
+        pairs, info = self._report_pairs(create_missing=False)
 
         currency = self.currency_id or self.env.company.currency_id
         decimals = int(getattr(currency, 'decimal_places', 2) or 2)
@@ -700,9 +740,11 @@ class CommissionReportWizard(models.TransientModel):
         commission_total = 0.0
         not_payable_count = 0
         commission_not_payable_total = 0.0
+        manual_count = 0
 
         for m, entry in pairs:
             inv_paid_date, payable, reason = info[m.id]
+            manual_count += 1 if entry.manual_payable else 0
             # Solo las comisiones pagaderas suman para pagar al vendedor
             if payable:
                 amount_total += (m.amount_untaxed or 0.0)
@@ -762,8 +804,12 @@ class CommissionReportWizard(models.TransientModel):
             'commission_percent': self.commission_percent,
             'commission_percent_str': f"{(self.commission_percent or 0.0):.2f}",
             'invoice_lines': invoice_lines,
+            'invoice_count': len(invoice_lines),
+            'manual_count': manual_count,
             'currency': currency,
         }
+        if not pairs:
+            return None, data
 
         # Render QWeb PDF en servidor (sin assets extra/HTTP adicional)
         Report = self.env['ir.actions.report'].sudo().with_context(
@@ -772,21 +818,40 @@ class CommissionReportWizard(models.TransientModel):
             discard_logo_check=True,         # evita chequeos extra de logo
         )
         pdf_bytes, _ = Report._render_qweb_pdf('crm_commission.action_commission_report_pdf', [self.id], data=data)
+        return pdf_bytes, data
 
-        # Crear attachment y devolver descarga directa
-        fname = f"reporte_comisiones_{(self.user_id.name or '').replace(' ', '_')}_{fields.Datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-        attachment = self.env['ir.attachment'].create({
-            'name': fname,
-            'type': 'binary',
-            'datas': base64.b64encode(pdf_bytes),
-            'mimetype': 'application/pdf',
-            'res_model': self._name,
-            'res_id': self.id,
+    # --------- Botón “Enviar reporte a mi correo” (periodos extensos) ----------
+    def action_request_by_email(self):
+        """Encola el reporte para generarse en segundo plano y enviarse al correo
+        del usuario. No consulta nada aquí, para no cargar el servidor."""
+        self.ensure_one()
+        user = self.env.user
+        email = user.email or (user.login if '@' in (user.login or '') else False)
+        if not email:
+            raise UserError("Tu usuario no tiene un correo electrónico configurado. "
+                            "Pide a tu administrador de sistemas que lo agregue.")
+        self.request_id = self.env['commission.report.request'].create({
+            'requested_by_id': user.id,
+            'email_to': email,
+            'salesperson_id': self.user_id.id,
+            'date_start': self.date_start,
+            'date_end': self.date_end,
+            'filter_payment': self.filter_payment,
+            'sort_field': self.sort_field,
+            'sort_direction': self.sort_direction,
+            'company_id': self.env.company.id,
         })
         return {
-            'type': 'ir.actions.act_url',
-            'url': f"/web/content/{attachment.id}?download=true",
-            'target': 'self',
+            'type': 'ir.actions.client',
+            'tag': 'display_notification',
+            'params': {
+                'title': 'Tu reporte se está generando',
+                'message': (f"Aquí no aparecerá nada: te llegará a tu correo electrónico ({email}) "
+                            f"en unos minutos, para no sobrecargar el servidor."),
+                'type': 'success',
+                'sticky': True,
+                'next': self.action_back_to_report(),
+            }
         }
 
     # --------- Botón “Marcar todas como pagadas” ----------
@@ -796,6 +861,7 @@ class CommissionReportWizard(models.TransientModel):
         No depende de lo que haya alcanzado a renderizarse en la tabla.
         """
         self.ensure_one()
+        self._ensure_interactive()
 
         pairs = self._iter_moves_with_entries()
         info = self._commission_info(pairs)
@@ -837,6 +903,7 @@ class CommissionReportWizard(models.TransientModel):
         Aquí el diálogo se crea ya guardado, así que sus casillas funcionan.
         """
         self.ensure_one()
+        self._ensure_interactive()
         pairs = self._iter_moves_with_entries()
         info = self._commission_info(pairs)
         not_payable = [(m, e) for (m, e) in pairs if not info[m.id][1]]

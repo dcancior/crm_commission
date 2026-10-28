@@ -9,6 +9,7 @@
 # ╚══════════════════════════════════════════════════════════════════╝
 
 from . import commission_report_wizard
+from . import commission_report_request
 from . import mechanic_commission_wizard
 from . import commission_units_detail_wizard
 from . import mechanic_manual_service_wizard

@@ -54,31 +54,58 @@
     <field name="name">commission.report.wizard.form</field>
     <field name="model">commission.report.wizard</field>
     <field name="arch" type="xml">
-      <form string="Reporte de Comisión (rango)">
+      <form string="Reporte de Comisión (rango)" class="o_commission_report">
         <sheet>
 
           <!-- Moneda para formateo de campos monetary -->
           <field name="currency_id" invisible="1"/>
+          <field name="is_large_period" invisible="1"/>
+          <field name="request_id" invisible="1"/>
 
-          <!-- Filtros -->
-          <group string="Filtros">
-            <!-- Orden de captura: 1) Vendedor, 2) Trimestre (llena Desde/Hasta), 3) Filtro de pago -->
+          <!-- Filtros. Orden de captura: 1) Vendedor, 2) Periodo, 3) Filtro de pago -->
+          <group string="Filtros" class="o_commission_filters">
             <field name="user_id" required="1" options="{'no_create_edit': True}" domain="[('sale_team_id.name', 'ilike', 'Ventas')]"/>
-            <field name="quarter" widget="radio" options="{'horizontal': true}"/>
-            <field name="date_start" required="1"/>
-            <field name="date_end" required="1"/>
+            <field name="period_mode" widget="radio" options="{'horizontal': true}"/>
+
+            <!-- Por trimestre: al elegirlo se llenan las fechas; debajo, el rango que abarca -->
+            <field name="quarter" widget="radio" options="{'horizontal': true}"
+                   attrs="{'invisible': [('period_mode', '!=', 'quarter')], 'required': [('period_mode', '=', 'quarter')]}"/>
+            <field name="period_label" string="Abarca" readonly="1"
+                   attrs="{'invisible': [('period_mode', '!=', 'quarter')]}"/>
+
+            <!-- Desde / Hasta en una sola línea (se acomoda en pantallas chicas) -->
+            <label for="date_start" string="Desde / Hasta" attrs="{'invisible': [('period_mode', '!=', 'range')]}"/>
+            <div class="o_commission_dates" attrs="{'invisible': [('period_mode', '!=', 'range')]}">
+              <field name="date_start" required="1" class="oe_inline"/>
+              <span class="mx-2 text-muted">al</span>
+              <field name="date_end" required="1" class="oe_inline"/>
+            </div>
+
             <field name="filter_payment"/>
             <!-- Orden actual de la tabla; lo sincroniza list_sort_sync.js al pulsar
                  un encabezado, para que el PDF salga en el mismo orden -->
             <field name="sort_field" invisible="1"/>
             <field name="sort_direction" invisible="1"/>
           </group>
-          <div class="alert alert-danger" role="alert" attrs="{'invisible': [('range_error_msg', '=', False)]}">
-            <field name="range_error_msg" nolabel="1" readonly="1"/>
+
+          <!-- Periodo extenso: no se consulta en pantalla, se envía por correo -->
+          <div class="alert alert-info" role="alert"
+               attrs="{'invisible': ['|', ('is_large_period', '=', False), ('request_id', '!=', False)]}">
+            <i class="fa fa-envelope me-2" role="img" aria-label="Correo"/>
+            <field name="large_period_msg" nolabel="1" readonly="1"/>
+            <div class="mt-2">Pulsa <strong>Enviar reporte a mi correo</strong> para solicitarlo.</div>
+          </div>
+          <div class="alert alert-success" role="status"
+               attrs="{'invisible': ['|', ('is_large_period', '=', False), ('request_id', '=', False)]}">
+            <i class="fa fa-check-circle me-2" role="img" aria-label="Solicitado"/>
+            <strong>Tu reporte se está generando.</strong>
+            Aquí no aparecerá nada: te llegará a tu correo electrónico en unos minutos,
+            para no sobrecargar el servidor.
           </div>
 
           <!-- Totales / KPIs -->
-          <group string="Totales -> Solo cuentan las facturas pagadas al 100% por el cliente dentro de 3 meses">
+          <group string="Totales -> Solo cuentan las facturas pagadas al 100% por el cliente dentro de 3 meses"
+                 attrs="{'invisible': [('is_large_period', '=', True)]}">
             <group>
               <field name="commission_percent" readonly="1"/>
               <field name="lines_count" readonly="1"/>
@@ -91,7 +118,7 @@
             </group>
           </group>
 
-          <notebook>
+          <notebook attrs="{'invisible': [('is_large_period', '=', True)]}">
             <page string="Facturas Comisionadas">
               <!-- Aviso del orden actual: solo pantalla, no sale en el PDF -->
               <div class="text-muted mb-2">
@@ -202,13 +229,23 @@
         </sheet>
 
         <footer>
-          <button name="action_save" type="object" string="Guardar" class="btn-primary"/>
-          <button name="action_refresh" type="object" string="Actualizar" class="btn-secondary"/>
-          <button name="action_mark_all_paid" type="object" string="Marcar todas como pagadas" class="oe_highlight"/>
+          <!-- Consulta en pantalla (periodo de hasta un trimestre) -->
+          <button name="action_save" type="object" string="Guardar" class="btn-primary"
+                  attrs="{'invisible': [('is_large_period', '=', True)]}"/>
+          <button name="action_refresh" type="object" string="Actualizar" class="btn-secondary"
+                  attrs="{'invisible': [('is_large_period', '=', True)]}"/>
+          <button name="action_mark_all_paid" type="object" string="Marcar todas como pagadas" class="oe_highlight"
+                  attrs="{'invisible': [('is_large_period', '=', True)]}"/>
           <button name="action_open_enable_payment" type="object" string="Habilitar pago (plazo vencido)"
                   class="btn-secondary" icon="fa-unlock"
+                  attrs="{'invisible': [('is_large_period', '=', True)]}"
                   help="Habilitar para pago comisiones no pagaderas porque el cliente no pagó la factura completa dentro de 3 meses"/>
-          <button name="action_print_pdf" type="object" string="Descargar PDF" class="btn-primary"/>
+          <button name="action_print_pdf" type="object" string="Descargar PDF" class="btn-primary"
+                  attrs="{'invisible': [('is_large_period', '=', True)]}"/>
+          <!-- Periodo extenso: se genera en segundo plano y llega por correo -->
+          <button name="action_request_by_email" type="object" string="Enviar reporte a mi correo"
+                  class="btn-primary" icon="fa-paper-plane"
+                  attrs="{'invisible': ['|', ('is_large_period', '=', False), ('request_id', '!=', False)]}"/>
           <button string="Cerrar" class="btn-secondary" special="cancel"/>
         </footer>
       </form>
@@ -271,10 +308,74 @@
     </field>
   </record>
 
+  <!-- ===== Reportes enviados por correo (periodos extensos) ===== -->
+  <record id="view_commission_report_request_tree" model="ir.ui.view">
+    <field name="name">commission.report.request.tree</field>
+    <field name="model">commission.report.request</field>
+    <field name="arch" type="xml">
+      <tree create="0" edit="0" decoration-muted="state == 'done'" decoration-danger="state == 'error'"
+            decoration-info="state in ('pending', 'processing')">
+        <field name="create_date" string="Solicitado"/>
+        <field name="requested_by_id" optional="show"/>
+        <field name="salesperson_id"/>
+        <field name="date_start"/>
+        <field name="date_end"/>
+        <field name="filter_payment" optional="hide"/>
+        <field name="email_to" optional="show"/>
+        <field name="state" widget="badge"
+               decoration-success="state == 'done'" decoration-danger="state == 'error'"
+               decoration-info="state in ('pending', 'processing')"/>
+        <field name="date_done" optional="show"/>
+      </tree>
+    </field>
+  </record>
+
+  <record id="view_commission_report_request_form" model="ir.ui.view">
+    <field name="name">commission.report.request.form</field>
+    <field name="model">commission.report.request</field>
+    <field name="arch" type="xml">
+      <form create="0" edit="0">
+        <header>
+          <field name="state" widget="statusbar" statusbar_visible="pending,processing,done"/>
+        </header>
+        <sheet>
+          <group>
+            <group string="Lo que se seleccionó">
+              <field name="salesperson_id"/>
+              <field name="date_start"/>
+              <field name="date_end"/>
+              <field name="filter_payment"/>
+            </group>
+            <group string="Envío">
+              <field name="requested_by_id"/>
+              <field name="email_to"/>
+              <field name="create_date" string="Solicitado"/>
+              <field name="date_done"/>
+              <field name="attachment_id" attrs="{'invisible': [('attachment_id', '=', False)]}"/>
+            </group>
+          </group>
+          <field name="error_message" attrs="{'invisible': [('state', '!=', 'error')]}" class="text-danger"/>
+        </sheet>
+      </form>
+    </field>
+  </record>
+
+  <record id="action_commission_report_request" model="ir.actions.act_window">
+    <field name="name">Reportes enviados por correo</field>
+    <field name="res_model">commission.report.request</field>
+    <field name="view_mode">tree,form</field>
+    <field name="help" type="html">
+      <p class="o_view_nocontent_smiling_face">Aún no has pedido reportes por correo</p>
+      <p>Cuando consultas en el Reporte de Comisión de Ventas un periodo de más de un trimestre,
+         se genera en segundo plano y te llega por correo. Aquí puedes ver si ya se envió.</p>
+    </field>
+  </record>
+
   <!-- Acción para abrir el wizard principal -->
   <act_window id="action_commission_report_wizard" name="Reporte de Comisión de Ventas" res_model="commission.report.wizard" view_mode="form" target="new"/>
 
   <!-- Menú -->
   <menuitem id="menu_commission_report_root" name="Comisiones de Ventas" sequence="100" groups="crm_commission.group_commission_view" web_icon="crm_commission,static/description/icon_commission.svg"/>
   <menuitem id="menu_commission_report_wizard" name="Reporte de Comisión de Ventas" parent="menu_commission_report_root" action="action_commission_report_wizard" sequence="10" groups="crm_commission.group_commission_view"/>
+  <menuitem id="menu_commission_report_request" name="Reportes enviados por correo" parent="menu_commission_report_root" action="action_commission_report_request" sequence="11" groups="crm_commission.group_commission_view"/>
 </odoo>
