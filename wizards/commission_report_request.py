@@ -75,6 +75,9 @@ class CommissionReportRequest(models.Model):
     ], string='Estado', default='pending', required=True, readonly=True, index=True)
     date_done = fields.Datetime(string='Enviado el', readonly=True)
     attachment_id = fields.Many2one('ir.attachment', string='PDF', readonly=True)
+    # Para descargar el PDF desde la solicitud (p. ej. si el correo no salió)
+    pdf_file = fields.Binary(related='attachment_id.datas', string='Descargar PDF')
+    pdf_filename = fields.Char(related='attachment_id.name')
     error_message = fields.Text(string='Error', readonly=True)
 
     @api.depends('salesperson_id', 'date_start', 'date_end')
@@ -128,8 +131,7 @@ class CommissionReportRequest(models.Model):
         self.env.cr.commit()
         try:
             with self.env.cr.savepoint():
-                self._generate_and_send()
-            self.write({'state': 'done', 'date_done': fields.Datetime.now(), 'error_message': False})
+                pdf_bytes, data = self._generate_pdf()
         except Exception as exc:  # pylint: disable=broad-except
             _logger.exception("Reportes de comisión: no se pudo generar la solicitud %s", self.id)
             self.write({'state': 'error', 'error_message': str(exc)})
@@ -138,6 +140,21 @@ class CommissionReportRequest(models.Model):
                     self._send_mail(self._error_mail_body(), subject_prefix='No se pudo generar tu')
             except Exception:  # pylint: disable=broad-except
                 _logger.exception("Reportes de comisión: tampoco se pudo avisar del error (%s)", self.id)
+            return
+
+        # El PDF ya quedó guardado en la solicitud: si el correo falla, se
+        # puede descargar desde "Reportes enviados por correo".
+        self.env.cr.commit()
+        mail = self._send_mail(self._report_mail_body(data, bool(pdf_bytes)), self.attachment_id)
+        # Si se envió bien, Odoo ya lo borró (auto_delete); si sigue y falló, es error
+        if mail.exists() and mail.state == 'exception':
+            _logger.warning("Reportes de comisión: no se pudo enviar el correo de la solicitud %s", self.id)
+            self.write({'state': 'error', 'error_message': (
+                "El reporte se generó, pero no se pudo enviar el correo"
+                f"{' (puedes descargar el PDF aquí)' if self.attachment_id else ''}: "
+                f"{mail.failure_reason or ''}")})
+        else:
+            self.write({'state': 'done', 'date_done': fields.Datetime.now(), 'error_message': False})
 
     # ----------------- Generación -----------------
 
@@ -148,7 +165,9 @@ class CommissionReportRequest(models.Model):
         return self.env[model_name].with_user(user).with_company(self.company_id).with_context(
             tz=user.tz or 'America/Mexico_City', lang=user.lang or 'es_MX')
 
-    def _generate_and_send(self):
+    def _generate_pdf(self):
+        """Genera el PDF con los permisos del usuario y lo guarda en la solicitud.
+        Retorna (pdf_bytes, data); pdf_bytes es None si no hay facturas."""
         self.ensure_one()
         wizard = self._user_env_model('commission.report.wizard').create({
             'company_id': self.company_id.id,
@@ -174,13 +193,11 @@ class CommissionReportRequest(models.Model):
                 'res_id': self.id,
             })
             self.attachment_id = attachment
-        mail = self._send_mail(self._report_mail_body(data, bool(pdf_bytes)), attachment)
-        # Si se envió bien, Odoo ya lo borró (auto_delete); si sigue y falló, es error
-        if mail.exists() and mail.state == 'exception':
-            raise ValueError(f"No se pudo enviar el correo: {mail.failure_reason or ''}")
+        return pdf_bytes, data
 
     def _send_mail(self, body, attachment=None, subject_prefix='Tu'):
         period = f"{self.date_start.strftime('%d/%m/%Y')} al {self.date_end.strftime('%d/%m/%Y')}"
+        attachment = attachment or self.env['ir.attachment']
         mail = self.env['mail.mail'].sudo().create({
             'subject': f"{subject_prefix} Reporte de Comisión de Ventas: {self.salesperson_id.name} ({period})",
             'email_from': (self.env['ir.mail_server'].sudo()._get_default_from_address()

@@ -623,6 +623,10 @@ class CommissionReportWizard(models.TransientModel):
             'name': 'Reporte de Comisión de Ventas',
             'res_model': 'commission.report.wizard',
             'view_mode': 'form',
+            # Necesario cuando la acción no pasa por el servidor (p. ej. el
+            # 'next' de la notificación de action_request_by_email): el cliente
+            # espera 'views' y sin ella falla con "reading 'map'".
+            'views': [(False, 'form')],
             'res_id': self.id,
             'target': 'new',
         }

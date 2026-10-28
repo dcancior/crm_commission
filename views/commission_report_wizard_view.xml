@@ -338,6 +338,7 @@
                decoration-success="state == 'done'" decoration-danger="state == 'error'"
                decoration-info="state in ('pending', 'processing')"/>
         <field name="date_done" optional="show"/>
+        <field name="error_message" optional="show" string="Detalle"/>
       </tree>
     </field>
   </record>
@@ -363,7 +364,10 @@
               <field name="email_to"/>
               <field name="create_date" string="Solicitado"/>
               <field name="date_done"/>
-              <field name="attachment_id" attrs="{'invisible': [('attachment_id', '=', False)]}"/>
+              <field name="attachment_id" invisible="1"/>
+              <field name="pdf_filename" invisible="1"/>
+              <field name="pdf_file" filename="pdf_filename" readonly="1"
+                     attrs="{'invisible': [('attachment_id', '=', False)]}"/>
             </group>
           </group>
           <field name="error_message" attrs="{'invisible': [('state', '!=', 'error')]}" class="text-danger"/>
