@@ -124,8 +124,12 @@
                       <t t-esc="l.get('commission_amount_str') or l.get('commission_amount')"/>
                     </td>
                   </tr>
-                  <tr t-if="not l.get('payable')" class="reason-row not-payable">
-                    <td colspan="9">No pagadera: <t t-esc="l.get('not_payable_reason')"/></td>
+                  <tr t-if="l.get('not_payable_reason')"
+                      t-att-class="'reason-row' + ('' if l.get('payable') else ' not-payable')">
+                    <td colspan="9">
+                      <t t-if="not l.get('payable')">No pagadera: </t>
+                      <t t-esc="l.get('not_payable_reason')"/>
+                    </td>
                   </tr>
                 </t>
               </t>

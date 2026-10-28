@@ -145,8 +145,9 @@ def get_commission_status(move, payment_date):
 
 def get_display_reason(reason, entry):
     """Motivo a mostrar en la línea: si la comisión no es pagadera pero ya se le
-    pagó al vendedor, se agrega la nota (sigue sin contar para pagar)."""
-    if reason and entry.commission_paid:
+    pagó al vendedor, se agrega la nota (sigue sin contar para pagar). Si se
+    habilitó manualmente, el motivo ya trae esa nota."""
+    if reason and entry.commission_paid and not entry.manual_payable:
         return (f"{reason}. Nota: se pagó la comisión y el plazo de los "
                 f"{COMMISSION_PAYMENT_TERM_MONTHS} meses ya había vencido")
     return reason
@@ -295,12 +296,26 @@ class CommissionReportWizard(models.TransientModel):
             ('invoice_date', '<', cutoff),
         ]
 
-    def _commission_info(self, moves):
-        """{move_id: (fecha de pago del cliente, pagadera, motivo)} calculado una sola vez."""
-        payment_dates = get_invoice_payment_dates(moves)
+    def _commission_info(self, pairs):
+        """{move_id: (fecha de pago del cliente, pagadera, motivo)} calculado una sola vez.
+
+        Una comisión no pagadera por la regla del plazo se vuelve pagadera si un
+        usuario la habilitó manualmente (entry.manual_payable); el motivo
+        conserva la causa original y quién/cuándo la habilitó.
+        """
+        payment_dates = get_invoice_payment_dates(
+            self.env['account.move'].concat(*[m for m, _e in pairs]))
         info = {}
-        for m in moves:
+        for m, entry in pairs:
             payable, reason = get_commission_status(m, payment_dates[m.id])
+            if not payable and entry.manual_payable:
+                payable = True
+                when = ''
+                if entry.manual_payable_datetime:
+                    when = fields.Datetime.context_timestamp(
+                        self, entry.manual_payable_datetime).strftime('%d/%m/%Y %H:%M')
+                reason = (f"{reason}. Habilitada manualmente para pago por "
+                          f"{entry.manual_payable_user_id.name or ''} el {when}")
             info[m.id] = (payment_dates[m.id], payable, reason)
         return info
 
@@ -420,7 +435,7 @@ class CommissionReportWizard(models.TransientModel):
         """Pares (move, entry) filtrados y ordenados como en pantalla, más su info de comisión."""
         self.ensure_one()
         pairs = self._iter_moves_with_entries(create_missing=create_missing)
-        info = self._commission_info(self.env['account.move'].concat(*[m for m, _e in pairs]))
+        info = self._commission_info(pairs)
         # Aplica el filtro actual del wizard
         pairs = [p for p in pairs if self._filter_pair_by_selection(p, info)]
         # Aplica el orden elegido en la tabla (mismo que usará el PDF)
@@ -783,7 +798,7 @@ class CommissionReportWizard(models.TransientModel):
         self.ensure_one()
 
         pairs = self._iter_moves_with_entries()
-        info = self._commission_info(self.env['account.move'].concat(*[m for m, _e in pairs]))
+        info = self._commission_info(pairs)
         # Sin importar el filtro visual, nos quedamos con las NO pagadas (las que
         # interesa marcar) y solo si la comisión es pagadera
         unpaid_entries = self.env['commission.payment.entry'].browse([
@@ -855,9 +870,11 @@ class CommissionReportWizardLine(models.TransientModel):
     # no, salen en la tabla pero no suman para pagar al vendedor. Los rellena
     # _load_lines (ver get_commission_status).
     commission_payable = fields.Boolean(string='Pagadera', readonly=True, default=True)
-    not_payable_reason = fields.Char(string='Motivo no pagadera', readonly=True)
+    # Motivo de no pagadera, o la nota de quién/cuándo la habilitó manualmente
+    not_payable_reason = fields.Char(string='Motivo', readonly=True)
     commission_payable_amount = fields.Monetary(string='Comisión a pagar', readonly=True,
                                                 currency_field='currency_id')
+    manual_payable = fields.Boolean(related='payment_entry_id.manual_payable', readonly=True)
 
     # Datos de pago (RELATED al entry)
     payment_method = fields.Selection(
@@ -904,6 +921,51 @@ class CommissionReportWizardLine(models.TransientModel):
                     })
         return res
 
+    def action_enable_manual_payment(self):
+        """Botón "Habilitar pago" (con confirmación) de una comisión no pagadera.
+
+        Deja la comisión pagadera aunque el plazo haya vencido y registra en el
+        entry quién y cuándo la habilitó.
+
+        La factura y el reporte llegan por contexto (enable_move_id,
+        report_wizard_id) porque, si el reporte aún no estaba guardado, al
+        pulsar el botón Odoo lo guarda y create() reconstruye las líneas: el id
+        de esta línea puede ya no existir.
+        """
+        ctx = self.env.context
+        move = self.env['account.move'].browse(ctx.get('enable_move_id'))
+        if not move.exists():
+            move = self.exists().move_id[:1]
+        if not move:
+            raise UserError("No se encontró la factura de esta comisión; pulse Actualizar e intente de nuevo.")
+
+        Entry = self.env['commission.payment.entry']
+        entry = Entry.search([
+            ('move_id', '=', move.id),
+            ('salesperson_id', '=', move.invoice_user_id.id),
+        ], limit=1)
+        if not entry:
+            entry = Entry.create({'move_id': move.id, 'salesperson_id': move.invoice_user_id.id})
+        if not entry.manual_payable:
+            entry.write({
+                'manual_payable': True,
+                'manual_payable_user_id': self.env.user.id,
+                'manual_payable_datetime': fields.Datetime.now(),
+            })
+
+        # Reabre el reporte recalculado (totales incluidos)
+        wizard = self.env['commission.report.wizard'].browse(ctx.get('report_wizard_id')).exists()
+        if not wizard:
+            wizard = self.search([
+                ('payment_entry_id', '=', entry.id),
+                ('create_uid', '=', self.env.uid),
+            ], order='id desc', limit=1).wizard_id
+        if not wizard:
+            return True
+        action = wizard.action_refresh()
+        action['name'] = 'Reporte de Comisión de Ventas'
+        return action
+
 
 class CommissionPaymentEntry(models.Model):
     _name = 'commission.payment.entry'
@@ -917,6 +979,12 @@ class CommissionPaymentEntry(models.Model):
     payment_datetime = fields.Datetime(string='Fecha/Hora pago')
     payment_user_id = fields.Many2one('res.users', string='Registró')
     note = fields.Char(string='Nota')
+
+    # Habilitación manual de una comisión no pagadera (plazo de pago vencido).
+    # La pone el botón "Habilitar pago" del reporte; queda quién y cuándo.
+    manual_payable = fields.Boolean(string='Pago habilitado manualmente', readonly=True)
+    manual_payable_user_id = fields.Many2one('res.users', string='Habilitó', readonly=True)
+    manual_payable_datetime = fields.Datetime(string='Fecha habilitación', readonly=True)
 
     commission_paid = fields.Boolean(string='Comisión pagada', compute='_compute_paid', store=True)
 

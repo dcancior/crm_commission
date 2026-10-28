@@ -32,7 +32,7 @@
 
           <!-- Regla de pago: factura pagada completa dentro del plazo -->
           <field name="commission_payable" readonly="1"/>
-          <field name="not_payable_reason" readonly="1" attrs="{'invisible': [('commission_payable', '=', True)]}"/>
+          <field name="not_payable_reason" readonly="1" attrs="{'invisible': [('not_payable_reason', '=', False)]}"/>
 
           <!-- Único editable (solo si la comisión es pagadera) -->
           <field name="payment_method" attrs="{'readonly': [('commission_payable', '=', False)]}"/>
@@ -104,7 +104,7 @@
 
               <!-- ÚNICA tabla: las líneas ya vienen filtradas desde Python con _load_lines() -->
               <field name="line_ids" nolabel="1" mode="tree" context="{'no_open': 0, 'default_wizard_id': active_id, 'form_view_ref': 'crm_commission.view_commission_report_line_form'}" options="{'no_open': False, 'no_create': True}">
-                <tree create="0" edit="0" delete="0" decoration-danger="not commission_payable">
+                <tree create="0" edit="0" delete="0" decoration-danger="not commission_payable" decoration-warning="manual_payable">
                   <field name="commission_paid" readonly="1" widget="boolean_toggle"/> <!--Booleano pagado no pagado -->
                   <field name="commission_payable" readonly="1" force_save="1"/> <!-- Pagada completa en plazo -->
                   <field name="move_id" string="Factura" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/> <!-- Número de factura-->
@@ -122,6 +122,14 @@
                   <!-- Solo suma lo pagadero (cuadra con "Total Comisión") -->
                   <field name="commission_payable_amount" readonly="1" force_save="1" sum="Comisión a pagar"/>
                   <field name="not_payable_reason" string="Motivo" readonly="1" force_save="1" optional="show"/>
+                  <field name="manual_payable" invisible="1"/>
+                  <!-- Habilita para pago una comisión no pagadera; la factura y el reporte
+                       van por contexto (ver action_enable_manual_payment) -->
+                  <button name="action_enable_manual_payment" type="object" string="Habilitar pago"
+                          icon="fa-unlock" class="btn-link text-warning"
+                          context="{'enable_move_id': move_id, 'report_wizard_id': parent.id}"
+                          confirm="¿Estás seguro que deseas marcarla para pagar aunque el plazo de los 3 meses ya venció?"
+                          attrs="{'invisible': [('commission_payable', '=', True)]}"/>
                 </tree>
 
                 <!-- Subform inline (opcional) -->
@@ -136,7 +144,7 @@
                     <field name="invoice_payment_date" string="Fecha de pago" readonly="1"/>
                     <field name="partner_id" string="Cliente" readonly="1" options="{'no_open': True, 'no_create_edit': True}"/> <!-- Cliente -->
                     <field name="commission_payable" readonly="1"/>
-                    <field name="not_payable_reason" readonly="1" attrs="{'invisible': [('commission_payable', '=', True)]}"/>
+                    <field name="not_payable_reason" readonly="1" attrs="{'invisible': [('not_payable_reason', '=', False)]}"/>
                     <field name="payment_method" string="Forma de pago comisión" attrs="{'readonly': [('commission_payable', '=', False)]}"/> <!-- Se edita aquí (solo si es pagadera) -->
                     <!-- Aclaramos que esta fecha es de la comisión -->
                     <field name="payment_datetime" string="Fecha pago comisión" readonly="1"/> <!-- Fecha/hora del pago de la comisión -->
