@@ -11,6 +11,7 @@
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError, UserError
 import base64
+import calendar
 from datetime import datetime, date  # ← NUEVO
 from dateutil.relativedelta import relativedelta
 
@@ -28,6 +29,14 @@ COMMISSION_PAYMENT_TERM_MONTHS = 3
 # sistemas (base.group_system) no tienen estos límites.
 REPORT_MAX_RANGE_MONTHS = 3     # tamaño máximo del bloque consultado
 REPORT_MAX_HISTORY_MONTHS = 6   # qué tan atrás se puede consultar
+
+# Trimestres que el usuario elige en el reporte: (clave, nombre, primer mes)
+QUARTERS = [
+    ('q1', 'Enero - Marzo', 1),
+    ('q2', 'Abril - Junio', 4),
+    ('q3', 'Julio - Septiembre', 7),
+    ('q4', 'Octubre - Diciembre', 10),
+]
 
 # Etiquetas tal y como se ven en los encabezados de la tabla, para el aviso de
 # orden en pantalla. Las claves son los name= de las columnas del tree.
@@ -49,12 +58,39 @@ SORT_COLUMN_LABELS = {
 }
 
 
+def current_quarter_key(today):
+    return f"q{(today.month - 1) // 3 + 1}"
+
+
+def quarter_start(day):
+    """Primer día del trimestre al que pertenece la fecha."""
+    return date(day.year, 3 * ((day.month - 1) // 3) + 1, 1)
+
+
+def get_quarter_range(key, today):
+    """(inicio, fin) del trimestre `key` en su ocurrencia más reciente ya iniciada.
+
+    En octubre de 2026 los cuatro trimestres son de 2026; en enero de 2027,
+    "Enero - Marzo" es de 2027 y los otros tres de 2026. El último día sale de
+    calendar.monthrange, que ya considera los años bisiestos.
+    """
+    first_month = {k: month for k, _label, month in QUARTERS}[key]
+    year = today.year if date(today.year, first_month, 1) <= today else today.year - 1
+    last_month = first_month + 2
+    return (date(year, first_month, 1),
+            date(year, last_month, calendar.monthrange(year, last_month)[1]))
+
+
+def _default_quarter(self):
+    return current_quarter_key(fields.Date.context_today(self))
+
 def _default_date_start(self):
     today = fields.Date.context_today(self)
-    return today.replace(day=1)
+    return get_quarter_range(current_quarter_key(today), today)[0]
 
 def _default_date_end(self):
-    return fields.Date.context_today(self)
+    today = fields.Date.context_today(self)
+    return get_quarter_range(current_quarter_key(today), today)[1]
 
 
 # ===================== Helper: fecha de pago del cliente =====================
@@ -123,8 +159,18 @@ class CommissionReportWizard(models.TransientModel):
 
     # ========= Filtros =========
     user_id = fields.Many2one('res.users', string='Vendedor', required=True)
+    # Al elegir un trimestre se llenan Desde/Hasta (ver _onchange_quarter)
+    quarter = fields.Selection(selection='_selection_quarters', string='Trimestre',
+                               default=_default_quarter)
     date_start = fields.Date(string='Desde', required=True, default=_default_date_start)
     date_end   = fields.Date(string='Hasta', required=True, default=_default_date_end)
+
+    @api.model
+    def _selection_quarters(self):
+        """Los cuatro trimestres con el año que les toca (ver get_quarter_range)."""
+        today = fields.Date.context_today(self)
+        return [(key, f"{label} {get_quarter_range(key, today)[0].year}")
+                for key, label, _month in QUARTERS]
 
     @api.constrains('date_start', 'date_end')
     def _check_dates(self):
@@ -151,8 +197,11 @@ class CommissionReportWizard(models.TransientModel):
         ask_admin = "Si necesita un reporte general, solicítelo a su administrador de sistemas."
         if self.date_end > self.date_start + relativedelta(months=REPORT_MAX_RANGE_MONTHS):
             return (f"El periodo seleccionado es demasiado grande: el máximo son "
-                    f"{REPORT_MAX_RANGE_MONTHS} meses por consulta. {ask_admin}")
-        oldest = fields.Date.context_today(self) - relativedelta(months=REPORT_MAX_HISTORY_MONTHS)
+                    f"{REPORT_MAX_RANGE_MONTHS} meses (un trimestre) por consulta. {ask_admin}")
+        # Se cuenta por trimestres completos: se permite todo el trimestre que
+        # toca el límite de 6 meses, para que los trimestres no queden cortados.
+        oldest = quarter_start(
+            fields.Date.context_today(self) - relativedelta(months=REPORT_MAX_HISTORY_MONTHS))
         if self.date_start < oldest:
             return (f"Solo se pueden consultar los últimos {REPORT_MAX_HISTORY_MONTHS} meses "
                     f"(desde el {oldest.strftime('%d/%m/%Y')}). {ask_admin}")
@@ -422,7 +471,19 @@ class CommissionReportWizard(models.TransientModel):
         # tabla vacía) y el formulario muestra range_error_msg. No se usa un
         # aviso emergente porque saltaría a mitad de la edición (p. ej. al mover
         # la fecha inicial antes que la final).
+        # Si el usuario edita las fechas a mano, el trimestre deja de aplicar.
+        if self.quarter and (self.date_start, self.date_end) != get_quarter_range(
+                self.quarter, fields.Date.context_today(self)):
+            self.quarter = False
         self._load_lines()
+
+    # Odoo encadena el onchange: al cambiar Desde/Hasta aquí, se ejecuta
+    # _onchange_any_filter y se recarga la tabla.
+    @api.onchange('quarter')
+    def _onchange_quarter(self):
+        if self.quarter:
+            self.date_start, self.date_end = get_quarter_range(
+                self.quarter, fields.Date.context_today(self))
 
     @api.depends('date_start', 'date_end')
     def _compute_range_error_msg(self):

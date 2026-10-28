@@ -62,7 +62,9 @@
 
           <!-- Filtros -->
           <group string="Filtros">
+            <!-- Orden de captura: 1) Vendedor, 2) Trimestre (llena Desde/Hasta), 3) Filtro de pago -->
             <field name="user_id" required="1" options="{'no_create_edit': True}" domain="[('sale_team_id.name', 'ilike', 'Ventas')]"/>
+            <field name="quarter" widget="radio" options="{'horizontal': true}"/>
             <field name="date_start" required="1"/>
             <field name="date_end" required="1"/>
             <field name="filter_payment"/>
@@ -73,11 +75,6 @@
           </group>
           <div class="alert alert-danger" role="alert" attrs="{'invisible': [('range_error_msg', '=', False)]}">
             <field name="range_error_msg" nolabel="1" readonly="1"/>
-          </div>
-          <div class="text-muted mb-2">
-            <i class="fa fa-info-circle me-1" role="img" aria-label="Información"/>
-            Consulta por bloques de máximo 3 meses y solo de los últimos 6 meses.
-            Si necesita un reporte general, solicítelo a su administrador de sistemas.
           </div>
 
           <!-- Totales / KPIs -->
