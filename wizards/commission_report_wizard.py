@@ -174,6 +174,9 @@ class CommissionReportWizard(models.TransientModel):
     large_period_msg = fields.Char(compute='_compute_large_period')
     # Solicitud encolada desde este reporte (cambia el aviso a "se está generando")
     request_id = fields.Many2one('commission.report.request', string='Solicitud enviada', readonly=True)
+    # True mientras los filtros cambiaron y aún no se pulsa «Consultar»: la tabla
+    # se vacía y se pide consultar (ver _onchange_any_filter / _load_lines)
+    needs_refresh = fields.Boolean(default=True)
 
     @api.model
     def _selection_quarters(self):
@@ -454,8 +457,14 @@ class CommissionReportWizard(models.TransientModel):
     # ----------------- CARGA DE LÍNEAS (UI) -----------------
 
     def _load_lines(self):
-        """Reconstruye la tabla en UI respetando el filtro y creando entries faltantes."""
+        """Reconstruye la tabla en UI respetando el filtro y creando entries faltantes.
+
+        Solo se llama desde botones (Consultar, Guardar, regresar al reporte...),
+        con el reporte ya guardado: las líneas quedan en la base y la pantalla
+        las lee de ahí. No se usa en onchange (ver _onchange_any_filter).
+        """
         for rec in self:
+            rec.needs_refresh = False
             if not (rec.user_id and rec.date_start and rec.date_end) or rec._is_large_period():
                 rec.line_ids = [(5, 0, 0)]
                 continue
@@ -475,41 +484,32 @@ class CommissionReportWizard(models.TransientModel):
                 }))
             rec.line_ids = [(5, 0, 0)] + lines
 
-    @api.model_create_multi
-    def create(self, vals_list):
-        """Asegura que, al crearse el wizard en servidor (al pulsar cualquier botón), las líneas ya queden cargadas."""
-        recs = super().create(vals_list)
-        for rec in recs:
-            try:
-                rec._load_lines()
-            except Exception:
-                # no romper creación del wizard si algo falla cargando líneas
-                pass
-        return recs
-
-    # Nota: sort_field / sort_direction NO disparan recarga de líneas a propósito.
-    # El reordenado en pantalla ya lo hace el cliente y recargar aquí borraría
-    # ediciones sin guardar (p. ej. la forma de pago de comisión).
+    # Los cambios de filtro NO consultan: solo vacían la tabla y piden pulsar
+    # «Consultar». Antes se cargaba la tabla en el onchange, pero en Odoo 16 no
+    # siempre se disparaba (p. ej. al cambiar de trimestre la tabla no se
+    # actualizaba) y además mandaba cientos de líneas en cada clic.
+    # sort_field / sort_direction no vacían la tabla: el reordenado lo hace el
+    # cliente y vaciarla borraría ediciones sin guardar (forma de pago).
     @api.onchange('user_id', 'date_start', 'date_end', 'filter_payment')
     def _onchange_any_filter(self):
-        # Con un periodo extenso _load_lines no consulta nada (deja la tabla
-        # vacía) y el formulario muestra large_period_msg con el botón para
-        # enviarlo por correo. No se usa un aviso emergente porque saltaría a
-        # mitad de la edición (p. ej. al mover la fecha inicial antes que la final).
-        # Cualquier cambio de filtro invalida la solicitud ya enviada.
-        self.request_id = False
-        self._load_lines()
+        self._reset_results()
 
-    # Odoo encadena el onchange: al cambiar Desde/Hasta aquí, se ejecuta
-    # _onchange_any_filter y se recarga la tabla.
     @api.onchange('quarter', 'period_mode')
     def _onchange_quarter(self):
-        if self.period_mode != 'quarter':
-            return
-        today = fields.Date.context_today(self)
-        if not self.quarter:
-            self.quarter = current_quarter_key(today)
-        self.date_start, self.date_end = get_quarter_range(self.quarter, today)
+        if self.period_mode == 'quarter':
+            today = fields.Date.context_today(self)
+            if not self.quarter:
+                self.quarter = current_quarter_key(today)
+            self.date_start, self.date_end = get_quarter_range(self.quarter, today)
+        self._reset_results()
+
+    def _reset_results(self):
+        # Con un periodo extenso el formulario muestra large_period_msg con el
+        # botón para enviarlo por correo. Cualquier cambio de filtro invalida
+        # la solicitud ya enviada.
+        self.request_id = False
+        self.line_ids = [(5, 0, 0)]
+        self.needs_refresh = True
 
     # ----------------- TOTALES / KPIs -----------------
 
@@ -607,10 +607,14 @@ class CommissionReportWizard(models.TransientModel):
     # ----------------- ACCIONES -----------------
 
     def action_refresh(self):
+        """Botón «Consultar»: carga la tabla con los filtros actuales y reabre el
+        reporte (con un periodo extenso la tabla queda vacía y sale el aviso de
+        envío por correo)."""
         self.ensure_one()
         self._load_lines()
         return {
             'type': 'ir.actions.act_window',
+            'name': 'Reporte de Comisión de Ventas',
             'res_model': 'commission.report.wizard',
             'view_mode': 'form',
             'res_id': self.id,
@@ -1087,11 +1091,7 @@ class CommissionMassPayWizard(models.TransientModel):
         parent_id = self.env.context.get('parent_wizard_id')
         if parent_id:
             parent = self.env['commission.report.wizard'].browse(parent_id)
-            # refresca líneas en servidor antes de reconstruir la vista
-            try:
-                parent._load_lines()
-            except Exception:
-                pass
+            # action_refresh recarga las líneas en servidor y reabre el reporte
             return parent.action_refresh()
 
         return {'type': 'ir.actions.act_window_close'}

@@ -12,7 +12,7 @@
 
 {
     'name': 'CRM Commission',
-    'version': '16.0.1.0.4',
+    'version': '16.0.1.0.5',
     'summary': 'Permite asignar comisión a los vendedores del CRM',
     'depends': ['web', 'board', 'mail', 'crm', 'sale', 'sale_stock', 'hr', 'workshop_mechanic'],
     'data': [

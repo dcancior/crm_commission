@@ -61,6 +61,7 @@
           <field name="currency_id" invisible="1"/>
           <field name="is_large_period" invisible="1"/>
           <field name="request_id" invisible="1"/>
+          <field name="needs_refresh" invisible="1"/>
 
           <!-- Filtros. Orden de captura: 1) Vendedor, 2) Periodo, 3) Filtro de pago -->
           <group string="Filtros" class="o_commission_filters">
@@ -88,6 +89,17 @@
             <field name="sort_direction" invisible="1"/>
           </group>
 
+          <!-- La tabla solo se carga al pulsar Consultar (no en cada cambio de filtro) -->
+          <div class="mb-3" attrs="{'invisible': [('is_large_period', '=', True)]}">
+            <button name="action_refresh" type="object" string="Consultar"
+                    class="btn-primary" icon="fa-search"/>
+          </div>
+          <div class="alert alert-secondary" role="status"
+               attrs="{'invisible': ['|', ('needs_refresh', '=', False), ('is_large_period', '=', True)]}">
+            <i class="fa fa-info-circle me-2" role="img" aria-label="Información"/>
+            Elige el vendedor, el periodo y el filtro, y pulsa <strong>Consultar</strong> para ver el reporte.
+          </div>
+
           <!-- Periodo extenso: no se consulta en pantalla, se envía por correo -->
           <div class="alert alert-info" role="alert"
                attrs="{'invisible': ['|', ('is_large_period', '=', False), ('request_id', '!=', False)]}">
@@ -105,7 +117,7 @@
 
           <!-- Totales / KPIs -->
           <group string="Totales -> Solo cuentan las facturas pagadas al 100% por el cliente dentro de 3 meses"
-                 attrs="{'invisible': [('is_large_period', '=', True)]}">
+                 attrs="{'invisible': ['|', ('is_large_period', '=', True), ('needs_refresh', '=', True)]}">
             <group>
               <field name="commission_percent" readonly="1"/>
               <field name="lines_count" readonly="1"/>
@@ -118,7 +130,7 @@
             </group>
           </group>
 
-          <notebook attrs="{'invisible': [('is_large_period', '=', True)]}">
+          <notebook attrs="{'invisible': ['|', ('is_large_period', '=', True), ('needs_refresh', '=', True)]}">
             <page string="Facturas Comisionadas">
               <!-- Aviso del orden actual: solo pantalla, no sale en el PDF -->
               <div class="text-muted mb-2">
@@ -231,8 +243,6 @@
         <footer>
           <!-- Consulta en pantalla (periodo de hasta un trimestre) -->
           <button name="action_save" type="object" string="Guardar" class="btn-primary"
-                  attrs="{'invisible': [('is_large_period', '=', True)]}"/>
-          <button name="action_refresh" type="object" string="Actualizar" class="btn-secondary"
                   attrs="{'invisible': [('is_large_period', '=', True)]}"/>
           <button name="action_mark_all_paid" type="object" string="Marcar todas como pagadas" class="oe_highlight"
                   attrs="{'invisible': [('is_large_period', '=', True)]}"/>
