@@ -11,7 +11,6 @@
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError, UserError
 from datetime import datetime, date, time
-import calendar
 import pytz
 import re  # para _get_report_base_filename
 
@@ -21,11 +20,12 @@ class MechanicCommissionWizard(models.TransientModel):
     _description = "Wizard: Comisiones de mecánicos por rango de fechas (facturas activas)"
 
     # === Filtros ===
+    # Sin valor por defecto: el reporte abre vacío (rápido) y el usuario elige
+    # qué consultar antes de pulsar "Aplicar filtros".
     employee_selection = fields.Selection(
         string="Mecánico",
         selection="_get_employee_selection",
         required=True,
-        default='all',
     )
     employee_id = fields.Many2one(
         "hr.employee",
@@ -34,19 +34,10 @@ class MechanicCommissionWizard(models.TransientModel):
         store=True,
     )
 
-    # >>> RANGO DE FECHAS (reemplaza month/year)
-    def _default_date_from(self):
-        today = fields.Date.context_today(self)
-        # today es datetime.date; llevamos al primer día del mes actual
-        return today.replace(day=1)
-
-    def _default_date_to(self):
-        today = fields.Date.context_today(self)
-        last_day = calendar.monthrange(today.year, today.month)[1]
-        return today.replace(day=last_day)
-
-    date_from = fields.Date(string="Desde", required=True, default=_default_date_from)
-    date_to = fields.Date(string="Hasta", required=True, default=_default_date_to)
+    # >>> RANGO DE FECHAS (reemplaza month/year). Sin valor por defecto: antes
+    # abría con todo el mes en curso de todos los mecánicos y tardaba en cargar.
+    date_from = fields.Date(string="Desde", required=True)
+    date_to = fields.Date(string="Hasta", required=True)
 
     # === KPIs ===
     services_count = fields.Integer(
@@ -193,8 +184,8 @@ class MechanicCommissionWizard(models.TransientModel):
         """Convierte la selección en employee_id real para lógica interna"""
         Employee = self.env['hr.employee']
         for w in self:
-            if w.employee_selection == 'all':
-                w.employee_id = False  # Significa "todos"
+            if not w.employee_selection or w.employee_selection == 'all':
+                w.employee_id = False  # Vacío o "todos"
             else:
                 try:
                     emp_id = int(w.employee_selection)
@@ -337,6 +328,8 @@ class MechanicCommissionWizard(models.TransientModel):
     # Botón "Aplicar filtros"
     def action_apply_filters(self):
         self.ensure_one()
+        if not self.employee_selection:
+            raise UserError("Selecciona un mecánico (o «Todos»).")
         if not (self.date_from and self.date_to):
             raise UserError("Indica las fechas 'Desde' y 'Hasta'.")
         if self.date_from > self.date_to:
@@ -404,6 +397,11 @@ class MechanicCommissionWizard(models.TransientModel):
 
     def action_print_pdf(self):
         self.ensure_one()
+        if not self.applied_date_from:
+            raise UserError(
+                "Todavía no hay información para imprimir.\n"
+                "Selecciona los filtros y presiona el botón «Aplicar filtros»."
+            )
         if self.filters_dirty:
             raise UserError(
                 "Cambiaste los filtros pero no los has aplicado.\n"
@@ -520,15 +518,8 @@ class MechanicCommissionWizard(models.TransientModel):
             return fields.Datetime.context_timestamp(self, order.date_order).date()
         return fields.Date.context_today(self)
 
-    # Al abrir el reporte se carga automáticamente con los filtros por defecto.
-    # Después, mover un filtro NO recalcula nada: solo se avisa (filters_dirty)
-    # hasta que el usuario pulse "Aplicar filtros".
-    @api.onchange('employee_selection', 'date_from', 'date_to', 'report_paid_filter')
-    def _onchange_filters(self):
-        for w in self:
-            if w.applied_date_from:
-                continue  # ya hay una consulta en pantalla: esperar al botón
-            w._onchange_build_lines()
+    # Mover un filtro NO recalcula nada (ni siquiera al abrir el reporte): la
+    # consulta solo se hace al pulsar "Aplicar filtros" (action_apply_filters).
 
     def _onchange_build_lines(self):
         """Aplica los filtros de pantalla y reconstruye las líneas.

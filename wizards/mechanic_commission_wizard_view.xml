@@ -36,6 +36,13 @@
                                 class="btn-warning"
                                 attrs="{'invisible': [('filters_dirty', '=', False)]}"/>
                     </div>
+                    <div class="alert alert-info" role="alert"
+                         attrs="{'invisible': [('applied_date_from', '!=', False)]}">
+                        <i class="fa fa-info-circle me-1" role="img" aria-label="Información"/>
+                        Selecciona el <strong>Mecánico</strong> y las fechas <strong>Desde</strong> y
+                        <strong>Hasta</strong>, y presiona el botón <strong>Aplicar filtros</strong>
+                        para ver la información.
+                    </div>
                     <div class="alert alert-warning" role="alert"
                          attrs="{'invisible': [('filters_dirty', '=', False)]}">
                         <i class="fa fa-exclamation-triangle me-1" role="img" aria-label="Aviso"/>
