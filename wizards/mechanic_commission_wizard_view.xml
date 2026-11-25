@@ -17,7 +17,32 @@
                              al pulsar un encabezado, para que el PDF salga igual -->
                         <field name="sort_field" invisible="1"/>
                         <field name="sort_direction" invisible="1"/>
+                        <!-- Filtros con los que se calculó lo que se muestra abajo -->
+                        <field name="applied_employee_selection" invisible="1"/>
+                        <field name="applied_date_from" invisible="1"/>
+                        <field name="applied_date_to" invisible="1"/>
+                        <field name="applied_paid_filter" invisible="1"/>
+                        <field name="filters_dirty" invisible="1"/>
                     </group>
+
+                    <!-- La información ya no se actualiza sola: se consulta con este botón -->
+                    <div class="mb-3">
+                        <button name="action_apply_filters" type="object"
+                                string="Aplicar filtros" icon="fa-search"
+                                class="btn-primary"
+                                attrs="{'invisible': [('filters_dirty', '=', True)]}"/>
+                        <button name="action_apply_filters" type="object"
+                                string="Aplicar filtros" icon="fa-search"
+                                class="btn-warning"
+                                attrs="{'invisible': [('filters_dirty', '=', False)]}"/>
+                    </div>
+                    <div class="alert alert-warning" role="alert"
+                         attrs="{'invisible': [('filters_dirty', '=', False)]}">
+                        <i class="fa fa-exclamation-triangle me-1" role="img" aria-label="Aviso"/>
+                        Cambiaste los filtros. Tienes que presionar el botón
+                        <strong>Aplicar filtros</strong> para poder ver los cambios.
+                        Los totales y el detalle de abajo todavía corresponden a los filtros anteriores.
+                    </div>
 
                     <!-- KPIs -->
                     <group col="4">

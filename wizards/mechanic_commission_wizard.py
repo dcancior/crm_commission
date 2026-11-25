@@ -9,7 +9,7 @@
 # ╚══════════════════════════════════════════════════════════════════╝
 
 from odoo import models, fields, api
-from odoo.exceptions import ValidationError
+from odoo.exceptions import ValidationError, UserError
 from datetime import datetime, date, time
 import calendar
 import pytz
@@ -77,7 +77,7 @@ class MechanicCommissionWizard(models.TransientModel):
         default=lambda self: self.env.company.currency_id.id,
     )
 
-    # O2M NO compute: lo pobla exclusivamente _onchange_build_lines()
+    # O2M NO compute: lo pobla exclusivamente _build_lines()
     line_ids = fields.One2many(
         "mechanic.commission.wizard.line",
         "wizard_id",
@@ -106,6 +106,21 @@ class MechanicCommissionWizard(models.TransientModel):
     sort_direction = fields.Char(string="Sentido del orden", default='asc')
     # Solo informativo en pantalla (no aparece en el PDF)
     sort_label = fields.Char(string="Orden actual", compute='_compute_sort_label')
+
+    # === Filtros APLICADOS ===
+    # La tabla y los KPIs ya no cambian solos al mover un filtro: muestran lo que
+    # se consultó la última vez que se pulsó "Aplicar filtros". Aquí se guarda esa
+    # foto; los campos de arriba (employee_selection, date_from, ...) son solo lo
+    # que el usuario está eligiendo en pantalla.
+    applied_employee_selection = fields.Char(string="Mecánico aplicado")
+    applied_date_from = fields.Date(string="Desde aplicado")
+    applied_date_to = fields.Date(string="Hasta aplicado")
+    applied_paid_filter = fields.Char(string="Filtro de pago aplicado")
+    # True cuando lo elegido en pantalla no coincide con lo que se está mostrando
+    filters_dirty = fields.Boolean(
+        string="Filtros pendientes de aplicar",
+        compute='_compute_filters_dirty',
+    )
 
     # --- Validaciones de rango ---
     @api.constrains('date_from', 'date_to')
@@ -146,7 +161,7 @@ class MechanicCommissionWizard(models.TransientModel):
     def action_save_lines(self):
         self.ensure_one()
         self._inverse_line_ids()      # persiste pagos/forma/metadata
-        self._onchange_build_lines()  # reconstruye el O2M con los entries actuales
+        self._build_lines()           # reconstruye el O2M con los filtros ya aplicados
         self._compute_totals()        # recalcula KPIs ya mismo
 
         # Mantiene el modal abierto y evita cierres
@@ -218,21 +233,23 @@ class MechanicCommissionWizard(models.TransientModel):
 
     # >>>>>> Calcula KPIs leyendo mechanic.commission.entry y respeta el filtro <<<<<<
     @api.depends(
-        'employee_selection', 'date_from', 'date_to', 'report_paid_filter',
+        'applied_employee_selection', 'applied_date_from', 'applied_date_to', 'applied_paid_filter',
         'line_ids', 'line_ids.is_paid', 'line_ids.pago_comision'
     )
     def _compute_totals(self):
+        """KPIs de lo que se está mostrando (filtros aplicados, no los de pantalla)."""
         Entry = self.env['mechanic.commission.entry']
         for w in self:
-            if not (w.date_from and w.date_to):
+            if not (w.applied_date_from and w.applied_date_to):
                 w.services_count = 0
                 w.total_hours = 0.0
                 w.payout_total = 0.0
                 w.amount_invoiced = 0.0
                 continue
 
-            date_start = fields.Date.to_string(w.date_from)
-            date_end = fields.Date.to_string(w.date_to)
+            date_start = fields.Date.to_string(w.applied_date_from)
+            date_end = fields.Date.to_string(w.applied_date_to)
+            applied_employee = w._get_applied_employee()
 
             # Busca entries vinculadas a order_line (no a invoice_line) del rango seleccionado
             # Las entries pueden no tener factura aún (invoice_id=False es válido)
@@ -243,9 +260,9 @@ class MechanicCommissionWizard(models.TransientModel):
             ]
             
             # Filtrar por empleado si no es "Todos"
-            if w.employee_selection != 'all' and w.employee_id:
-                dom.append(('employee_id', '=', w.employee_id.id))
-            elif w.employee_selection == 'all':
+            if w.applied_employee_selection != 'all' and applied_employee:
+                dom.append(('employee_id', '=', applied_employee.id))
+            elif w.applied_employee_selection == 'all':
                 # Filtrar solo empleados mecánicos
                 Employee = w.env['hr.employee']
                 mechanics = Employee.search([
@@ -260,15 +277,72 @@ class MechanicCommissionWizard(models.TransientModel):
             # Solo contar entries con payout > 0 (igual que las mostradas en la tabla)
             entries = entries.filtered(lambda e: e.payout and e.payout > 0)
 
-            if w.report_paid_filter == 'paid':
+            if w.applied_paid_filter == 'paid':
                 entries = entries.filtered(lambda e: e.is_paid)
-            elif w.report_paid_filter == 'unpaid':
+            elif w.applied_paid_filter == 'unpaid':
                 entries = entries.filtered(lambda e: not e.is_paid)
 
             w.services_count = len(entries)
             w.total_hours = sum(entries.mapped('hours') or [0.0])
             w.payout_total = sum(entries.mapped('payout') or [0.0])
             w.amount_invoiced = sum(entries.mapped('subtotal_customer') or [0.0])
+
+    @api.depends(
+        'employee_selection', 'date_from', 'date_to', 'report_paid_filter',
+        'applied_employee_selection', 'applied_date_from', 'applied_date_to', 'applied_paid_filter',
+    )
+    def _compute_filters_dirty(self):
+        for w in self:
+            w.filters_dirty = bool(w.applied_date_from) and (
+                (w.employee_selection or False) != (w.applied_employee_selection or False)
+                or w.date_from != w.applied_date_from
+                or w.date_to != w.applied_date_to
+                or (w.report_paid_filter or 'all') != (w.applied_paid_filter or 'all')
+            )
+
+    def _get_applied_employee(self):
+        """Empleado de los filtros aplicados (vacío = todos)."""
+        self.ensure_one()
+        Employee = self.env['hr.employee']
+        sel = self.applied_employee_selection
+        if not sel or sel == 'all':
+            return Employee
+        try:
+            return Employee.browse(int(sel)).exists()
+        except (ValueError, TypeError):
+            return Employee
+
+    def _copy_filters_to_applied(self):
+        """Toma lo elegido en pantalla como los filtros a mostrar."""
+        for w in self:
+            w.applied_employee_selection = w.employee_selection
+            w.applied_date_from = w.date_from
+            w.applied_date_to = w.date_to
+            w.applied_paid_filter = w.report_paid_filter or 'all'
+
+    def _reopen_action(self):
+        """Vuelve a abrir este mismo wizard para que la pantalla muestre lo recalculado."""
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': 'Reporte de Comisiones (Mecánicos)',
+            'res_model': self._name,
+            'res_id': self.id,
+            'view_mode': 'form',
+            'views': [(self.env.ref('crm_commission.view_mechanic_commission_wizard_form').id, 'form')],
+            'target': 'new',
+            'context': self.env.context,
+        }
+
+    # Botón "Aplicar filtros"
+    def action_apply_filters(self):
+        self.ensure_one()
+        if not (self.date_from and self.date_to):
+            raise UserError("Indica las fechas 'Desde' y 'Hasta'.")
+        if self.date_from > self.date_to:
+            raise UserError("La fecha 'Desde' no puede ser posterior a la fecha 'Hasta'.")
+        self._onchange_build_lines()
+        return self._reopen_action()
 
     @api.depends('sort_field', 'sort_direction')
     def _compute_sort_label(self):
@@ -330,6 +404,11 @@ class MechanicCommissionWizard(models.TransientModel):
 
     def action_print_pdf(self):
         self.ensure_one()
+        if self.filters_dirty:
+            raise UserError(
+                "Cambiaste los filtros pero no los has aplicado.\n"
+                "Presiona el botón «Aplicar filtros» para ver los cambios y después descarga el PDF."
+            )
         self._compute_totals()
 
         cur = self.currency_id or self.env.company.currency_id
@@ -409,7 +488,7 @@ class MechanicCommissionWizard(models.TransientModel):
         return self.env.ref('crm_commission.action_mechanic_commission_report').report_action(self, data=data)
 
     def _local_day_bounds_utc(self):
-        """Convierte el rango [date_from, date_to] (fechas locales del usuario) a
+        """Convierte el rango aplicado [applied_date_from, applied_date_to] (fechas locales del usuario) a
         límites datetime en UTC.
 
         sale.order.date_order es Datetime y se guarda en UTC. Comparar ese campo
@@ -424,8 +503,8 @@ class MechanicCommissionWizard(models.TransientModel):
         except Exception:
             user_tz = pytz.UTC
 
-        start_local = datetime.combine(self.date_from, time.min)
-        end_local = datetime.combine(self.date_to, time.max)  # 23:59:59.999999
+        start_local = datetime.combine(self.applied_date_from, time.min)
+        end_local = datetime.combine(self.applied_date_to, time.max)  # 23:59:59.999999
         start_utc = user_tz.localize(start_local).astimezone(pytz.UTC).replace(tzinfo=None)
         end_utc = user_tz.localize(end_local).astimezone(pytz.UTC).replace(tzinfo=None)
         return fields.Datetime.to_string(start_utc), fields.Datetime.to_string(end_utc)
@@ -441,19 +520,40 @@ class MechanicCommissionWizard(models.TransientModel):
             return fields.Datetime.context_timestamp(self, order.date_order).date()
         return fields.Date.context_today(self)
 
-    # ÚNICO lugar que construye line_ids (blindado y por registro)
-    @api.onchange('employee_selection', 'date_from', 'date_to')
+    # Al abrir el reporte se carga automáticamente con los filtros por defecto.
+    # Después, mover un filtro NO recalcula nada: solo se avisa (filters_dirty)
+    # hasta que el usuario pulse "Aplicar filtros".
+    @api.onchange('employee_selection', 'date_from', 'date_to', 'report_paid_filter')
+    def _onchange_filters(self):
+        for w in self:
+            if w.applied_date_from:
+                continue  # ya hay una consulta en pantalla: esperar al botón
+            w._onchange_build_lines()
+
     def _onchange_build_lines(self):
+        """Aplica los filtros de pantalla y reconstruye las líneas.
+
+        Se conserva el nombre porque otros modelos lo llaman tras crear el wizard
+        (mechanic.commission.entry y sale.order) para regenerar comisiones.
+        """
+        self._copy_filters_to_applied()
+        self._build_lines()
+
+    # ÚNICO lugar que construye line_ids (blindado y por registro).
+    # Usa SIEMPRE los filtros aplicados, no lo que esté elegido en pantalla.
+    def _build_lines(self):
         for w in self:
             lines_cmds = []
+            emp_sel = w.applied_employee_selection
+            applied_employee = w._get_applied_employee()
 
-            if not (w.date_from and w.date_to and w.employee_selection):
+            if not (w.applied_date_from and w.applied_date_to and emp_sel):
                 w.line_ids = [(5, 0, 0)]
                 continue
 
             # Rango como fechas (para comparar contra entry.invoice_date, que es Date)
-            date_start = fields.Date.to_string(w.date_from)
-            date_end = fields.Date.to_string(w.date_to)
+            date_start = fields.Date.to_string(w.applied_date_from)
+            date_end = fields.Date.to_string(w.applied_date_to)
 
             # Rango completo del día local convertido a UTC (date_order es Datetime UTC)
             dt_start, dt_end = w._local_day_bounds_utc()
@@ -470,7 +570,7 @@ class MechanicCommissionWizard(models.TransientModel):
             # Usamos try-except para evitar errores si el campo no existe en el modelo
             
             # Determinar qué mecánicos incluir
-            if w.employee_selection == 'all':
+            if emp_sel == 'all':
                 # Obtener todos los empleados con trabajo de mecánico
                 Employee = w.env['hr.employee']
                 target_mechanics = Employee.search([
@@ -479,7 +579,7 @@ class MechanicCommissionWizard(models.TransientModel):
                 ])
             else:
                 # Solo el mecánico seleccionado
-                target_mechanics = w.employee_id
+                target_mechanics = applied_employee
             
             if not target_mechanics:
                 w.line_ids = [(5, 0, 0)]
@@ -589,8 +689,8 @@ class MechanicCommissionWizard(models.TransientModel):
                 ('invoice_date', '>=', date_start),
                 ('invoice_date', '<=', date_end),
             ]
-            if w.employee_selection != 'all' and w.employee_id:
-                cleanup_domain.append(('employee_id', '=', w.employee_id.id))
+            if emp_sel != 'all' and applied_employee:
+                cleanup_domain.append(('employee_id', '=', applied_employee.id))
             else:
                 # Para "todos", limpiar solo mecánicos válidos
                 if target_mechanics:
@@ -607,8 +707,8 @@ class MechanicCommissionWizard(models.TransientModel):
                     ('invoice_date', '<=', date_end),
                     ('id', 'not in', entries_to_keep.ids),
                 ]
-                if w.employee_selection != 'all' and w.employee_id:
-                    cleanup_domain2.append(('employee_id', '=', w.employee_id.id))
+                if emp_sel != 'all' and applied_employee:
+                    cleanup_domain2.append(('employee_id', '=', applied_employee.id))
                 else:
                     # Para "todos", limpiar solo mecánicos válidos  
                     if target_mechanics:
@@ -629,18 +729,14 @@ class MechanicCommissionWizard(models.TransientModel):
                     ) if e.payout and e.payout > 0
                 ]
 
-            if w.report_paid_filter == 'paid':
+            if w.applied_paid_filter == 'paid':
                 lines_cmds = [cmd for cmd in lines_cmds if cmd and cmd[2] and
                               w.env['mechanic.commission.entry'].browse(cmd[2]['commission_entry_id']).is_paid]
-            elif w.report_paid_filter == 'unpaid':
+            elif w.applied_paid_filter == 'unpaid':
                 lines_cmds = [cmd for cmd in lines_cmds if cmd and cmd[2] and
                               not w.env['mechanic.commission.entry'].browse(cmd[2]['commission_entry_id']).is_paid]
 
             w.line_ids = [(5, 0, 0)] + lines_cmds
-
-    @api.onchange('report_paid_filter')
-    def _onchange_report_paid_filter(self):
-        self._onchange_build_lines()
 
     def action_mark_all_paid(self):
         self.ensure_one()
