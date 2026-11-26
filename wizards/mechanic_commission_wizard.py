@@ -395,6 +395,16 @@ class MechanicCommissionWizard(models.TransientModel):
 
         return line_records.sorted(key=sort_key, reverse=(self.sort_direction or 'asc') == 'desc')
 
+    def _format_local_datetime(self, value):
+        """Datetime guardado en UTC -> texto en la zona horaria del usuario.
+
+        Odoo guarda los Datetime en UTC; en el PDF se escribía tal cual y la
+        hora de pago salía adelantada 6 h (Cd. de México / Guadalajara).
+        """
+        if not value:
+            return ""
+        return fields.Datetime.context_timestamp(self, value).strftime('%Y-%m-%d %H:%M:%S')
+
     def action_print_pdf(self):
         self.ensure_one()
         if not self.applied_date_from:
@@ -450,7 +460,7 @@ class MechanicCommissionWizard(models.TransientModel):
             "hours": _num(l.hours, 2),
             "subtotal_customer": _money(l.subtotal_customer),
             "payout": _money(l.payout),
-            "paid_date": fields.Datetime.to_string(l.paid_date) if l.paid_date else "",
+            "paid_date": self._format_local_datetime(l.paid_date),
         } for l in line_records]
 
         # Etiqueta de periodo para el reporte
